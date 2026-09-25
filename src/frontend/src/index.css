@@ -1,0 +1,1082 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@font-face {
+  font-family: "Space Grotesk";
+  src: url("/assets/fonts/SpaceGrotesk.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "DM Sans";
+  src: url("/assets/fonts/DMSans.woff2") format("woff2");
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/assets/fonts/JetBrainsMono.woff2") format("woff2");
+  font-display: swap;
+}
+
+@layer base {
+  :root {
+    --font-display: "Space Grotesk";
+    --font-body: "DM Sans";
+    --font-mono: "JetBrains Mono";
+    --radius: 0.375rem;
+
+    /* HR SOLUCIONES INTEGRALES — dark-first industrial tooling palette.
+       Mechanic / spare-parts identity: taller green (primary), tool amber
+       (accent), graphite-steel neutrals (hue 85 warm steel). Light mode is a
+       warm paper "shop ledger" derived from the dark system. */
+    --background: 0.972 0.004 85;
+    --foreground: 0.2 0.012 80;
+    --card: 0.994 0.003 85;
+    --card-foreground: 0.2 0.012 80;
+    --popover: 0.994 0.003 85;
+    --popover-foreground: 0.2 0.012 80;
+
+    --primary: 0.5 0.13 152;
+    --primary-foreground: 0.99 0.01 152;
+
+    --secondary: 0.94 0.006 85;
+    --secondary-foreground: 0.28 0.012 80;
+    --muted: 0.94 0.006 85;
+    --muted-foreground: 0.5 0.012 82;
+
+    --accent: 0.68 0.15 70;
+    --accent-foreground: 0.2 0.02 70;
+
+    --destructive: 0.55 0.2 27;
+    --destructive-foreground: 0.99 0.005 27;
+
+    --success: 0.55 0.14 148;
+    --success-foreground: 0.99 0.01 148;
+    --warning: 0.66 0.15 78;
+    --warning-foreground: 0.2 0.02 78;
+    --info: 0.55 0.12 240;
+    --info-foreground: 0.99 0.005 240;
+
+    --border: 0.9 0.006 85;
+    --input: 0.9 0.006 85;
+    --ring: 0.5 0.13 152;
+
+    --chart-1: 0.6 0.14 152;
+    --chart-2: 0.7 0.15 70;
+    --chart-3: 0.55 0.12 240;
+    --chart-4: 0.58 0.16 27;
+    --chart-5: 0.6 0.1 190;
+
+    --sidebar: 0.952 0.006 85;
+    --sidebar-foreground: 0.2 0.012 80;
+    --sidebar-primary: 0.5 0.13 152;
+    --sidebar-primary-foreground: 0.99 0.01 152;
+    --sidebar-accent: 0.92 0.008 85;
+    --sidebar-accent-foreground: 0.28 0.012 80;
+    --sidebar-border: 0.9 0.006 85;
+    --sidebar-ring: 0.5 0.13 152;
+    /* Collapsible flow groups: group header rail + nested child rows. */
+    --sidebar-group: 0.926 0.008 85;
+    --sidebar-group-foreground: 0.42 0.012 82;
+    --sidebar-child: 0.962 0.005 85;
+    --sidebar-child-foreground: 0.32 0.012 80;
+
+    /* Status families for cotizaciones, citas y gastos.
+       Each pair stays AA+ in both modes. */
+    --status-draft: 0.62 0.012 65;
+    --status-draft-foreground: 0.99 0.002 65;
+    --status-sent: 0.55 0.12 240;
+    --status-sent-foreground: 0.99 0.005 240;
+    --status-accepted: 0.55 0.14 148;
+    --status-accepted-foreground: 0.99 0.01 148;
+    --status-pending: 0.66 0.15 78;
+    --status-pending-foreground: 0.2 0.02 78;
+    --status-rejected: 0.55 0.2 27;
+    --status-rejected-foreground: 0.99 0.005 27;
+    --status-expired: 0.6 0.17 42;
+    --status-expired-foreground: 0.99 0.01 42;
+    --status-cancelled: 0.6 0.03 30;
+    --status-cancelled-foreground: 0.99 0.004 30;
+    --status-scheduled: 0.55 0.12 240;
+    --status-scheduled-foreground: 0.99 0.005 240;
+    --status-confirmed: 0.55 0.14 148;
+    --status-confirmed-foreground: 0.99 0.01 148;
+    --status-attended: 0.58 0.09 190;
+    --status-attended-foreground: 0.99 0.005 190;
+    --status-noshow: 0.62 0.18 330;
+    --status-noshow-foreground: 0.99 0.008 330;
+
+    /* Financial status families — cuentas por cobrar / por pagar.
+       `overdue` is the overdue/danger emphasis: a hotter, more saturated red
+       than `rejected` so a vencida badge reads as actionable debt, not an
+       error. `settled` is the paid/closed state. */
+    --status-open: 0.66 0.15 78;
+    --status-open-foreground: 0.2 0.02 78;
+    --status-overdue: 0.58 0.22 25;
+    --status-overdue-foreground: 0.99 0.005 25;
+    --status-settled: 0.55 0.14 148;
+    --status-settled-foreground: 0.99 0.01 148;
+
+    /* POS counter + document/print surfaces. */
+    --counter: 0.984 0.003 85;
+    --counter-foreground: 0.2 0.012 80;
+    --counter-border: 0.9 0.006 85;
+    --sheet: 0.995 0.002 85;
+    --sheet-foreground: 0.2 0.012 80;
+    --sheet-border: 0.88 0.006 85;
+    --sheet-muted: 0.5 0.012 82;
+    --calendar-grid: 0.9 0.006 85;
+    --calendar-today: 0.5 0.13 152;
+    --calendar-weekend: 0.94 0.006 85;
+
+    /* Print geometry — single source of truth shared by the on-screen
+       preview and the @page rules, so preview equals print. */
+    --doc-a4-width: 210mm;
+    --doc-a4-height: 297mm;
+    --doc-a4-margin: 14mm;
+    --doc-80mm-width: 80mm;
+    --doc-80mm-margin: 3mm;
+
+    --gradient-primary: linear-gradient(
+      135deg,
+      oklch(0.5 0.13 152) 0%,
+      oklch(0.68 0.15 150) 100%
+    );
+    --gradient-subtle: linear-gradient(
+      180deg,
+      oklch(0.978 0.004 85) 0%,
+      oklch(0.945 0.006 85) 100%
+    );
+    --transition-smooth: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .dark {
+    --background: 0.165 0.012 85;
+    --foreground: 0.94 0.008 85;
+    --card: 0.205 0.013 85;
+    --card-foreground: 0.94 0.008 85;
+    --popover: 0.22 0.014 85;
+    --popover-foreground: 0.94 0.008 85;
+
+    --primary: 0.78 0.16 152;
+    --primary-foreground: 0.16 0.012 152;
+
+    --secondary: 0.25 0.014 85;
+    --secondary-foreground: 0.86 0.008 85;
+    --muted: 0.25 0.014 85;
+    --muted-foreground: 0.6 0.01 83;
+
+    --accent: 0.8 0.15 72;
+    --accent-foreground: 0.18 0.02 72;
+
+    --destructive: 0.62 0.19 27;
+    --destructive-foreground: 0.16 0.012 27;
+
+    --success: 0.72 0.16 148;
+    --success-foreground: 0.16 0.012 148;
+    --warning: 0.78 0.16 75;
+    --warning-foreground: 0.18 0.02 75;
+    --info: 0.7 0.13 240;
+    --info-foreground: 0.16 0.012 240;
+
+    --border: 0.3 0.014 85;
+    --input: 0.3 0.014 85;
+    --ring: 0.78 0.16 152;
+
+    --chart-1: 0.78 0.16 152;
+    --chart-2: 0.8 0.15 72;
+    --chart-3: 0.7 0.13 240;
+    --chart-4: 0.66 0.18 27;
+    --chart-5: 0.72 0.11 190;
+
+    --sidebar: 0.138 0.012 85;
+    --sidebar-foreground: 0.9 0.008 85;
+    --sidebar-primary: 0.78 0.16 152;
+    --sidebar-primary-foreground: 0.16 0.012 152;
+    --sidebar-accent: 0.23 0.014 85;
+    --sidebar-accent-foreground: 0.9 0.008 85;
+    --sidebar-border: 0.28 0.014 85;
+    --sidebar-ring: 0.78 0.16 152;
+    /* Collapsible flow groups: group header rail + nested child rows. */
+    --sidebar-group: 0.19 0.012 85;
+    --sidebar-group-foreground: 0.62 0.01 83;
+    --sidebar-child: 0.12 0.011 85;
+    --sidebar-child-foreground: 0.78 0.008 85;
+
+    /* Status families for cotizaciones, citas y gastos.
+       Each pair stays AA+ in both modes. */
+    --status-draft: 0.58 0.012 65;
+    --status-draft-foreground: 0.16 0.004 65;
+    --status-sent: 0.7 0.13 240;
+    --status-sent-foreground: 0.16 0.012 240;
+    --status-accepted: 0.72 0.16 148;
+    --status-accepted-foreground: 0.16 0.012 148;
+    --status-pending: 0.78 0.16 75;
+    --status-pending-foreground: 0.18 0.02 75;
+    --status-rejected: 0.62 0.19 27;
+    --status-rejected-foreground: 0.16 0.012 27;
+    --status-expired: 0.68 0.17 42;
+    --status-expired-foreground: 0.18 0.02 42;
+    --status-cancelled: 0.6 0.02 30;
+    --status-cancelled-foreground: 0.96 0.004 30;
+    --status-scheduled: 0.7 0.13 240;
+    --status-scheduled-foreground: 0.16 0.012 240;
+    --status-confirmed: 0.72 0.16 148;
+    --status-confirmed-foreground: 0.16 0.012 148;
+    --status-attended: 0.72 0.1 190;
+    --status-attended-foreground: 0.16 0.012 190;
+    --status-noshow: 0.68 0.18 330;
+    --status-noshow-foreground: 0.16 0.012 330;
+
+    /* Financial status families — cuentas por cobrar / por pagar.
+       `overdue` is the overdue/danger emphasis: a hotter, more saturated red
+       than `rejected` so a vencida badge reads as actionable debt, not an
+       error. `settled` is the paid/closed state. */
+    --status-open: 0.78 0.16 75;
+    --status-open-foreground: 0.18 0.02 75;
+    --status-overdue: 0.66 0.21 25;
+    --status-overdue-foreground: 0.16 0.012 25;
+    --status-settled: 0.72 0.16 148;
+    --status-settled-foreground: 0.16 0.012 148;
+
+    /* POS counter + document/print surfaces. */
+    --counter: 0.19 0.012 85;
+    --counter-foreground: 0.94 0.008 85;
+    --counter-border: 0.3 0.014 85;
+    --sheet: 0.995 0.002 85;
+    --sheet-foreground: 0.2 0.012 80;
+    --sheet-border: 0.88 0.006 85;
+    --sheet-muted: 0.5 0.012 82;
+    --calendar-grid: 0.3 0.014 85;
+    --calendar-today: 0.78 0.16 152;
+    --calendar-weekend: 0.205 0.012 85;
+
+    /* Print geometry — same values in both modes; the sheet is always paper. */
+    --doc-a4-width: 210mm;
+    --doc-a4-height: 297mm;
+    --doc-a4-margin: 14mm;
+    --doc-80mm-width: 80mm;
+    --doc-80mm-margin: 3mm;
+
+    --gradient-primary: linear-gradient(
+      135deg,
+      oklch(0.72 0.16 152) 0%,
+      oklch(0.86 0.17 150) 100%
+    );
+    --gradient-subtle: linear-gradient(
+      180deg,
+      oklch(0.205 0.013 85) 0%,
+      oklch(0.175 0.012 85) 100%
+    );
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground font-body antialiased;
+    font-feature-settings: "cv11", "ss01";
+  }
+  h1,
+  h2,
+  h3,
+  h4 {
+    @apply font-display;
+  }
+}
+
+@layer utilities {
+  .transition-smooth {
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  /* Monospaced data rail — SKUs, lot/serial numbers, invoice numbers, plates.
+     Tabular alignment is the signature detail of this system. */
+  .data-rail {
+    font-family: var(--font-mono);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.01em;
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .bg-gradient-primary {
+    background-image: var(--gradient-primary);
+  }
+
+  .bg-gradient-subtle {
+    background-image: var(--gradient-subtle);
+  }
+
+  /* Hairline grid texture for panel surfaces — engineered, not decorative. */
+  .surface-grid {
+    background-image: linear-gradient(
+        oklch(var(--border) / 0.35) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, oklch(var(--border) / 0.35) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .scroll-slim::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scroll-slim::-webkit-scrollbar-thumb {
+    background-color: oklch(var(--border));
+    border-radius: 9999px;
+  }
+  .scroll-slim::-webkit-scrollbar-track {
+    background-color: transparent;
+  }
+
+  /* Collapsible sidebar flow groups — the 6-flow navigation. */
+  .nav-group-header {
+    @apply flex w-full items-center gap-2 rounded-sm px-2 py-2 text-xs font-semibold uppercase tracking-widest text-sidebar-group-foreground transition-smooth;
+  }
+  .nav-group-header:hover {
+    @apply bg-sidebar-accent text-sidebar-accent-foreground;
+  }
+  .nav-group-header[data-state="open"] {
+    @apply text-sidebar-foreground;
+  }
+  .nav-group-chevron {
+    @apply ml-auto h-3.5 w-3.5 shrink-0 transition-transform duration-200;
+  }
+  .nav-group-header[data-state="open"] .nav-group-chevron {
+    @apply rotate-90;
+  }
+  .nav-child {
+    @apply relative flex items-center gap-2 rounded-sm py-1.5 pl-7 pr-2 text-sm text-sidebar-child-foreground transition-smooth;
+  }
+  .nav-child:hover {
+    @apply bg-sidebar-accent text-sidebar-accent-foreground;
+  }
+  .nav-child[data-active="true"] {
+    @apply bg-sidebar-accent font-medium text-sidebar-primary;
+  }
+  .nav-child[data-active="true"]::before {
+    content: "";
+    @apply absolute inset-y-0 left-0 w-0.5 bg-sidebar-primary;
+  }
+
+  /* Status badge variants — cotizaciones, citas y gastos. */
+  .badge-status {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium leading-none;
+  }
+  .badge-draft {
+    background-color: oklch(var(--status-draft) / 0.16);
+    color: oklch(var(--status-draft));
+  }
+  .badge-sent,
+  .badge-scheduled {
+    background-color: oklch(var(--status-sent) / 0.16);
+    color: oklch(var(--status-sent));
+  }
+  .badge-accepted,
+  .badge-confirmed {
+    background-color: oklch(var(--status-accepted) / 0.16);
+    color: oklch(var(--status-accepted));
+  }
+  .badge-pending {
+    background-color: oklch(var(--status-pending) / 0.18);
+    color: oklch(var(--status-pending));
+  }
+  .badge-rejected {
+    background-color: oklch(var(--status-rejected) / 0.16);
+    color: oklch(var(--status-rejected));
+  }
+  .badge-expired {
+    background-color: oklch(var(--status-expired) / 0.16);
+    color: oklch(var(--status-expired));
+  }
+  .badge-cancelled {
+    background-color: oklch(var(--status-cancelled) / 0.18);
+    color: oklch(var(--status-cancelled));
+  }
+  .badge-attended {
+    background-color: oklch(var(--status-attended) / 0.16);
+    color: oklch(var(--status-attended));
+  }
+  .badge-noshow {
+    background-color: oklch(var(--status-noshow) / 0.16);
+    color: oklch(var(--status-noshow));
+  }
+  /* Financial status badges — cuentas por cobrar / por pagar. */
+  .badge-open {
+    background-color: oklch(var(--status-open) / 0.18);
+    color: oklch(var(--status-open));
+  }
+  .badge-overdue {
+    background-color: oklch(var(--status-overdue) / 0.18);
+    color: oklch(var(--status-overdue));
+  }
+  .badge-settled {
+    background-color: oklch(var(--status-settled) / 0.16);
+    color: oklch(var(--status-settled));
+  }
+
+  /* Accounts summary rail — cuentas por cobrar / por pagar.
+     Four KPI cards; the vencido card carries the overdue emphasis rail so the
+     danger figure is legible at a glance without decorating the whole row. */
+  .accounts-summary {
+    @apply grid gap-4 sm:grid-cols-2 xl:grid-cols-4;
+  }
+  .accounts-card {
+    @apply rounded-lg border border-border bg-card p-4;
+    border-left-width: 2px;
+    border-left-color: oklch(var(--border));
+  }
+  .accounts-card[data-emphasis="primary"] {
+    border-left-color: oklch(var(--primary));
+  }
+  .accounts-card[data-emphasis="overdue"] {
+    border-left-color: oklch(var(--status-overdue));
+    background-color: oklch(var(--status-overdue) / 0.05);
+  }
+  .accounts-card[data-emphasis="settled"] {
+    border-left-color: oklch(var(--status-settled));
+  }
+  .accounts-card-label {
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+  .accounts-card-value {
+    @apply mt-2 font-mono text-2xl font-semibold tabular-nums tracking-tight;
+  }
+  .accounts-card[data-emphasis="overdue"] .accounts-card-value {
+    color: oklch(var(--status-overdue));
+  }
+  .accounts-card-meta {
+    @apply mt-1 text-xs text-muted-foreground;
+  }
+
+  /* Status filter chips — segmented control above the financial tables. */
+  .filter-chips {
+    @apply flex flex-wrap items-center gap-1.5;
+  }
+  .filter-chip {
+    @apply inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1 text-xs font-medium text-muted-foreground transition-smooth;
+  }
+  .filter-chip:hover {
+    @apply bg-muted text-foreground;
+  }
+  .filter-chip[data-active="true"] {
+    @apply border-primary bg-primary/10 text-primary;
+  }
+  .filter-chip-count {
+    @apply font-mono text-[11px] tabular-nums opacity-70;
+  }
+
+  /* Overdue due-date cell — the danger emphasis inside a table row. */
+  .due-overdue {
+    @apply font-medium;
+    color: oklch(var(--status-overdue));
+  }
+  .due-overdue-days {
+    @apply ml-1 font-mono text-[11px] tabular-nums;
+  }
+
+  /* POS counter surface. */
+  .counter-panel {
+    @apply rounded-sm border bg-counter text-counter-foreground;
+    border-color: oklch(var(--counter-border));
+  }
+  .counter-total {
+    @apply font-mono text-3xl font-bold tracking-tight tabular-nums;
+  }
+  .counter-scan {
+    @apply font-mono tracking-widest uppercase;
+  }
+
+  /* Printable document preview — A4 sheet and 80mm receipt roll.
+     Screen geometry is the print geometry: the sheet box (width + padding)
+     is expressed in mm and the same mm values are reused by the @page rules
+     below, so "lo que se ve es lo que se imprime". */
+  .doc-preview {
+    @apply mx-auto bg-sheet text-sheet-foreground shadow-elevated;
+    border: 1px solid oklch(var(--sheet-border));
+    box-sizing: border-box;
+    overflow-wrap: break-word;
+  }
+  /* A4: 210×297mm page, 14mm margins → 182mm of content. */
+  .doc-preview-a4 {
+    width: 210mm;
+    min-height: 297mm;
+    padding: var(--doc-a4-margin);
+  }
+  /* Tirilla POS 80mm: continuous roll, 3mm side margins → 74mm of content.
+     Mono-friendly, never wider than the roll. */
+  .doc-preview-80mm {
+    width: 80mm;
+    max-width: 80mm;
+    padding: 4mm var(--doc-80mm-margin);
+    font-size: 10px;
+    line-height: 1.35;
+    overflow-x: hidden;
+  }
+  .doc-preview-80mm .doc-title {
+    font-size: 12px;
+  }
+  .doc-preview-80mm .data-rail,
+  .doc-preview-80mm .tabular {
+    letter-spacing: 0;
+  }
+  /* Long unbroken values (SKUs, códigos de barras, N° de factura) must wrap
+     inside the roll instead of forcing horizontal scroll. */
+  .doc-preview-80mm .doc-value,
+  .doc-preview-80mm .doc-nowrap-safe {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .doc-rule {
+    border-top: 1px dashed oklch(var(--sheet-border));
+  }
+  .doc-meta {
+    color: oklch(var(--sheet-muted));
+  }
+  /* Format toggle used by DocumentPreview and the import/export dialogs.
+     The active format drives the matching @page rule in print. */
+  .doc-format-toggle {
+    @apply inline-flex items-center gap-1 rounded-sm border border-border bg-card p-0.5;
+  }
+  .doc-format-toggle button {
+    @apply inline-flex min-h-10 items-center rounded-[3px] px-3 py-1.5 text-xs font-medium text-muted-foreground transition-smooth;
+  }
+  .doc-format-toggle button[data-active="true"] {
+    @apply bg-primary/10 text-primary;
+  }
+  /* Import/export dialog shell — same surface language as the notify dialog. */
+  .io-dialog {
+    @apply rounded-md border border-border bg-popover text-popover-foreground shadow-elevated;
+  }
+  .io-dialog-dropzone {
+    @apply flex flex-col items-center justify-center gap-2 rounded-md border border-dashed border-input bg-muted/30 px-6 py-8 text-center text-sm text-muted-foreground transition-smooth;
+  }
+  .io-dialog-dropzone:hover,
+  .io-dialog-dropzone[data-dragging="true"] {
+    @apply border-primary/50 bg-primary/5 text-primary;
+  }
+  .io-dialog-hint {
+    @apply text-xs text-muted-foreground;
+  }
+  .io-dialog-error {
+    @apply rounded-sm border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive;
+  }
+  .io-dialog-success {
+    @apply rounded-sm border border-success/30 bg-success/10 px-3 py-2 text-xs text-success;
+  }
+  .io-dialog-field {
+    @apply flex items-center justify-between gap-3 border-b border-border/60 py-2 text-sm last:border-b-0;
+  }
+  .io-dialog-field dt {
+    @apply text-muted-foreground;
+  }
+  .io-dialog-field dd {
+    @apply font-mono tabular-nums;
+  }
+
+  /* Formal report sheet — the inventory valuation document. */
+  .report-sheet {
+    @apply mx-auto bg-sheet text-sheet-foreground shadow-elevated;
+    border: 1px solid oklch(var(--sheet-border));
+    width: 210mm;
+    padding: 14mm;
+  }
+  .report-sheet .report-rule {
+    border-top: 1px solid oklch(var(--sheet-border));
+  }
+  .report-sheet .report-muted {
+    color: oklch(var(--sheet-muted));
+  }
+  .report-sheet .report-table th,
+  .report-sheet .report-table td {
+    border-bottom: 1px solid oklch(var(--sheet-border));
+  }
+  .report-sheet .report-table thead th {
+    border-bottom-width: 2px;
+  }
+  .report-signature-line {
+    border-bottom: 1px solid oklch(var(--sheet-border));
+  }
+
+  /* Calendar / agenda grid. */
+  .calendar-grid {
+    @apply grid grid-cols-7;
+  }
+  .calendar-cell {
+    @apply relative min-h-[92px] border-b border-r p-1.5 text-left transition-smooth;
+    border-color: oklch(var(--calendar-grid));
+  }
+  .calendar-cell:hover {
+    @apply bg-muted/40;
+  }
+  .calendar-cell[data-weekend="true"] {
+    background-color: oklch(var(--calendar-weekend));
+  }
+  .calendar-cell[data-today="true"] {
+    box-shadow: inset 0 0 0 1px oklch(var(--calendar-today));
+  }
+  .calendar-daynum {
+    @apply font-mono text-xs tabular-nums text-muted-foreground;
+  }
+  .calendar-event {
+    @apply mt-1 block w-full truncate rounded-sm px-1.5 py-0.5 text-left text-[11px] font-medium;
+  }
+
+  /* Evidence photo grid — up to 6 process photos per workshop order. */
+  .photo-grid {
+    @apply grid grid-cols-2 gap-3 sm:grid-cols-3;
+  }
+  .photo-tile {
+    @apply relative aspect-[4/3] overflow-hidden rounded-md border border-border bg-secondary;
+  }
+  .photo-tile img {
+    @apply size-full object-cover;
+  }
+  .photo-tile-actions {
+    @apply absolute right-1.5 top-1.5 flex items-center gap-1 opacity-0 transition-opacity duration-150;
+  }
+  .photo-tile:hover .photo-tile-actions,
+  .photo-tile:focus-within .photo-tile-actions {
+    @apply opacity-100;
+  }
+  .photo-tile-action {
+    @apply inline-flex size-7 items-center justify-center rounded-sm bg-background/85 text-foreground shadow-subtle backdrop-blur transition-smooth;
+  }
+  .photo-tile-action:hover {
+    @apply bg-background;
+  }
+  .photo-tile-action[data-variant="destructive"]:hover {
+    @apply bg-destructive/10 text-destructive;
+  }
+  .photo-tile-caption {
+    @apply absolute inset-x-0 bottom-0 truncate bg-background/85 px-2 py-1 text-[11px] text-muted-foreground backdrop-blur;
+  }
+  .photo-add-tile {
+    @apply flex aspect-[4/3] flex-col items-center justify-center gap-1.5 rounded-md border border-dashed border-input bg-muted/30 text-muted-foreground transition-smooth;
+  }
+  .photo-add-tile:hover {
+    @apply border-primary/50 bg-primary/5 text-primary;
+  }
+  .photo-add-tile:disabled {
+    @apply cursor-not-allowed opacity-60;
+  }
+  .photo-progress {
+    @apply absolute inset-x-0 bottom-0 h-1 bg-muted;
+  }
+  .photo-progress-bar {
+    @apply h-full bg-primary transition-[width] duration-200;
+  }
+
+  /* Installment plan table — facturas a crédito. */
+  .installment-table {
+    @apply w-full border-collapse text-sm;
+  }
+  .installment-table th {
+    @apply border-b border-border pb-2 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+  .installment-table td {
+    @apply border-b border-border/60 py-2;
+  }
+  .installment-table tbody tr:last-child td {
+    @apply border-b-0;
+  }
+  .installment-table .installment-number {
+    @apply font-mono text-xs tabular-nums text-muted-foreground;
+  }
+  .installment-table .installment-amount {
+    @apply text-right font-mono tabular-nums;
+  }
+  .installment-table tr[data-paid="true"] {
+    @apply text-muted-foreground;
+  }
+  .installment-table tr[data-paid="true"] .installment-amount {
+    @apply line-through;
+  }
+  .installment-table tr[data-overdue="true"] .installment-due {
+    @apply font-medium text-destructive;
+  }
+  .installment-summary {
+    @apply flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-border pt-3 text-xs text-muted-foreground;
+  }
+  .installment-summary strong {
+    @apply font-mono tabular-nums text-foreground;
+  }
+
+  /* Profit blocks — utilidad de repuestos vs servicios. */
+  .profit-grid {
+    @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-3;
+  }
+  .profit-block {
+    @apply rounded-lg border border-border bg-card p-4;
+  }
+  .profit-block[data-emphasis="true"] {
+    @apply border-primary/40 bg-primary/5;
+  }
+  .profit-block-label {
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+  .profit-block-value {
+    @apply mt-2 font-mono text-2xl font-semibold tabular-nums tracking-tight;
+  }
+  .profit-block-rows {
+    @apply mt-3 space-y-1.5 border-t border-border pt-3 text-sm;
+  }
+  .profit-block-row {
+    @apply flex items-baseline justify-between gap-3;
+  }
+  .profit-block-row dt {
+    @apply text-muted-foreground;
+  }
+  .profit-block-row dd {
+    @apply font-mono tabular-nums;
+  }
+  .profit-block-margin[data-positive="true"] {
+    @apply text-success;
+  }
+  .profit-block-margin[data-positive="false"] {
+    @apply text-destructive;
+  }
+
+  /* Row action cluster for data tables: editar, guardar, cancelar, eliminar. */
+  .row-actions {
+    @apply flex items-center justify-end gap-1 opacity-0 transition-opacity duration-150;
+  }
+  tr:hover .row-actions,
+  tr:focus-within .row-actions,
+  .row-actions[data-pinned="true"] {
+    @apply opacity-100;
+  }
+  .row-action {
+    @apply inline-flex h-7 w-7 items-center justify-center rounded-sm text-muted-foreground transition-smooth;
+  }
+  .row-action:hover {
+    @apply bg-muted text-foreground;
+  }
+  .row-action[data-variant="destructive"]:hover {
+    @apply bg-destructive/10 text-destructive;
+  }
+  .row-action[data-variant="confirm"]:hover {
+    @apply bg-primary/10 text-primary;
+  }
+
+  /* Operation panel — centered company information header.
+     The identity block of the taller: logo mark, razón social, and the
+     fiscal/contact data rail. Sits on an elevated card with a green left rail
+     and a hairline grid texture, so it reads as the machine's nameplate. */
+  .company-header {
+    @apply relative overflow-hidden rounded-lg border border-border bg-card px-5 py-6 text-center shadow-company sm:px-8;
+    border-left-width: 2px;
+    border-left-color: oklch(var(--primary));
+  }
+  .company-header-logo {
+    @apply mx-auto flex size-14 items-center justify-center rounded-md bg-gradient-primary font-display text-xl font-bold tracking-tight text-primary-foreground;
+  }
+  .company-header-name {
+    @apply mt-3 font-display text-xl font-bold tracking-tight sm:text-2xl;
+  }
+  .company-header-legal {
+    @apply mt-1 text-xs uppercase tracking-widest text-muted-foreground;
+  }
+  .company-header-rail {
+    @apply mt-4 flex flex-wrap items-center justify-center gap-x-6 gap-y-2 border-t border-border pt-4 text-xs text-muted-foreground;
+  }
+  .company-header-field {
+    @apply inline-flex items-center gap-1.5;
+  }
+  .company-header-field strong {
+    @apply data-rail font-medium text-foreground;
+  }
+
+  /* Operation panel — flow shortcut groups. Each flow (Taller, Catálogo,
+     Ventas, Compras, Administración) is a labeled band of shortcut cards;
+     every card carries a 2px colored left rail and a live metric in mono. */
+  .flow-group {
+    @apply rounded-lg border border-border bg-card/60 p-4 sm:p-5;
+  }
+  .flow-group-head {
+    @apply mb-3 flex items-center gap-2;
+  }
+  .flow-group-icon {
+    @apply flex size-7 items-center justify-center rounded-sm bg-muted text-muted-foreground;
+  }
+  .flow-group-label {
+    @apply text-xs font-semibold uppercase tracking-widest text-muted-foreground;
+  }
+  .flow-group-count {
+    @apply ml-auto font-mono text-[11px] tabular-nums text-muted-foreground;
+  }
+  .flow-shortcuts {
+    @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-3;
+  }
+  .flow-shortcut {
+    @apply relative flex flex-col gap-2 rounded-md border border-border bg-card p-4 text-left shadow-shortcut transition-smooth animate-shortcut-in;
+    border-left-width: 2px;
+    border-left-color: oklch(var(--border));
+  }
+  .flow-shortcut:hover {
+    @apply border-primary/40 bg-muted/40;
+    transform: translateY(-1px);
+  }
+  .flow-shortcut:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+  .flow-shortcut[data-tone="primary"] {
+    border-left-color: oklch(var(--primary));
+  }
+  .flow-shortcut[data-tone="accent"] {
+    border-left-color: oklch(var(--accent));
+  }
+  .flow-shortcut[data-tone="info"] {
+    border-left-color: oklch(var(--info));
+  }
+  .flow-shortcut-head {
+    @apply flex items-center gap-2;
+  }
+  .flow-shortcut-icon {
+    @apply flex size-7 shrink-0 items-center justify-center rounded-sm bg-muted text-muted-foreground;
+  }
+  .flow-shortcut[data-tone="primary"] .flow-shortcut-icon {
+    @apply bg-primary/10 text-primary;
+  }
+  .flow-shortcut[data-tone="accent"] .flow-shortcut-icon {
+    @apply bg-accent/15 text-accent;
+  }
+  .flow-shortcut[data-tone="info"] .flow-shortcut-icon {
+    @apply bg-info/10 text-info;
+  }
+  .flow-shortcut-name {
+    @apply truncate text-sm font-semibold text-foreground;
+  }
+  .flow-shortcut-metric {
+    @apply font-mono text-2xl font-semibold tabular-nums tracking-tight;
+  }
+  .flow-shortcut-metric[data-tone="primary"] {
+    color: oklch(var(--primary));
+  }
+  .flow-shortcut-metric[data-tone="accent"] {
+    color: oklch(var(--accent));
+  }
+  .flow-shortcut-caption {
+    @apply text-xs text-muted-foreground;
+  }
+}
+
+/* ==========================================================================
+   Print: emit only the fiscal document.
+   Strategy: hide the app chrome (`.no-print` and known shell zones) with
+   `display: none`, then promote the printable sheet to a static, full-width
+   block so multi-page A4 flows naturally and the 80mm roll stays unclipped.
+   `body * { visibility: hidden }` is intentionally NOT used — it clips
+   multi-page documents and forces absolute positioning.
+   ========================================================================== */
+
+/* Default @page (A4 documents). Overridden per-format by the print classes
+   applied to <html> by DocumentPreview / the import-export dialogs. */
+@page {
+  size: A4 portrait;
+  margin: var(--doc-a4-margin, 14mm);
+}
+
+@media print {
+  html {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111111 !important;
+    width: auto !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* App chrome: sidebar, header, buttons, toolbars, toasts. */
+  .no-print,
+  [data-print="hide"],
+  nav,
+  aside,
+  header,
+  footer,
+  button,
+  [role="dialog"] .io-dialog-actions {
+    display: none !important;
+  }
+
+  /* Any element explicitly marked as the printable root wins. */
+  [data-print="root"] {
+    display: block !important;
+  }
+
+  .doc-preview,
+  .report-sheet,
+  .invoice-sheet {
+    position: static !important;
+    inset: auto !important;
+    margin: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #111111 !important;
+    max-width: none !important;
+  }
+
+  /* A4: fill the printable area inside the @page margin, no extra padding,
+     allow natural page breaks. */
+  .doc-preview-a4,
+  .report-sheet,
+  .invoice-sheet {
+    width: 100% !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    page-break-after: auto;
+  }
+
+  /* 80mm tirilla: the @page rule below owns the roll width and margins, so
+     the sheet itself only needs to fill it without side padding. */
+  .doc-preview-80mm {
+    width: 100% !important;
+    max-width: none !important;
+    min-height: 0 !important;
+    padding: 0 !important;
+    overflow: visible !important;
+    font-size: 10px !important;
+  }
+
+  /* Keep rows, totals blocks, and signature blocks intact across pages. */
+  .doc-preview tr,
+  .report-sheet tr,
+  .invoice-sheet tr,
+  .doc-preview .doc-keep,
+  .report-sheet .report-keep {
+    page-break-inside: avoid;
+  }
+
+  .doc-preview thead,
+  .report-sheet thead,
+  .invoice-sheet thead {
+    display: table-header-group;
+  }
+
+  .doc-preview tfoot,
+  .report-sheet tfoot,
+  .invoice-sheet tfoot {
+    display: table-footer-group;
+  }
+
+  /* Paper is always light: neutralize themed surfaces inside the sheet. */
+  .doc-preview .text-muted-foreground,
+  .doc-preview .doc-meta,
+  .report-sheet .report-muted,
+  .report-sheet .text-muted-foreground,
+  .invoice-sheet .text-muted-foreground {
+    color: #4b5563 !important;
+  }
+
+  .doc-preview .text-primary,
+  .doc-preview .text-success,
+  .doc-preview .text-destructive,
+  .report-sheet .text-primary,
+  .report-sheet .text-success,
+  .report-sheet .text-destructive,
+  .invoice-sheet .text-primary {
+    color: #111111 !important;
+  }
+
+  .doc-preview .bg-muted,
+  .doc-preview .bg-muted\/20,
+  .doc-preview .bg-muted\/30,
+  .doc-preview .bg-muted\/40,
+  .doc-preview .bg-muted\/50,
+  .doc-preview .bg-secondary,
+  .doc-preview .bg-card,
+  .report-sheet .bg-muted,
+  .report-sheet .bg-muted\/20,
+  .report-sheet .bg-muted\/40,
+  .report-sheet .bg-secondary,
+  .report-sheet .bg-card {
+    background-color: transparent !important;
+  }
+
+  .doc-preview .bg-gradient-primary,
+  .invoice-sheet .bg-gradient-primary {
+    background-image: none !important;
+    background-color: #111111 !important;
+    color: #ffffff !important;
+  }
+
+  .doc-preview table,
+  .report-sheet .report-table,
+  .invoice-sheet table {
+    border-collapse: collapse;
+    width: 100%;
+  }
+
+  .doc-preview th,
+  .doc-preview td,
+  .report-sheet .report-table th,
+  .report-sheet .report-table td,
+  .invoice-sheet th,
+  .invoice-sheet td {
+    border-bottom: 1px solid #d1d5db !important;
+  }
+
+  .report-sheet .report-signature-line {
+    border-bottom: 1px solid #9ca3af !important;
+  }
+}
+
+/* Per-format @page override via CSS named pages.
+   `@page` cannot be nested inside a style rule, so the format is selected by
+   assigning a named page to the sheet: `.doc-preview-80mm { page: tirilla }`.
+   The print root may also carry `.print-80mm` for dialogs that print a roll
+   without using `.doc-preview-80mm`. */
+@page tirilla {
+  size: 80mm auto;
+  margin: 4mm var(--doc-80mm-margin, 3mm);
+}
+
+@page a4 {
+  size: A4 portrait;
+  margin: var(--doc-a4-margin, 14mm);
+}
+
+@media print {
+  .doc-preview-a4,
+  .report-sheet,
+  .invoice-sheet,
+  .print-a4 .doc-preview {
+    page: a4;
+  }
+
+  .doc-preview-80mm,
+  .print-80mm .doc-preview {
+    page: tirilla;
+  }
+}
+
+/* 80mm roll: continuous paper, no page-height constraint, never overflow. */
+@media print and (max-width: 90mm) {
+  html,
+  body {
+    width: 74mm !important;
+  }
+
+  .doc-preview-80mm {
+    width: 74mm !important;
+    max-width: 74mm !important;
+    font-size: 10px !important;
+  }
+
+  .doc-preview-80mm .data-rail,
+  .doc-preview-80mm .tabular {
+    letter-spacing: 0 !important;
+  }
+}

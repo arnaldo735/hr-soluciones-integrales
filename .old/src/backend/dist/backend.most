@@ -1,0 +1,5948 @@
+// Version: 4.0.0
+type AccessControlState__201339279 =
+  {
+    var adminAssigned : Bool;
+    userRoles : Map__230067015<Principal, UserRole__91647283>
+  };
+type AppointmentStatus__1020181705 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__16454536 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__198079340 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__22702783 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__528534355 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__576198783 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__706919522 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__884172777 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__905144024 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type AppointmentStatus__949193971 =
+  {#attended; #cancelled; #confirmed; #noShow; #scheduled};
+type Appointment__261687749 =
+  {
+    createdAt : Timestamp__7607913;
+    customerId : Id__831659287;
+    durationMinutes : Nat;
+    id : Id__831659287;
+    motorcycleId : Id__831659287;
+    reason : Text;
+    scheduledAt : Timestamp__7607913;
+    status : AppointmentStatus__905144024;
+    technicianId : ?Id__831659287;
+    updatedAt : Timestamp__7607913
+  };
+type Appointment__32285393 =
+  {
+    createdAt : Timestamp__605599695;
+    customerId : Id__835680607;
+    durationMinutes : Nat;
+    id : Id__835680607;
+    motorcycleId : Id__835680607;
+    reason : Text;
+    scheduledAt : Timestamp__605599695;
+    status : AppointmentStatus__706919522;
+    technicianId : ?Id__835680607;
+    updatedAt : Timestamp__605599695
+  };
+type Appointment__367507406 =
+  {
+    createdAt : Timestamp__1039836891;
+    customerId : Id__68706484;
+    durationMinutes : Nat;
+    id : Id__68706484;
+    motorcycleId : Id__68706484;
+    reason : Text;
+    scheduledAt : Timestamp__1039836891;
+    status : AppointmentStatus__576198783;
+    technicianId : ?Id__68706484;
+    updatedAt : Timestamp__1039836891
+  };
+type Appointment__433800605 =
+  {
+    createdAt : Timestamp__310406396;
+    customerId : Id__338555919;
+    durationMinutes : Nat;
+    id : Id__338555919;
+    motorcycleId : Id__338555919;
+    reason : Text;
+    scheduledAt : Timestamp__310406396;
+    status : AppointmentStatus__528534355;
+    technicianId : ?Id__338555919;
+    updatedAt : Timestamp__310406396
+  };
+type Appointment__631065446 =
+  {
+    createdAt : Timestamp__205116725;
+    customerId : Id__682458743;
+    durationMinutes : Nat;
+    id : Id__682458743;
+    motorcycleId : Id__682458743;
+    reason : Text;
+    scheduledAt : Timestamp__205116725;
+    status : AppointmentStatus__16454536;
+    technicianId : ?Id__682458743;
+    updatedAt : Timestamp__205116725
+  };
+type Appointment__734866746 =
+  {
+    createdAt : Timestamp__836802844;
+    customerId : Id__1073409734;
+    durationMinutes : Nat;
+    id : Id__1073409734;
+    motorcycleId : Id__1073409734;
+    reason : Text;
+    scheduledAt : Timestamp__836802844;
+    status : AppointmentStatus__198079340;
+    technicianId : ?Id__1073409734;
+    updatedAt : Timestamp__836802844
+  };
+type Appointment__77617247 =
+  {
+    createdAt : Timestamp__177202075;
+    customerId : Id__290385373;
+    durationMinutes : Nat;
+    id : Id__290385373;
+    motorcycleId : Id__290385373;
+    reason : Text;
+    scheduledAt : Timestamp__177202075;
+    status : AppointmentStatus__949193971;
+    technicianId : ?Id__290385373;
+    updatedAt : Timestamp__177202075
+  };
+type Appointment__804082241 =
+  {
+    createdAt : Timestamp__1028304436;
+    customerId : Id__1058561351;
+    durationMinutes : Nat;
+    id : Id__1058561351;
+    motorcycleId : Id__1058561351;
+    reason : Text;
+    scheduledAt : Timestamp__1028304436;
+    status : AppointmentStatus__1020181705;
+    technicianId : ?Id__1058561351;
+    updatedAt : Timestamp__1028304436
+  };
+type Appointment__835580385 =
+  {
+    createdAt : Timestamp__486448937;
+    customerId : Id__677737347;
+    durationMinutes : Nat;
+    id : Id__677737347;
+    motorcycleId : Id__677737347;
+    reason : Text;
+    scheduledAt : Timestamp__486448937;
+    status : AppointmentStatus__884172777;
+    technicianId : ?Id__677737347;
+    updatedAt : Timestamp__486448937
+  };
+type Appointment__911734655 =
+  {
+    createdAt : Timestamp__613503416;
+    customerId : Id__465323056;
+    durationMinutes : Nat;
+    id : Id__465323056;
+    motorcycleId : Id__465323056;
+    reason : Text;
+    scheduledAt : Timestamp__613503416;
+    status : AppointmentStatus__22702783;
+    technicianId : ?Id__465323056;
+    updatedAt : Timestamp__613503416
+  };
+type BusinessSettings__1021365173 =
+  {address : Text; name : Text; phone : Text; taxId : Text; taxRate : Nat};
+type BusinessSettings__167119193 =
+  {address : Text; name : Text; phone : Text; taxId : Text; taxRate : Nat};
+type BusinessSettings__178864821 =
+  {address : Text; name : Text; phone : Text; taxId : Text; taxRate : Nat};
+type BusinessSettings__548099142 =
+  {
+    address : Text;
+    name : Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__585784217
+  };
+type BusinessSettings__605080669 =
+  {
+    address : Text;
+    name : Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__799697541
+  };
+type BusinessSettings__61048047 =
+  {
+    address : Text;
+    name : Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__636293663
+  };
+type BusinessSettings__682960040 =
+  {
+    address : Text;
+    name : Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__709191531
+  };
+type BusinessSettings__750133389 =
+  {address : Text; name : Text; phone : Text; taxId : Text; taxRate : Nat};
+type BusinessSettings__949434397 =
+  {
+    address : Text;
+    name : Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__1029385262
+  };
+type BusinessSettings__957115348 =
+  {
+    address : Text;
+    name : Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__57071152
+  };
+type BusinessSettings__98731410 =
+  {
+    address : Text;
+    name : Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__336751505
+  };
+type CommissionLineKey__183384074 =
+  {laborId : Id__338555919; orderId : Id__338555919};
+type CommissionLineKey__183503415 =
+  {laborId : Id__677737347; orderId : Id__677737347};
+type CommissionLineKey__290848128 =
+  {laborId : Id__68706484; orderId : Id__68706484};
+type CommissionLineKey__325001514 =
+  {laborId : Id__389469852; orderId : Id__389469852};
+type CommissionLineKey__452801020 =
+  {laborId : Id__835680607; orderId : Id__835680607};
+type CommissionLineKey__60277288 =
+  {laborId : Id__465323056; orderId : Id__465323056};
+type CommissionLineKey__612890457 =
+  {laborId : Id__682458743; orderId : Id__682458743};
+type CommissionLineKey__996513607 =
+  {laborId : Id__831659287; orderId : Id__831659287};
+type CommissionLine__1000447934 =
+  {
+    at : Timestamp__7607913;
+    baseAmount : Money__787739131;
+    commissionAmount : Money__787739131;
+    commissionRate : Nat;
+    description : Text;
+    laborId : Id__831659287;
+    motorcycleBrand : Text;
+    motorcycleModel : Text;
+    motorcyclePlate : Text;
+    orderId : Id__831659287;
+    orderNumber : Text;
+    serviceDate : Timestamp__7607913;
+    serviceId : Id__831659287;
+    serviceName : Text;
+    technicianCode : Text;
+    technicianId : Id__831659287;
+    technicianName : Text
+  };
+type CommissionLine__162869390 =
+  {
+    at : Timestamp__1039836891;
+    baseAmount : Money__532546771;
+    commissionAmount : Money__532546771;
+    commissionRate : Nat;
+    description : Text;
+    laborId : Id__68706484;
+    motorcycleBrand : Text;
+    motorcycleModel : Text;
+    motorcyclePlate : Text;
+    orderId : Id__68706484;
+    orderNumber : Text;
+    serviceDate : Timestamp__1039836891;
+    serviceId : Id__68706484;
+    serviceName : Text;
+    technicianCode : Text;
+    technicianId : Id__68706484;
+    technicianName : Text
+  };
+type CommissionLine__237611726 =
+  {
+    at : Timestamp__613503416;
+    baseAmount : Money__990610718;
+    commissionAmount : Money__990610718;
+    commissionRate : Nat;
+    description : Text;
+    laborId : Id__465323056;
+    motorcycleBrand : Text;
+    motorcycleModel : Text;
+    motorcyclePlate : Text;
+    orderId : Id__465323056;
+    orderNumber : Text;
+    serviceDate : Timestamp__613503416;
+    serviceId : Id__465323056;
+    serviceName : Text;
+    technicianCode : Text;
+    technicianId : Id__465323056;
+    technicianName : Text
+  };
+type CommissionLine__622763064 =
+  {
+    at : Timestamp__205116725;
+    baseAmount : Money__657441901;
+    commissionAmount : Money__657441901;
+    commissionRate : Nat;
+    description : Text;
+    laborId : Id__682458743;
+    motorcycleBrand : Text;
+    motorcycleModel : Text;
+    motorcyclePlate : Text;
+    orderId : Id__682458743;
+    orderNumber : Text;
+    serviceDate : Timestamp__205116725;
+    serviceId : Id__682458743;
+    serviceName : Text;
+    technicianCode : Text;
+    technicianId : Id__682458743;
+    technicianName : Text
+  };
+type CommissionLine__699692151 =
+  {
+    at : Timestamp__605599695;
+    baseAmount : Money__418178358;
+    commissionAmount : Money__418178358;
+    commissionRate : Nat;
+    description : Text;
+    laborId : Id__835680607;
+    motorcycleBrand : Text;
+    motorcycleModel : Text;
+    motorcyclePlate : Text;
+    orderId : Id__835680607;
+    orderNumber : Text;
+    serviceDate : Timestamp__605599695;
+    serviceId : Id__835680607;
+    serviceName : Text;
+    technicianCode : Text;
+    technicianId : Id__835680607;
+    technicianName : Text
+  };
+type CommissionLine__762264487 =
+  {
+    at : Timestamp__881976031;
+    baseAmount : Money__1052153277;
+    commissionAmount : Money__1052153277;
+    commissionRate : Nat;
+    description : Text;
+    laborId : Id__323312187;
+    motorcycleBrand : Text;
+    motorcycleModel : Text;
+    motorcyclePlate : Text;
+    orderId : Id__323312187;
+    orderNumber : Text;
+    serviceDate : Timestamp__881976031;
+    serviceId : Id__323312187;
+    serviceName : Text;
+    technicianCode : Text;
+    technicianId : Id__323312187;
+    technicianName : Text
+  };
+type CommissionPaymentLoan__326041643 =
+  {
+    amount : Money__747169860;
+    date : Timestamp__486448937;
+    loanId : Id__677737347;
+    note : ?Text
+  };
+type CommissionPaymentLoan__44856743 =
+  {
+    amount : Money__657441901;
+    date : Timestamp__205116725;
+    loanId : Id__682458743;
+    note : ?Text
+  };
+type CommissionPaymentLoan__45238418 =
+  {
+    amount : Money__787739131;
+    date : Timestamp__7607913;
+    loanId : Id__831659287;
+    note : ?Text
+  };
+type CommissionPaymentLoan__536334748 =
+  {
+    amount : Money__990610718;
+    date : Timestamp__613503416;
+    loanId : Id__465323056;
+    note : ?Text
+  };
+type CommissionPaymentLoan__790130335 =
+  {
+    amount : Money__186267775;
+    date : Timestamp__310406396;
+    loanId : Id__338555919;
+    note : ?Text
+  };
+type CommissionPaymentLoan__801118859 =
+  {
+    amount : Money__418178358;
+    date : Timestamp__605599695;
+    loanId : Id__835680607;
+    note : ?Text
+  };
+type CommissionPaymentLoan__803233462 =
+  {
+    amount : Money__1052153277;
+    date : Timestamp__881976031;
+    loanId : Id__323312187;
+    note : ?Text
+  };
+type CommissionPaymentLoan__863596174 =
+  {
+    amount : Money__532546771;
+    date : Timestamp__1039836891;
+    loanId : Id__68706484;
+    note : ?Text
+  };
+type CommissionPayment__1059691631 =
+  {
+    baseAmount : Money__747169860;
+    commissionAmount : Money__747169860;
+    id : Id__677737347;
+    lineCount : Nat;
+    loans : [CommissionPaymentLoan__326041643];
+    loansDeducted : Money__747169860;
+    netPaid : Money__747169860;
+    paidAt : Timestamp__486448937;
+    paidBy : Principal;
+    period : CommissionPeriod__461578750;
+    technicianCode : Text;
+    technicianId : Id__677737347;
+    technicianName : Text
+  };
+type CommissionPayment__223593228 =
+  {
+    baseAmount : Money__990610718;
+    commissionAmount : Money__990610718;
+    id : Id__465323056;
+    lineCount : Nat;
+    lines : [CommissionLine__237611726];
+    loans : [CommissionPaymentLoan__536334748];
+    loansDeducted : Money__990610718;
+    netPaid : Money__990610718;
+    paidAt : Timestamp__613503416;
+    paidBy : Principal;
+    period : CommissionPeriod__1026838741;
+    technicianCode : Text;
+    technicianId : Id__465323056;
+    technicianName : Text
+  };
+type CommissionPayment__426908577 =
+  {
+    baseAmount : Money__418178358;
+    commissionAmount : Money__418178358;
+    id : Id__835680607;
+    lineCount : Nat;
+    lines : [CommissionLine__699692151];
+    loans : [CommissionPaymentLoan__801118859];
+    loansDeducted : Money__418178358;
+    netPaid : Money__418178358;
+    paidAt : Timestamp__605599695;
+    paidBy : Principal;
+    period : CommissionPeriod__24293569;
+    technicianCode : Text;
+    technicianId : Id__835680607;
+    technicianName : Text
+  };
+type CommissionPayment__428300045 =
+  {
+    baseAmount : Money__657441901;
+    commissionAmount : Money__657441901;
+    id : Id__682458743;
+    lineCount : Nat;
+    lines : [CommissionLine__622763064];
+    loans : [CommissionPaymentLoan__44856743];
+    loansDeducted : Money__657441901;
+    netPaid : Money__657441901;
+    paidAt : Timestamp__205116725;
+    paidBy : Principal;
+    period : CommissionPeriod__130227101;
+    technicianCode : Text;
+    technicianId : Id__682458743;
+    technicianName : Text
+  };
+type CommissionPayment__732177830 =
+  {
+    baseAmount : Money__186267775;
+    commissionAmount : Money__186267775;
+    id : Id__338555919;
+    lineCount : Nat;
+    loans : [CommissionPaymentLoan__790130335];
+    loansDeducted : Money__186267775;
+    netPaid : Money__186267775;
+    paidAt : Timestamp__310406396;
+    paidBy : Principal;
+    period : CommissionPeriod__723436546;
+    technicianCode : Text;
+    technicianId : Id__338555919;
+    technicianName : Text
+  };
+type CommissionPayment__799068375 =
+  {
+    baseAmount : Money__1052153277;
+    commissionAmount : Money__1052153277;
+    id : Id__323312187;
+    lineCount : Nat;
+    lines : [CommissionLine__762264487];
+    loans : [CommissionPaymentLoan__803233462];
+    loansDeducted : Money__1052153277;
+    netPaid : Money__1052153277;
+    paidAt : Timestamp__881976031;
+    paidBy : Principal;
+    period : CommissionPeriod__397540626;
+    technicianCode : Text;
+    technicianId : Id__323312187;
+    technicianName : Text
+  };
+type CommissionPayment__946460145 =
+  {
+    baseAmount : Money__532546771;
+    commissionAmount : Money__532546771;
+    id : Id__68706484;
+    lineCount : Nat;
+    lines : [CommissionLine__162869390];
+    loans : [CommissionPaymentLoan__863596174];
+    loansDeducted : Money__532546771;
+    netPaid : Money__532546771;
+    paidAt : Timestamp__1039836891;
+    paidBy : Principal;
+    period : CommissionPeriod__990310629;
+    technicianCode : Text;
+    technicianId : Id__68706484;
+    technicianName : Text
+  };
+type CommissionPeriod__1026838741 =
+  {from : ?Timestamp__613503416; to : ?Timestamp__613503416};
+type CommissionPeriod__130227101 =
+  {from : ?Timestamp__205116725; to : ?Timestamp__205116725};
+type CommissionPeriod__209051668 =
+  {from : ?Timestamp__7607913; to : ?Timestamp__7607913};
+type CommissionPeriod__24293569 =
+  {from : ?Timestamp__605599695; to : ?Timestamp__605599695};
+type CommissionPeriod__397540626 =
+  {from : ?Timestamp__881976031; to : ?Timestamp__881976031};
+type CommissionPeriod__461578750 =
+  {from : ?Timestamp__486448937; to : ?Timestamp__486448937};
+type CommissionPeriod__723436546 =
+  {from : ?Timestamp__310406396; to : ?Timestamp__310406396};
+type CommissionPeriod__990310629 =
+  {from : ?Timestamp__1039836891; to : ?Timestamp__1039836891};
+type CompanyProfile__1061314079 =
+  {
+    address : Text;
+    email : ?Text;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__585784217;
+    updatedAt : Timestamp__486448937;
+    website : ?Text
+  };
+type CompanyProfile__17980882 =
+  {
+    address : Text;
+    checkDigit : ?Nat;
+    city : Text;
+    documentType : DocumentType__787779763;
+    email : ?Text;
+    fiscalRegime : FiscalRegime__241490808;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__645727838;
+    taxResponsibility : TaxResponsibility__985372525;
+    tradeName : ?Text;
+    updatedAt : Timestamp__43627346;
+    website : ?Text
+  };
+type CompanyProfile__218571542 =
+  {
+    address : Text;
+    checkDigit : ?Nat;
+    city : Text;
+    documentType : DocumentType__429692035;
+    email : ?Text;
+    fiscalRegime : FiscalRegime__592884474;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : Nat;
+    taxResponsibility : TaxResponsibility__524330732;
+    tradeName : ?Text;
+    updatedAt : Timestamp__1039836891;
+    website : ?Text
+  };
+type CompanyProfile__33915540 =
+  {
+    address : Text;
+    checkDigit : ?Nat;
+    city : Text;
+    documentType : DocumentType__538901394;
+    email : ?Text;
+    fiscalRegime : FiscalRegime__667926507;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__799697541;
+    taxResponsibility : TaxResponsibility__423642647;
+    tradeName : ?Text;
+    updatedAt : Timestamp__7607913;
+    website : ?Text
+  };
+type CompanyProfile__350404412 =
+  {
+    address : Text;
+    checkDigit : ?Nat;
+    city : Text;
+    documentType : DocumentType__340876044;
+    email : ?Text;
+    fiscalRegime : FiscalRegime__500130876;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : Nat;
+    taxResponsibility : TaxResponsibility__400906732;
+    tradeName : ?Text;
+    updatedAt : Timestamp__205116725;
+    website : ?Text
+  };
+type CompanyProfile__500616242 =
+  {
+    address : Text;
+    email : ?Text;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__336751505;
+    updatedAt : Timestamp__1028304436;
+    website : ?Text
+  };
+type CompanyProfile__844693020 =
+  {
+    address : Text;
+    email : ?Text;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__709191531;
+    updatedAt : Timestamp__836802844;
+    website : ?Text
+  };
+type CompanyProfile__873916824 =
+  {
+    address : Text;
+    checkDigit : ?Nat;
+    city : Text;
+    documentType : DocumentType__995924073;
+    email : ?Text;
+    fiscalRegime : FiscalRegime__647565061;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : Nat;
+    taxResponsibility : TaxResponsibility__291465541;
+    tradeName : ?Text;
+    updatedAt : Timestamp__613503416;
+    website : ?Text
+  };
+type CompanyProfile__916775167 =
+  {
+    address : Text;
+    checkDigit : ?Nat;
+    city : Text;
+    documentType : DocumentType__383914118;
+    email : ?Text;
+    fiscalRegime : FiscalRegime__259344024;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : Nat;
+    taxResponsibility : TaxResponsibility__1042508987;
+    tradeName : ?Text;
+    updatedAt : Timestamp__605599695;
+    website : ?Text
+  };
+type Counters__139607768 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextOrderPhotoId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type Counters__275218943 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type Counters__418896284 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextTechnicianId : Nat
+  };
+type Counters__503773944 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseCategoryId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextOrderPhotoId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextReceivablePaymentId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextSupplierOrderId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type Counters__512489927 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseCategoryId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextOrderPhotoId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseInvoiceId : Nat;
+    var nextPurchaseInvoiceLineId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextReceivablePaymentId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextSupplierOrderId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type Customer__134735249 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__486448937;
+    document : ?Text;
+    email : ?Text;
+    id : Id__677737347;
+    name : Text;
+    phone : Text
+  };
+type Customer__153367834 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__605599695;
+    document : ?Text;
+    email : ?Text;
+    id : Id__835680607;
+    name : Text;
+    phone : Text
+  };
+type Customer__225412617 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__641042506;
+    document : ?Text;
+    email : ?Text;
+    id : Id__216382997;
+    name : Text;
+    phone : Text
+  };
+type Customer__278604873 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__205116725;
+    document : ?Text;
+    email : ?Text;
+    id : Id__682458743;
+    name : Text;
+    phone : Text
+  };
+type Customer__426668004 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__613503416;
+    document : ?Text;
+    email : ?Text;
+    id : Id__465323056;
+    name : Text;
+    phone : Text
+  };
+type Customer__47921922 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__7607913;
+    document : ?Text;
+    email : ?Text;
+    id : Id__831659287;
+    name : Text;
+    phone : Text
+  };
+type Customer__592776857 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__310406396;
+    document : ?Text;
+    email : ?Text;
+    id : Id__338555919;
+    name : Text;
+    phone : Text
+  };
+type Customer__612368474 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__836802844;
+    document : ?Text;
+    email : ?Text;
+    id : Id__1073409734;
+    name : Text;
+    phone : Text
+  };
+type Customer__627563761 =
+  {
+    createdAt : Timestamp__214345855;
+    document : ?Text;
+    email : ?Text;
+    id : Id__181169964;
+    name : Text;
+    phone : Text
+  };
+type Customer__705771782 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__1039836891;
+    document : ?Text;
+    email : ?Text;
+    id : Id__68706484;
+    name : Text;
+    phone : Text
+  };
+type Customer__794450161 =
+  {
+    address : ?Text;
+    createdAt : Timestamp__1028304436;
+    document : ?Text;
+    email : ?Text;
+    id : Id__1058561351;
+    name : Text;
+    phone : Text
+  };
+type Data__44217153<K, V> = {var count : Nat__227979830; kvs : [var ?(K, V)]};
+type Data__846125122<T> = {var count : Nat__227979830; elements : [var ?T]};
+type DocumentType__118779761 = {#cedulaCiudadania; #cedulaExtranjeria; #nit};
+type DocumentType__340876044 = {#cedulaCiudadania; #cedulaExtranjeria; #nit};
+type DocumentType__383914118 = {#cedulaCiudadania; #cedulaExtranjeria; #nit};
+type DocumentType__429692035 = {#cedulaCiudadania; #cedulaExtranjeria; #nit};
+type DocumentType__538901394 = {#cedulaCiudadania; #cedulaExtranjeria; #nit};
+type DocumentType__787779763 = {#cedulaCiudadania; #cedulaExtranjeria; #nit};
+type DocumentType__995924073 = {#cedulaCiudadania; #cedulaExtranjeria; #nit};
+type DriveCredentials__174240718 =
+  {
+    var accessToken : ?Text;
+    var accessTokenExpiresAt : ?Int;
+    var accountEmail : ?Text;
+    var connectedAt : Timestamp__605599695;
+    var refreshToken : Text
+  };
+type DriveCredentials__382368730 =
+  {
+    var accessToken : ?Text;
+    var accessTokenExpiresAt : ?Int;
+    var accountEmail : ?Text;
+    var connectedAt : Int;
+    var refreshToken : Text
+  };
+type DriveCredentials__972385448 =
+  {
+    var accessToken : ?Text;
+    var accessTokenExpiresAt : ?Int;
+    var accountEmail : ?Text;
+    var connectedAt : Timestamp__205116725;
+    var refreshToken : Text
+  };
+type ExpenseCategory__22611927 =
+  {
+    createdAt : Timestamp__605599695;
+    description : Text;
+    id : Id__835680607;
+    name : Text
+  };
+type ExpenseCategory__366814793 =
+  {#labor; #other; #parts; #rent; #salary; #taxes; #transport; #utilities};
+type ExpenseCategory__399771061 =
+  {#labor; #other; #parts; #rent; #salary; #taxes; #transport; #utilities};
+type ExpenseCategory__505700806 =
+  {#labor; #other; #parts; #rent; #salary; #taxes; #transport; #utilities};
+type ExpenseCategory__641894987 =
+  {
+    createdAt : Timestamp__704461902;
+    description : Text;
+    id : Id__540884235;
+    name : Text
+  };
+type ExpenseCategory__764194171 =
+  {#labor; #other; #parts; #rent; #salary; #taxes; #transport; #utilities};
+type ExpenseCategory__866542365 =
+  {#labor; #other; #parts; #rent; #salary; #taxes; #transport; #utilities};
+type ExpenseCategory__890461425 =
+  {
+    createdAt : Timestamp__205116725;
+    description : Text;
+    id : Id__682458743;
+    name : Text
+  };
+type ExpenseCategory__957791908 =
+  {
+    createdAt : Timestamp__1039836891;
+    description : Text;
+    id : Id__68706484;
+    name : Text
+  };
+type ExpenseCategory__984356129 =
+  {#labor; #other; #parts; #rent; #salary; #taxes; #transport; #utilities};
+type Expense__129352178 =
+  {
+    amount : Money__657441901;
+    categoryId : Id__682458743;
+    categoryName : Text;
+    concept : Text;
+    createdAt : Timestamp__205116725;
+    date : Timestamp__205116725;
+    id : Id__682458743;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__682458743;
+    supplierName : ?Text;
+    tax : Money__657441901
+  };
+type Expense__290139545 =
+  {
+    amount : Money__186267775;
+    category : ExpenseCategory__505700806;
+    concept : Text;
+    createdAt : Timestamp__310406396;
+    date : Timestamp__310406396;
+    id : Id__338555919;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__338555919;
+    supplierName : ?Text;
+    tax : Money__186267775
+  };
+type Expense__377604966 =
+  {
+    amount : Money__787739131;
+    category : ExpenseCategory__399771061;
+    concept : Text;
+    createdAt : Timestamp__7607913;
+    date : Timestamp__7607913;
+    id : Id__831659287;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__831659287;
+    supplierName : ?Text;
+    tax : Money__787739131
+  };
+type Expense__463896208 =
+  {
+    amount : Money__990610718;
+    category : ExpenseCategory__764194171;
+    concept : Text;
+    createdAt : Timestamp__613503416;
+    date : Timestamp__613503416;
+    id : Id__465323056;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__465323056;
+    supplierName : ?Text;
+    tax : Money__990610718
+  };
+type Expense__60290867 =
+  {
+    amount : Money__747169860;
+    category : ExpenseCategory__866542365;
+    concept : Text;
+    createdAt : Timestamp__486448937;
+    date : Timestamp__486448937;
+    id : Id__677737347;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__677737347;
+    supplierName : ?Text;
+    tax : Money__747169860
+  };
+type Expense__616435643 =
+  {
+    amount : Money__532546771;
+    categoryId : Id__68706484;
+    categoryName : Text;
+    concept : Text;
+    createdAt : Timestamp__1039836891;
+    date : Timestamp__1039836891;
+    id : Id__68706484;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__68706484;
+    supplierName : ?Text;
+    tax : Money__532546771
+  };
+type Expense__680440412 =
+  {
+    amount : Money__736808655;
+    category : ExpenseCategory__366814793;
+    concept : Text;
+    createdAt : Timestamp__1028304436;
+    date : Timestamp__1028304436;
+    id : Id__1058561351;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__1058561351;
+    supplierName : ?Text;
+    tax : Money__736808655
+  };
+type Expense__783262754 =
+  {
+    amount : Money__418178358;
+    categoryId : Id__835680607;
+    categoryName : Text;
+    concept : Text;
+    createdAt : Timestamp__605599695;
+    date : Timestamp__605599695;
+    id : Id__835680607;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__835680607;
+    supplierName : ?Text;
+    tax : Money__418178358
+  };
+type Expense__809941540 =
+  {
+    amount : Money__876449361;
+    categoryId : Id__620611075;
+    categoryName : Text;
+    concept : Text;
+    createdAt : Timestamp__520310395;
+    date : Timestamp__520310395;
+    id : Id__620611075;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__620611075;
+    supplierName : ?Text;
+    tax : Money__876449361
+  };
+type Expense__992457603 =
+  {
+    amount : Money__772428565;
+    category : ExpenseCategory__984356129;
+    concept : Text;
+    createdAt : Timestamp__836802844;
+    date : Timestamp__836802844;
+    id : Id__1073409734;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__1073409734;
+    supplierName : ?Text;
+    tax : Money__772428565
+  };
+type ExternalBlob__220559234 = Blob;
+type ExtractionStatus__127890801 =
+  {#extracted; #extracting; #failed; #pending};
+type ExtractionStatus__74602302 =
+  {#extracted; #extracting; #failed; #pending};
+type ExtractionStatus__985942684 =
+  {#extracted; #extracting; #failed; #pending};
+type FiscalRegime__241490808 = {#noResponsableIva; #responsableIva};
+type FiscalRegime__259344024 = {#noResponsableIva; #responsableIva};
+type FiscalRegime__500130876 = {#noResponsableIva; #responsableIva};
+type FiscalRegime__592884474 = {#noResponsableIva; #responsableIva};
+type FiscalRegime__647565061 = {#noResponsableIva; #responsableIva};
+type FiscalRegime__667926507 = {#noResponsableIva; #responsableIva};
+type FiscalRegime__773564200 = {#noResponsableIva; #responsableIva};
+type Id__1058561351 = Nat;
+type Id__1073409734 = Nat;
+type Id__181169964 = Nat;
+type Id__216382997 = Id__389469852;
+type Id__290385373 = Id__389469852;
+type Id__314374337 = Id__389469852;
+type Id__323312187 = Id__389469852;
+type Id__333305353 = Id__389469852;
+type Id__338555919 = Nat;
+type Id__389469852 = Nat;
+type Id__407182025 = Id__389469852;
+type Id__451026835 = Id__389469852;
+type Id__465323056 = Nat;
+type Id__493596235 = Id__389469852;
+type Id__526914916 = Id__389469852;
+type Id__540884235 = Id__389469852;
+type Id__554453025 = Id__389469852;
+type Id__620611075 = Id__389469852;
+type Id__677737347 = Nat;
+type Id__682458743 = Nat;
+type Id__68706484 = Nat;
+type Id__713514965 = Id__389469852;
+type Id__752432860 = Id__389469852;
+type Id__766779107 = Nat;
+type Id__811848263 = Id__389469852;
+type Id__831659287 = Nat;
+type Id__835680607 = Nat;
+type Id__838600906 = Id__389469852;
+type Id__907387011 = Id__389469852;
+type InstallmentPlan__1010115285 =
+  {
+    firstDueDate : Timestamp__613503416;
+    installmentCount : Nat;
+    installments : [Installment__1016022215]
+  };
+type InstallmentPlan__1016203862 =
+  {
+    firstDueDate : Timestamp__1039836891;
+    installmentCount : Nat;
+    installments : [Installment__35062865]
+  };
+type InstallmentPlan__217765582 =
+  {
+    firstDueDate : Timestamp__1061877594;
+    installmentCount : Nat;
+    installments : [Installment__381244127]
+  };
+type InstallmentPlan__691501097 =
+  {
+    firstDueDate : Timestamp__605599695;
+    installmentCount : Nat;
+    installments : [Installment__491123227]
+  };
+type InstallmentPlan__808180361 =
+  {
+    firstDueDate : Timestamp__205116725;
+    installmentCount : Nat;
+    installments : [Installment__909640473]
+  };
+type InstallmentPlan__825968234 =
+  {
+    firstDueDate : Timestamp__7607913;
+    installmentCount : Nat;
+    installments : [Installment__532853660]
+  };
+type Installment__1016022215 =
+  {
+    amount : Money__990610718;
+    dueDate : Timestamp__613503416;
+    number : Nat;
+    paid : Bool;
+    paidAt : ?Timestamp__613503416
+  };
+type Installment__35062865 =
+  {
+    amount : Money__532546771;
+    dueDate : Timestamp__1039836891;
+    number : Nat;
+    paid : Bool;
+    paidAt : ?Timestamp__1039836891
+  };
+type Installment__381244127 =
+  {
+    amount : Money__72911024;
+    dueDate : Timestamp__1061877594;
+    number : Nat;
+    paid : Bool;
+    paidAt : ?Timestamp__1061877594
+  };
+type Installment__491123227 =
+  {
+    amount : Money__418178358;
+    dueDate : Timestamp__605599695;
+    number : Nat;
+    paid : Bool;
+    paidAt : ?Timestamp__605599695
+  };
+type Installment__532853660 =
+  {
+    amount : Money__787739131;
+    dueDate : Timestamp__7607913;
+    number : Nat;
+    paid : Bool;
+    paidAt : ?Timestamp__7607913
+  };
+type Installment__909640473 =
+  {
+    amount : Money__657441901;
+    dueDate : Timestamp__205116725;
+    number : Nat;
+    paid : Bool;
+    paidAt : ?Timestamp__205116725
+  };
+type Internal__23036296<T> =
+  {children : [var ?Node__620761243<T>]; data : Data__846125122<T>};
+type Internal__283199666<K, V> =
+  {children : [var ?Node__204828119<K, V>]; data : Data__44217153<K, V>};
+type InvoiceFileKind__72299552 = {#image; #pdf};
+type InvoiceFileKind__813270630 = {#image; #pdf};
+type InvoiceFileKind__99921867 = {#image; #pdf};
+type InvoiceFileRef__338810805 =
+  {
+    fileName : Text;
+    gatewayUrl : ?Text;
+    kind : InvoiceFileKind__72299552;
+    mimeType : Text;
+    objectId : Text;
+    projectId : ?Text;
+    sizeBytes : Nat;
+    uploadedAt : Timestamp__344700625
+  };
+type InvoiceFileRef__765607992 =
+  {
+    fileName : Text;
+    gatewayUrl : ?Text;
+    kind : InvoiceFileKind__813270630;
+    mimeType : Text;
+    objectId : Text;
+    projectId : ?Text;
+    sizeBytes : Nat;
+    uploadedAt : Timestamp__444955092
+  };
+type InvoiceFileRef__795615373 =
+  {
+    fileName : Text;
+    gatewayUrl : ?Text;
+    kind : InvoiceFileKind__99921867;
+    mimeType : Text;
+    objectId : Text;
+    projectId : ?Text;
+    sizeBytes : Nat;
+    uploadedAt : Timestamp__605599695
+  };
+type InvoiceLineKind__1022866516 = {#part; #service};
+type InvoiceLineKind__586780447 = {#part; #service};
+type InvoiceLineKind__599090344 = {#part; #service};
+type InvoiceLineKind__68938760 = {#part; #service};
+type InvoiceLineKind__730294025 = {#part; #service};
+type InvoiceLineKind__856314758 = {#part; #service};
+type InvoiceLine__119167015 =
+  {
+    amount : Money__736808655;
+    description : Text;
+    quantity : Nat;
+    unitPrice : Money__736808655
+  };
+type InvoiceLine__319410059 =
+  {
+    amount : Money__772428565;
+    description : Text;
+    quantity : Nat;
+    unitPrice : Money__772428565
+  };
+type InvoiceLine__506762123 =
+  {
+    amount : Money__186267775;
+    description : Text;
+    quantity : Nat;
+    unitPrice : Money__186267775
+  };
+type InvoiceLine__540784387 =
+  {
+    amount : Money__747169860;
+    description : Text;
+    quantity : Nat;
+    unitPrice : Money__747169860
+  };
+type InvoiceLine__559172577 =
+  {
+    amount : Money__990610718;
+    description : Text;
+    kind : InvoiceLineKind__599090344;
+    quantity : Nat;
+    unitCost : Money__990610718;
+    unitPrice : Money__990610718
+  };
+type InvoiceLine__629210406 =
+  {
+    amount : Money__532546771;
+    description : Text;
+    kind : InvoiceLineKind__68938760;
+    quantity : Nat;
+    unitCost : Money__532546771;
+    unitPrice : Money__532546771
+  };
+type InvoiceLine__642802921 =
+  {
+    amount : Money__418178358;
+    description : Text;
+    kind : InvoiceLineKind__1022866516;
+    quantity : Nat;
+    unitCost : Money__418178358;
+    unitPrice : Money__418178358
+  };
+type InvoiceLine__660464818 =
+  {
+    amount : Money__376147918;
+    description : Text;
+    quantity : Nat;
+    unitPrice : Money__376147918
+  };
+type InvoiceLine__77416088 =
+  {
+    amount : Money__657441901;
+    description : Text;
+    kind : InvoiceLineKind__856314758;
+    quantity : Nat;
+    unitCost : Money__657441901;
+    unitPrice : Money__657441901
+  };
+type InvoiceLine__830351464 =
+  {
+    amount : Money__72911024;
+    description : Text;
+    kind : InvoiceLineKind__586780447;
+    quantity : Nat;
+    unitCost : Money__72911024;
+    unitPrice : Money__72911024
+  };
+type InvoiceOrigin__260732397 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__352082472 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__372268260 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__598061470 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__612347687 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__672597910 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__693293712 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__708019709 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__74023074 = {#pos; #quote; #workshopOrder};
+type InvoiceOrigin__828224585 = {#pos; #quote; #workshopOrder};
+type Invoice__279583182 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__68706484;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__532546771;
+    id : Id__68706484;
+    installments : ?InstallmentPlan__1016203862;
+    issuedAt : Timestamp__1039836891;
+    lines : [InvoiceLine__629210406];
+    number : Text;
+    orderId : ?Id__68706484;
+    origin : InvoiceOrigin__260732397;
+    paymentCondition : PaymentCondition__176429006;
+    paymentMethod : PaymentMethod__869464483;
+    paymentStatus : PaymentStatus__865880690;
+    posSaleId : ?Id__68706484;
+    subtotal : Money__532546771;
+    tax : Money__532546771;
+    taxRate : Nat;
+    total : Money__532546771
+  };
+type Invoice__539609799 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__677737347;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__747169860;
+    id : Id__677737347;
+    issuedAt : Timestamp__486448937;
+    lines : [InvoiceLine__540784387];
+    number : Text;
+    orderId : ?Id__677737347;
+    origin : InvoiceOrigin__598061470;
+    paymentMethod : PaymentMethod__870826488;
+    paymentStatus : PaymentStatus__627353604;
+    posSaleId : ?Id__677737347;
+    subtotal : Money__747169860;
+    tax : Money__747169860;
+    taxRate : TaxRate__585784217;
+    total : Money__747169860
+  };
+type Invoice__60653959 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__338555919;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__186267775;
+    id : Id__338555919;
+    issuedAt : Timestamp__310406396;
+    lines : [InvoiceLine__506762123];
+    number : Text;
+    orderId : ?Id__338555919;
+    origin : InvoiceOrigin__372268260;
+    paymentMethod : PaymentMethod__393737467;
+    paymentStatus : PaymentStatus__1001547300;
+    posSaleId : ?Id__338555919;
+    subtotal : Money__186267775;
+    tax : Money__186267775;
+    taxRate : TaxRate__57071152;
+    total : Money__186267775
+  };
+type Invoice__710428744 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__682458743;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__657441901;
+    id : Id__682458743;
+    installments : ?InstallmentPlan__808180361;
+    issuedAt : Timestamp__205116725;
+    lines : [InvoiceLine__77416088];
+    number : Text;
+    orderId : ?Id__682458743;
+    origin : InvoiceOrigin__708019709;
+    paymentCondition : PaymentCondition__311088440;
+    paymentMethod : PaymentMethod__621175407;
+    paymentStatus : PaymentStatus__284385023;
+    posSaleId : ?Id__682458743;
+    subtotal : Money__657441901;
+    tax : Money__657441901;
+    taxRate : Nat;
+    total : Money__657441901
+  };
+type Invoice__714629455 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__1058561351;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__736808655;
+    id : Id__1058561351;
+    issuedAt : Timestamp__1028304436;
+    lines : [InvoiceLine__119167015];
+    number : Text;
+    orderId : ?Id__1058561351;
+    origin : InvoiceOrigin__693293712;
+    paymentMethod : PaymentMethod__468337666;
+    paymentStatus : PaymentStatus__204123592;
+    posSaleId : ?Id__1058561351;
+    subtotal : Money__736808655;
+    tax : Money__736808655;
+    taxRate : TaxRate__336751505;
+    total : Money__736808655
+  };
+type Invoice__732995946 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__465323056;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__990610718;
+    id : Id__465323056;
+    installments : ?InstallmentPlan__1010115285;
+    issuedAt : Timestamp__613503416;
+    lines : [InvoiceLine__559172577];
+    number : Text;
+    orderId : ?Id__465323056;
+    origin : InvoiceOrigin__828224585;
+    paymentCondition : PaymentCondition__332245540;
+    paymentMethod : PaymentMethod__909990948;
+    paymentStatus : PaymentStatus__320648863;
+    posSaleId : ?Id__465323056;
+    subtotal : Money__990610718;
+    tax : Money__990610718;
+    taxRate : Nat;
+    total : Money__990610718
+  };
+type Invoice__752737744 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__526914916;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__72911024;
+    id : Id__526914916;
+    installments : ?InstallmentPlan__217765582;
+    issuedAt : Timestamp__1061877594;
+    lines : [InvoiceLine__830351464];
+    number : Text;
+    orderId : ?Id__526914916;
+    origin : InvoiceOrigin__672597910;
+    paymentCondition : PaymentCondition__1023797934;
+    paymentMethod : PaymentMethod__1022097888;
+    paymentStatus : PaymentStatus__671551282;
+    posSaleId : ?Id__526914916;
+    subtotal : Money__72911024;
+    tax : Money__72911024;
+    taxRate : TaxRate__1029385262;
+    total : Money__72911024
+  };
+type Invoice__764657985 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__835680607;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__418178358;
+    id : Id__835680607;
+    installments : ?InstallmentPlan__691501097;
+    issuedAt : Timestamp__605599695;
+    lines : [InvoiceLine__642802921];
+    number : Text;
+    orderId : ?Id__835680607;
+    origin : InvoiceOrigin__612347687;
+    paymentCondition : PaymentCondition__530547511;
+    paymentMethod : PaymentMethod__194147893;
+    paymentStatus : PaymentStatus__761496442;
+    posSaleId : ?Id__835680607;
+    subtotal : Money__418178358;
+    tax : Money__418178358;
+    taxRate : Nat;
+    total : Money__418178358
+  };
+type Invoice__991145913 =
+  {
+    customerAddress : ?Text;
+    customerId : Id__181169964;
+    customerName : Text;
+    customerTaxId : ?Text;
+    id : Id__181169964;
+    issuedAt : Timestamp__214345855;
+    lines : [InvoiceLine__660464818];
+    number : Text;
+    orderId : Id__181169964;
+    paymentMethod : PaymentMethod__688764164;
+    paymentStatus : PaymentStatus__944876930;
+    subtotal : Money__376147918;
+    tax : Money__376147918;
+    taxRate : TaxRate__636293663;
+    total : Money__376147918
+  };
+type LaborItem__1058309565 =
+  {description : Text; id : Id__181169964; price : Money__376147918};
+type LaborItem__1061830807 =
+  {
+    description : Text;
+    id : Id__465323056;
+    price : Money__990610718;
+    serviceId : ?Id__465323056;
+    technicianId : ?Id__465323056
+  };
+type LaborItem__165158698 =
+  {
+    description : Text;
+    id : Id__831659287;
+    price : Money__787739131;
+    serviceId : ?Id__831659287;
+    technicianId : ?Id__831659287
+  };
+type LaborItem__324369802 =
+  {description : Text; id : Id__1073409734; price : Money__772428565};
+type LaborItem__420109074 =
+  {
+    description : Text;
+    id : Id__835680607;
+    price : Money__418178358;
+    serviceId : ?Id__835680607;
+    technicianId : ?Id__835680607
+  };
+type LaborItem__703101035 =
+  {
+    description : Text;
+    id : Id__333305353;
+    price : Money__1031111499;
+    serviceId : ?Id__333305353;
+    technicianId : ?Id__333305353
+  };
+type LaborItem__71422969 =
+  {description : Text; id : Id__1058561351; price : Money__736808655};
+type LaborItem__892824816 =
+  {
+    description : Text;
+    id : Id__682458743;
+    price : Money__657441901;
+    serviceId : ?Id__682458743;
+    technicianId : ?Id__682458743
+  };
+type LaborItem__916521912 =
+  {
+    description : Text;
+    id : Id__68706484;
+    price : Money__532546771;
+    serviceId : ?Id__68706484;
+    technicianId : ?Id__68706484
+  };
+type Leaf__598469445<K, V> = {data : Data__44217153<K, V>};
+type Leaf__948582970<T> = {data : Data__846125122<T>};
+type LineApplyStatus__394038133 = {#created; #error; #pending; #updated};
+type LineApplyStatus__423954731 = {#created; #error; #pending; #updated};
+type LineApplyStatus__608310481 = {#created; #error; #pending; #updated};
+type LineMatchStatus__372498633 = {#existing; #new};
+type LineMatchStatus__868221502 = {#existing; #new};
+type LineMatchStatus__979159520 = {#existing; #new};
+type Lot__1045790050 =
+  {
+    id : Id__181169964;
+    lotNumber : Text;
+    partId : Id__181169964;
+    purchaseId : ?Id__181169964;
+    quantity : Nat;
+    receivedAt : Timestamp__214345855;
+    supplierId : ?Id__181169964;
+    unitCost : Money__376147918
+  };
+type Lot__1049180505 =
+  {
+    id : Id__677737347;
+    lotNumber : Text;
+    partId : Id__677737347;
+    purchaseId : ?Id__677737347;
+    quantity : Nat;
+    receivedAt : Timestamp__486448937;
+    supplierId : ?Id__677737347;
+    unitCost : Money__747169860
+  };
+type Lot__347984760 =
+  {
+    id : Id__1058561351;
+    lotNumber : Text;
+    partId : Id__1058561351;
+    purchaseId : ?Id__1058561351;
+    quantity : Nat;
+    receivedAt : Timestamp__1028304436;
+    supplierId : ?Id__1058561351;
+    unitCost : Money__736808655
+  };
+type Lot__393412874 =
+  {
+    id : Id__68706484;
+    lotNumber : Text;
+    partId : Id__68706484;
+    purchaseId : ?Id__68706484;
+    quantity : Nat;
+    receivedAt : Timestamp__1039836891;
+    supplierId : ?Id__68706484;
+    unitCost : Money__532546771
+  };
+type Lot__433345054 =
+  {
+    id : Id__682458743;
+    lotNumber : Text;
+    partId : Id__682458743;
+    purchaseId : ?Id__682458743;
+    quantity : Nat;
+    receivedAt : Timestamp__205116725;
+    supplierId : ?Id__682458743;
+    unitCost : Money__657441901
+  };
+type Lot__539730214 =
+  {
+    id : Id__465323056;
+    lotNumber : Text;
+    partId : Id__465323056;
+    purchaseId : ?Id__465323056;
+    quantity : Nat;
+    receivedAt : Timestamp__613503416;
+    supplierId : ?Id__465323056;
+    unitCost : Money__990610718
+  };
+type Lot__591690177 =
+  {
+    id : Id__1073409734;
+    lotNumber : Text;
+    partId : Id__1073409734;
+    purchaseId : ?Id__1073409734;
+    quantity : Nat;
+    receivedAt : Timestamp__836802844;
+    supplierId : ?Id__1073409734;
+    unitCost : Money__772428565
+  };
+type Lot__672089387 =
+  {
+    id : Id__835680607;
+    lotNumber : Text;
+    partId : Id__835680607;
+    purchaseId : ?Id__835680607;
+    quantity : Nat;
+    receivedAt : Timestamp__605599695;
+    supplierId : ?Id__835680607;
+    unitCost : Money__418178358
+  };
+type Lot__672476020 =
+  {
+    id : Id__338555919;
+    lotNumber : Text;
+    partId : Id__338555919;
+    purchaseId : ?Id__338555919;
+    quantity : Nat;
+    receivedAt : Timestamp__310406396;
+    supplierId : ?Id__338555919;
+    unitCost : Money__186267775
+  };
+type Lot__726608520 =
+  {
+    id : Id__407182025;
+    lotNumber : Text;
+    partId : Id__407182025;
+    purchaseId : ?Id__407182025;
+    quantity : Nat;
+    receivedAt : Timestamp__288252184;
+    supplierId : ?Id__407182025;
+    unitCost : Money__37724346
+  };
+type Lot__869509375 =
+  {
+    id : Id__831659287;
+    lotNumber : Text;
+    partId : Id__831659287;
+    purchaseId : ?Id__831659287;
+    quantity : Nat;
+    receivedAt : Timestamp__7607913;
+    supplierId : ?Id__831659287;
+    unitCost : Money__787739131
+  };
+type Map__230067015<K, V> = Map__405889023<K, V>;
+type Map__405889023<K, V> = Map__603270868<K, V>;
+type Map__603270868<K, V> =
+  {var root : Node__204828119<K, V>; var size : Nat__227979830};
+type Money__1003075393 = Nat;
+type Money__100584181 = Money__698460738;
+type Money__1029900408 = Money__698460738;
+type Money__1031111499 = Money__698460738;
+type Money__1052153277 = Money__698460738;
+type Money__186267775 = Nat;
+type Money__376147918 = Nat;
+type Money__37724346 = Money__698460738;
+type Money__386013016 = Money__698460738;
+type Money__418178358 = Nat;
+type Money__441407701 = Money__698460738;
+type Money__527404733 = Money__698460738;
+type Money__528897802 = Money__698460738;
+type Money__532546771 = Nat;
+type Money__657441901 = Nat;
+type Money__698460738 = Nat;
+type Money__72911024 = Money__698460738;
+type Money__736808655 = Nat;
+type Money__747169860 = Nat;
+type Money__772428565 = Nat;
+type Money__787739131 = Nat;
+type Money__876449361 = Money__698460738;
+type Money__956068342 = Money__698460738;
+type Money__990610718 = Nat;
+type Motorcycle__1015266968 =
+  {
+    brand : Text;
+    createdAt : Timestamp__613503416;
+    customerId : Id__465323056;
+    id : Id__465323056;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__398328452 =
+  {
+    brand : Text;
+    createdAt : Timestamp__486448937;
+    customerId : Id__677737347;
+    id : Id__677737347;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__449860927 =
+  {
+    brand : Text;
+    createdAt : Timestamp__1028304436;
+    customerId : Id__1058561351;
+    id : Id__1058561351;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__456522821 =
+  {
+    brand : Text;
+    createdAt : Timestamp__641042506;
+    customerId : Id__216382997;
+    id : Id__216382997;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__595545290 =
+  {
+    brand : Text;
+    createdAt : Timestamp__1039836891;
+    customerId : Id__68706484;
+    id : Id__68706484;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__662803895 =
+  {
+    brand : Text;
+    createdAt : Timestamp__605599695;
+    customerId : Id__835680607;
+    id : Id__835680607;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__769470110 =
+  {
+    brand : Text;
+    createdAt : Timestamp__310406396;
+    customerId : Id__338555919;
+    id : Id__338555919;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__793990364 =
+  {
+    brand : Text;
+    createdAt : Timestamp__836802844;
+    customerId : Id__1073409734;
+    id : Id__1073409734;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__861642040 =
+  {
+    brand : Text;
+    createdAt : Timestamp__214345855;
+    customerId : Id__181169964;
+    id : Id__181169964;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__944420131 =
+  {
+    brand : Text;
+    createdAt : Timestamp__205116725;
+    customerId : Id__682458743;
+    id : Id__682458743;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type Motorcycle__981403685 =
+  {
+    brand : Text;
+    createdAt : Timestamp__7607913;
+    customerId : Id__831659287;
+    id : Id__831659287;
+    mileage : Nat;
+    model : Text;
+    plate : Text;
+    year : Nat
+  };
+type MovementKind__1019443965 = {#adjustment; #purchase; #sale};
+type MovementKind__1056066058 = {#adjustment; #purchase; #sale};
+type MovementKind__1072617758 = {#adjustment; #purchase; #sale};
+type MovementKind__128881246 = {#adjustment; #purchase; #sale};
+type MovementKind__270949342 = {#adjustment; #purchase; #sale};
+type MovementKind__495848464 = {#adjustment; #purchase; #sale};
+type MovementKind__51927276 = {#adjustment; #purchase; #sale};
+type MovementKind__568757609 = {#adjustment; #purchase; #sale};
+type MovementKind__721541724 = {#adjustment; #purchase; #sale};
+type MovementKind__791774612 = {#adjustment; #purchase; #sale};
+type MovementKind__804097689 = {#adjustment; #purchase; #sale};
+type Movement__115320755 =
+  {
+    at : Timestamp__613503416;
+    id : Id__465323056;
+    kind : MovementKind__51927276;
+    lotId : ?Id__465323056;
+    partId : Id__465323056;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__465323056;
+    unitCost : ?Money__990610718
+  };
+type Movement__179819967 =
+  {
+    at : Timestamp__1028304436;
+    id : Id__1058561351;
+    kind : MovementKind__270949342;
+    lotId : ?Id__1058561351;
+    partId : Id__1058561351;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__1058561351;
+    unitCost : ?Money__736808655
+  };
+type Movement__378224049 =
+  {
+    at : Timestamp__214345855;
+    id : Id__181169964;
+    kind : MovementKind__791774612;
+    lotId : ?Id__181169964;
+    partId : Id__181169964;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__181169964;
+    unitCost : ?Money__376147918
+  };
+type Movement__556930591 =
+  {
+    at : Timestamp__486448937;
+    id : Id__677737347;
+    kind : MovementKind__1056066058;
+    lotId : ?Id__677737347;
+    partId : Id__677737347;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__677737347;
+    unitCost : ?Money__747169860
+  };
+type Movement__617608149 =
+  {
+    at : Timestamp__605599695;
+    id : Id__835680607;
+    kind : MovementKind__568757609;
+    lotId : ?Id__835680607;
+    partId : Id__835680607;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__835680607;
+    unitCost : ?Money__418178358
+  };
+type Movement__67587889 =
+  {
+    at : Timestamp__205116725;
+    id : Id__682458743;
+    kind : MovementKind__721541724;
+    lotId : ?Id__682458743;
+    partId : Id__682458743;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__682458743;
+    unitCost : ?Money__657441901
+  };
+type Movement__721724591 =
+  {
+    at : Timestamp__310406396;
+    id : Id__338555919;
+    kind : MovementKind__128881246;
+    lotId : ?Id__338555919;
+    partId : Id__338555919;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__338555919;
+    unitCost : ?Money__186267775
+  };
+type Movement__924796070 =
+  {
+    at : Timestamp__288252184;
+    id : Id__407182025;
+    kind : MovementKind__804097689;
+    lotId : ?Id__407182025;
+    partId : Id__407182025;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__407182025;
+    unitCost : ?Money__37724346
+  };
+type Movement__933202288 =
+  {
+    at : Timestamp__7607913;
+    id : Id__831659287;
+    kind : MovementKind__1072617758;
+    lotId : ?Id__831659287;
+    partId : Id__831659287;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__831659287;
+    unitCost : ?Money__787739131
+  };
+type Movement__955454396 =
+  {
+    at : Timestamp__836802844;
+    id : Id__1073409734;
+    kind : MovementKind__1019443965;
+    lotId : ?Id__1073409734;
+    partId : Id__1073409734;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__1073409734;
+    unitCost : ?Money__772428565
+  };
+type Movement__985189546 =
+  {
+    at : Timestamp__1039836891;
+    id : Id__68706484;
+    kind : MovementKind__495848464;
+    lotId : ?Id__68706484;
+    partId : Id__68706484;
+    performedBy : Principal;
+    quantity : Nat;
+    reason : ?Text;
+    referenceId : ?Id__68706484;
+    unitCost : ?Money__532546771
+  };
+type Nat__227979830 = Nat__920180692;
+type Nat__920180692 = Nat;
+type NewActor__1053168963 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__465323056, Appointment__911734655>;
+    businessSettings : {var settings : BusinessSettings__178864821};
+    commissionPayments :
+      Map__230067015<Id__465323056, CommissionPayment__223593228>;
+    company : {var profile : CompanyProfile__873916824};
+    counters : NewCounters__95274195;
+    customers : Map__230067015<Id__465323056, Customer__426668004>;
+    expenses : Map__230067015<Id__465323056, Expense__463896208>;
+    invoices : Map__230067015<Id__465323056, Invoice__732995946>;
+    lots : Map__230067015<Id__465323056, Lot__539730214>;
+    motorcycles : Map__230067015<Id__465323056, Motorcycle__1015266968>;
+    movements : Map__230067015<Id__465323056, Movement__115320755>;
+    orders : Map__230067015<Id__465323056, WorkshopOrder__390599908>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__60277288>;
+    parts : Map__230067015<Id__465323056, Part__757259780>;
+    payments : Map__230067015<Id__465323056, Payment__879165932>;
+    posSales : Map__230067015<Id__465323056, PosSale__944485395>;
+    purchases : Map__230067015<Id__465323056, Purchase__1072232786>;
+    quotes : Map__230067015<Id__465323056, Quote__953668230>;
+    receivablePayments :
+      Map__230067015<Id__465323056, ReceivablePayment__23407358>;
+    serviceCategories :
+      Map__230067015<Id__465323056, ServiceCategory__1000625021>;
+    services : Map__230067015<Id__465323056, Service__230457008>;
+    supplierOrders : Map__230067015<Id__465323056, SupplierOrder__21263843>;
+    suppliers : Map__230067015<Id__465323056, Supplier__888557922>;
+    technicianLoans :
+      Map__230067015<Id__465323056, TechnicianLoan__550790875>;
+    technicians : Map__230067015<Id__465323056, Technician__48228132>;
+    userProfiles : Map__230067015<Principal, UserProfile__499403371>
+  };
+type NewActor__193197324 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__1058561351, Appointment__804082241>;
+    businessSettings : {var settings : BusinessSettings__98731410};
+    company : {var profile : CompanyProfile__500616242};
+    counters : Counters__418896284;
+    customers : Map__230067015<Id__1058561351, Customer__794450161>;
+    expenses : Map__230067015<Id__1058561351, Expense__680440412>;
+    invoices : Map__230067015<Id__1058561351, Invoice__714629455>;
+    lots : Map__230067015<Id__1058561351, Lot__347984760>;
+    motorcycles : Map__230067015<Id__1058561351, Motorcycle__449860927>;
+    movements : Map__230067015<Id__1058561351, Movement__179819967>;
+    orders : Map__230067015<Id__1058561351, WorkshopOrder__323831231>;
+    parts : Map__230067015<Id__1058561351, Part__517136355>;
+    payments : Map__230067015<Id__1058561351, Payment__948380800>;
+    posSales : Map__230067015<Id__1058561351, PosSale__460108168>;
+    purchases : Map__230067015<Id__1058561351, Purchase__426948546>;
+    quotes : Map__230067015<Id__1058561351, Quote__95992469>;
+    services : Map__230067015<Id__1058561351, Service__801757779>;
+    suppliers : Map__230067015<Id__1058561351, Supplier__304850569>;
+    technicians : Map__230067015<Id__1058561351, Technician__714662660>;
+    userProfiles : Map__230067015<Principal, UserProfile__46133562>
+  };
+type NewActor__248761742 =
+  {
+    accessControlState : AccessControlState__201339279;
+    businessSettings : {var settings : BusinessSettings__61048047};
+    counters :
+      {
+        var nextCustomerId : Nat;
+        var nextInvoiceId : Nat;
+        var nextInvoiceNumber : Nat;
+        var nextLaborId : Nat;
+        var nextLotId : Nat;
+        var nextMotorcycleId : Nat;
+        var nextMovementId : Nat;
+        var nextOrderId : Nat;
+        var nextOrderPartId : Nat;
+        var nextPartId : Nat;
+        var nextPaymentId : Nat;
+        var nextPurchaseId : Nat;
+        var nextPurchaseItemId : Nat;
+        var nextSupplierId : Nat
+      };
+    customers : Map__230067015<Id__181169964, Customer__627563761>;
+    invoices : Map__230067015<Id__181169964, Invoice__991145913>;
+    lots : Map__230067015<Id__181169964, Lot__1045790050>;
+    motorcycles : Map__230067015<Id__181169964, Motorcycle__861642040>;
+    movements : Map__230067015<Id__181169964, Movement__378224049>;
+    orders : Map__230067015<Id__181169964, WorkshopOrder__1046213111>;
+    parts : Map__230067015<Id__181169964, Part__369032184>;
+    payments : Map__230067015<Id__181169964, Payment__354812840>;
+    purchases : Map__230067015<Id__181169964, Purchase__137422891>;
+    suppliers : Map__230067015<Id__181169964, Supplier__616715695>;
+    userProfiles : Map__230067015<Principal, UserProfile__958225441>
+  };
+type NewActor__341238509 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__682458743, Appointment__631065446>;
+    businessSettings : {var settings : BusinessSettings__750133389};
+    commissionPayments :
+      Map__230067015<Id__682458743, CommissionPayment__428300045>;
+    company : {var profile : CompanyProfile__350404412};
+    counters : Counters__503773944;
+    customers : Map__230067015<Id__682458743, Customer__278604873>;
+    driveCredentials : {var credentials : ?DriveCredentials__972385448};
+    expenseCategories :
+      Map__230067015<Id__682458743, ExpenseCategory__890461425>;
+    expenses : Map__230067015<Id__682458743, Expense__129352178>;
+    invoices : Map__230067015<Id__682458743, Invoice__710428744>;
+    lots : Map__230067015<Id__682458743, Lot__433345054>;
+    motorcycles : Map__230067015<Id__682458743, Motorcycle__944420131>;
+    movements : Map__230067015<Id__682458743, Movement__67587889>;
+    orders : Map__230067015<Id__682458743, WorkshopOrder__886828756>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__612890457>;
+    parts : Map__230067015<Id__682458743, Part__316907304>;
+    payments : Map__230067015<Id__682458743, Payment__148980380>;
+    posSales : Map__230067015<Id__682458743, PosSale__465634361>;
+    purchases : Map__230067015<Id__682458743, Purchase__56357781>;
+    quotes : Map__230067015<Id__682458743, Quote__402585726>;
+    receivablePayments :
+      Map__230067015<Id__682458743, ReceivablePayment__841273733>;
+    serviceCategories :
+      Map__230067015<Id__682458743, ServiceCategory__913063150>;
+    services : Map__230067015<Id__682458743, Service__977311090>;
+    supplierOrders : Map__230067015<Id__682458743, SupplierOrder__269635366>;
+    suppliers : Map__230067015<Id__682458743, Supplier__212293571>;
+    technicianLoans : Map__230067015<Id__682458743, TechnicianLoan__95903112>;
+    technicians : Map__230067015<Id__682458743, Technician__56435852>;
+    userProfiles : Map__230067015<Principal, UserProfile__971468964>
+  };
+type NewActor__426998186 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__1073409734, Appointment__734866746>;
+    businessSettings : {var settings : BusinessSettings__682960040};
+    company : {var profile : CompanyProfile__844693020};
+    counters :
+      {
+        var nextAppointmentId : Nat;
+        var nextCustomerId : Nat;
+        var nextExpenseId : Nat;
+        var nextInvoiceId : Nat;
+        var nextInvoiceNumber : Nat;
+        var nextLaborId : Nat;
+        var nextLotId : Nat;
+        var nextMotorcycleId : Nat;
+        var nextMovementId : Nat;
+        var nextOrderId : Nat;
+        var nextOrderPartId : Nat;
+        var nextPartId : Nat;
+        var nextPaymentId : Nat;
+        var nextPosSaleId : Nat;
+        var nextPosSaleNumber : Nat;
+        var nextPurchaseId : Nat;
+        var nextPurchaseItemId : Nat;
+        var nextQuoteId : Nat;
+        var nextQuoteNumber : Nat;
+        var nextQuotePartLineId : Nat;
+        var nextQuoteServiceLineId : Nat;
+        var nextServiceId : Nat;
+        var nextSupplierId : Nat;
+        var nextTechnicianId : Nat
+      };
+    customers : Map__230067015<Id__1073409734, Customer__612368474>;
+    expenses : Map__230067015<Id__1073409734, Expense__992457603>;
+    invoices : Map__230067015<Id__1073409734, NewInvoice__393467652>;
+    lots : Map__230067015<Id__1073409734, Lot__591690177>;
+    motorcycles : Map__230067015<Id__1073409734, Motorcycle__793990364>;
+    movements : Map__230067015<Id__1073409734, Movement__955454396>;
+    orders : Map__230067015<Id__1073409734, NewWorkshopOrder__350546185>;
+    parts : Map__230067015<Id__1073409734, Part__228190784>;
+    payments : Map__230067015<Id__1073409734, Payment__116801709>;
+    posSales : Map__230067015<Id__1073409734, PosSale__915857909>;
+    purchases : Map__230067015<Id__1073409734, Purchase__1035565964>;
+    quotes : Map__230067015<Id__1073409734, Quote__678999130>;
+    services : Map__230067015<Id__1073409734, Service__320489677>;
+    suppliers : Map__230067015<Id__1073409734, Supplier__813955406>;
+    technicians : Map__230067015<Id__1073409734, Technician__404587213>;
+    userProfiles : Map__230067015<Principal, UserProfile__448324588>
+  };
+type NewActor__480550677 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__831659287, Appointment__261687749>;
+    businessSettings : {var settings : BusinessSettings__605080669};
+    commissionPayments :
+      Map__230067015<Id__831659287, NewCommissionPayment__776374544>;
+    company : {var profile : CompanyProfile__33915540};
+    counters : NewCounters__459168281;
+    customers : Map__230067015<Id__831659287, Customer__47921922>;
+    expenses : Map__230067015<Id__831659287, Expense__377604966>;
+    invoices : Map__230067015<Id__831659287, NewInvoice__496603046>;
+    lots : Map__230067015<Id__831659287, Lot__869509375>;
+    motorcycles : Map__230067015<Id__831659287, Motorcycle__981403685>;
+    movements : Map__230067015<Id__831659287, Movement__933202288>;
+    orders : Map__230067015<Id__831659287, NewWorkshopOrder__81366930>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__996513607>;
+    parts : Map__230067015<Id__831659287, Part__515355909>;
+    payments : Map__230067015<Id__831659287, Payment__781380011>;
+    posSales : Map__230067015<Id__831659287, NewPosSale__364845527>;
+    purchases : Map__230067015<Id__831659287, Purchase__664651860>;
+    quotes : Map__230067015<Id__831659287, Quote__226940507>;
+    serviceCategories :
+      Map__230067015<Id__831659287, ServiceCategory__256926762>;
+    services : Map__230067015<Id__831659287, Service__278837828>;
+    suppliers : Map__230067015<Id__831659287, Supplier__477043678>;
+    technicianLoans :
+      Map__230067015<Id__831659287, TechnicianLoan__236791659>;
+    technicians : Map__230067015<Id__831659287, Technician__797990442>;
+    userProfiles : Map__230067015<Principal, UserProfile__585216708>
+  };
+type NewActor__486559717 =
+  {
+    purchaseInvoices :
+      Map__230067015<Id__766779107, PurchaseInvoice__21425276>
+  };
+type NewActor__619974250 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__338555919, Appointment__433800605>;
+    businessSettings : {var settings : BusinessSettings__957115348};
+    commissionPayments :
+      Map__230067015<Id__338555919, CommissionPayment__732177830>;
+    company : {var profile : NewCompanyProfile__402658247};
+    counters : Counters__275218943;
+    customers : Map__230067015<Id__338555919, Customer__592776857>;
+    expenses : Map__230067015<Id__338555919, Expense__290139545>;
+    invoices : Map__230067015<Id__338555919, Invoice__60653959>;
+    lots : Map__230067015<Id__338555919, Lot__672476020>;
+    motorcycles : Map__230067015<Id__338555919, Motorcycle__769470110>;
+    movements : Map__230067015<Id__338555919, Movement__721724591>;
+    orders : Map__230067015<Id__338555919, NewWorkshopOrder__363033939>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__183384074>;
+    parts : Map__230067015<Id__338555919, Part__72383151>;
+    payments : Map__230067015<Id__338555919, Payment__628143693>;
+    posSales : Map__230067015<Id__338555919, PosSale__612084270>;
+    purchases : Map__230067015<Id__338555919, Purchase__929551669>;
+    quotes : Map__230067015<Id__338555919, Quote__474464891>;
+    serviceCategories :
+      Map__230067015<Id__338555919, ServiceCategory__55681556>;
+    services : Map__230067015<Id__338555919, Service__103523136>;
+    suppliers : Map__230067015<Id__338555919, Supplier__282669743>;
+    technicianLoans :
+      Map__230067015<Id__338555919, TechnicianLoan__817818258>;
+    technicians : Map__230067015<Id__338555919, Technician__67773430>;
+    userProfiles : Map__230067015<Principal, UserProfile__823120487>
+  };
+type NewActor__732283469 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__677737347, Appointment__835580385>;
+    businessSettings : {var settings : BusinessSettings__548099142};
+    commissionPayments :
+      Map__230067015<Id__677737347, CommissionPayment__1059691631>;
+    company : {var profile : CompanyProfile__1061314079};
+    counters : NewCounters__391380213;
+    customers : Map__230067015<Id__677737347, Customer__134735249>;
+    expenses : Map__230067015<Id__677737347, Expense__60290867>;
+    invoices : Map__230067015<Id__677737347, Invoice__539609799>;
+    lots : Map__230067015<Id__677737347, Lot__1049180505>;
+    motorcycles : Map__230067015<Id__677737347, Motorcycle__398328452>;
+    movements : Map__230067015<Id__677737347, Movement__556930591>;
+    orders : Map__230067015<Id__677737347, NewWorkshopOrder__573299842>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__183503415>;
+    parts : Map__230067015<Id__677737347, Part__788598332>;
+    payments : Map__230067015<Id__677737347, Payment__123063968>;
+    posSales : Map__230067015<Id__677737347, PosSale__685009912>;
+    purchases : Map__230067015<Id__677737347, Purchase__1054274303>;
+    quotes : Map__230067015<Id__677737347, Quote__868861137>;
+    serviceCategories :
+      Map__230067015<Id__677737347, ServiceCategory__598913783>;
+    services : Map__230067015<Id__677737347, Service__339164964>;
+    suppliers : Map__230067015<Id__677737347, Supplier__742847255>;
+    technicianLoans :
+      Map__230067015<Id__677737347, TechnicianLoan__711232200>;
+    technicians : Map__230067015<Id__677737347, NewTechnician__308856466>;
+    userProfiles : Map__230067015<Principal, UserProfile__24825253>
+  };
+type NewActor__949499829 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__835680607, Appointment__32285393>;
+    businessSettings : {var settings : BusinessSettings__167119193};
+    commissionPayments :
+      Map__230067015<Id__835680607, CommissionPayment__426908577>;
+    company : {var profile : CompanyProfile__916775167};
+    counters : Counters__512489927;
+    customers : Map__230067015<Id__835680607, Customer__153367834>;
+    driveCredentials : {var credentials : ?DriveCredentials__174240718};
+    expenseCategories :
+      Map__230067015<Id__835680607, ExpenseCategory__22611927>;
+    expenses : Map__230067015<Id__835680607, Expense__783262754>;
+    invoices : Map__230067015<Id__835680607, Invoice__764657985>;
+    lots : Map__230067015<Id__835680607, Lot__672089387>;
+    motorcycles : Map__230067015<Id__835680607, Motorcycle__662803895>;
+    movements : Map__230067015<Id__835680607, Movement__617608149>;
+    orders : Map__230067015<Id__835680607, WorkshopOrder__114653181>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__452801020>;
+    parts : Map__230067015<Id__835680607, Part__23570061>;
+    payments : Map__230067015<Id__835680607, Payment__754004387>;
+    posSales : Map__230067015<Id__835680607, PosSale__1003840985>;
+    purchaseInvoices :
+      Map__230067015<Id__835680607, PurchaseInvoice__386646187>;
+    purchases : Map__230067015<Id__835680607, Purchase__459594975>;
+    quotes : Map__230067015<Id__835680607, Quote__170431888>;
+    receivablePayments :
+      Map__230067015<Id__835680607, ReceivablePayment__243943556>;
+    serviceCategories :
+      Map__230067015<Id__835680607, ServiceCategory__156119941>;
+    services : Map__230067015<Id__835680607, Service__583051234>;
+    supplierOrders : Map__230067015<Id__835680607, SupplierOrder__611399941>;
+    suppliers : Map__230067015<Id__835680607, Supplier__877273530>;
+    technicianLoans :
+      Map__230067015<Id__835680607, TechnicianLoan__628285280>;
+    technicians : Map__230067015<Id__835680607, Technician__969373623>;
+    userProfiles : Map__230067015<Principal, UserProfile__780622392>
+  };
+type NewActor__963881556 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__68706484, Appointment__367507406>;
+    businessSettings : {var settings : BusinessSettings__1021365173};
+    commissionPayments :
+      Map__230067015<Id__68706484, CommissionPayment__946460145>;
+    company : {var profile : CompanyProfile__218571542};
+    counters : NewCounters__758852046;
+    customers : Map__230067015<Id__68706484, Customer__705771782>;
+    expenseCategories :
+      Map__230067015<Id__68706484, ExpenseCategory__957791908>;
+    expenses : Map__230067015<Id__68706484, Expense__616435643>;
+    invoices : Map__230067015<Id__68706484, Invoice__279583182>;
+    lots : Map__230067015<Id__68706484, Lot__393412874>;
+    motorcycles : Map__230067015<Id__68706484, Motorcycle__595545290>;
+    movements : Map__230067015<Id__68706484, Movement__985189546>;
+    orders : Map__230067015<Id__68706484, WorkshopOrder__577649936>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__290848128>;
+    parts : Map__230067015<Id__68706484, Part__279907418>;
+    payments : Map__230067015<Id__68706484, Payment__265641917>;
+    posSales : Map__230067015<Id__68706484, PosSale__1060646934>;
+    purchases : Map__230067015<Id__68706484, Purchase__350716635>;
+    quotes : Map__230067015<Id__68706484, Quote__501845365>;
+    receivablePayments :
+      Map__230067015<Id__68706484, ReceivablePayment__98412797>;
+    serviceCategories :
+      Map__230067015<Id__68706484, ServiceCategory__828605544>;
+    services : Map__230067015<Id__68706484, Service__258576453>;
+    supplierOrders : Map__230067015<Id__68706484, SupplierOrder__1053252473>;
+    suppliers : Map__230067015<Id__68706484, Supplier__524943105>;
+    technicianLoans : Map__230067015<Id__68706484, TechnicianLoan__76053247>;
+    technicians : Map__230067015<Id__68706484, Technician__31894530>;
+    userProfiles : Map__230067015<Principal, UserProfile__1039889572>
+  };
+type NewCommissionPayment__776374544 =
+  {
+    baseAmount : Money__787739131;
+    commissionAmount : Money__787739131;
+    id : Id__831659287;
+    lineCount : Nat;
+    lines : [CommissionLine__1000447934];
+    loans : [CommissionPaymentLoan__45238418];
+    loansDeducted : Money__787739131;
+    netPaid : Money__787739131;
+    paidAt : Timestamp__7607913;
+    paidBy : Principal;
+    period : CommissionPeriod__209051668;
+    technicianCode : Text;
+    technicianId : Id__831659287;
+    technicianName : Text
+  };
+type NewCompanyProfile__402658247 =
+  {
+    address : Text;
+    checkDigit : ?Nat;
+    city : Text;
+    documentType : DocumentType__118779761;
+    email : ?Text;
+    fiscalRegime : FiscalRegime__773564200;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__57071152;
+    taxResponsibility : TaxResponsibility__520356442;
+    tradeName : ?Text;
+    updatedAt : Timestamp__310406396;
+    website : ?Text
+  };
+type NewCounters__391380213 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type NewCounters__459168281 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextOrderPhotoId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type NewCounters__758852046 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseCategoryId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextOrderPhotoId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextReceivablePaymentId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextSupplierOrderId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type NewCounters__95274195 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextOrderPhotoId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextReceivablePaymentId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextSupplierOrderId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type NewInvoiceLine__1054906816 =
+  {
+    amount : Money__787739131;
+    description : Text;
+    kind : InvoiceLineKind__730294025;
+    quantity : Nat;
+    unitCost : Money__787739131;
+    unitPrice : Money__787739131
+  };
+type NewInvoice__393467652 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__1073409734;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__772428565;
+    id : Id__1073409734;
+    issuedAt : Timestamp__836802844;
+    lines : [InvoiceLine__319410059];
+    number : Text;
+    orderId : ?Id__1073409734;
+    origin : InvoiceOrigin__352082472;
+    paymentMethod : PaymentMethod__884237940;
+    paymentStatus : PaymentStatus__522605526;
+    posSaleId : ?Id__1073409734;
+    subtotal : Money__772428565;
+    tax : Money__772428565;
+    taxRate : TaxRate__709191531;
+    total : Money__772428565
+  };
+type NewInvoice__496603046 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__831659287;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__787739131;
+    id : Id__831659287;
+    installments : ?InstallmentPlan__825968234;
+    issuedAt : Timestamp__7607913;
+    lines : [NewInvoiceLine__1054906816];
+    number : Text;
+    orderId : ?Id__831659287;
+    origin : InvoiceOrigin__74023074;
+    paymentCondition : PaymentCondition__998272709;
+    paymentMethod : PaymentMethod__864907580;
+    paymentStatus : PaymentStatus__787074198;
+    posSaleId : ?Id__831659287;
+    subtotal : Money__787739131;
+    tax : Money__787739131;
+    taxRate : TaxRate__799697541;
+    total : Money__787739131
+  };
+type NewLaborItem__148620954 =
+  {
+    description : Text;
+    id : Id__677737347;
+    price : Money__747169860;
+    technicianId : ?Id__677737347
+  };
+type NewLaborItem__749707682 =
+  {
+    description : Text;
+    id : Id__338555919;
+    price : Money__186267775;
+    serviceId : ?Id__338555919;
+    technicianId : ?Id__338555919
+  };
+type NewPosSale__364845527 =
+  {
+    amountReceived : Money__787739131;
+    change : Money__787739131;
+    customerId : ?Id__831659287;
+    customerName : ?Text;
+    discount : Money__787739131;
+    id : Id__831659287;
+    invoiceId : Id__831659287;
+    lines : [PosSaleLine__260976166];
+    paymentCondition : PaymentCondition__998272709;
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__7607913;
+    soldBy : Principal;
+    subtotal : Money__787739131;
+    tax : Money__787739131;
+    taxRate : TaxRate__799697541;
+    total : Money__787739131
+  };
+type NewStatusChange__380276342 =
+  {
+    at : Timestamp__7607913;
+    from : ?OrderStatus__189538141;
+    performedBy : Principal;
+    to : OrderStatus__189538141
+  };
+type NewTechnician__308856466 =
+  {
+    active : Bool;
+    code : Text;
+    commissionRate : Nat;
+    createdAt : Timestamp__486448937;
+    email : ?Text;
+    hourlyRate : Money__747169860;
+    id : Id__677737347;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type NewWorkshopOrder__350546185 =
+  {
+    createdAt : Timestamp__836802844;
+    customerId : Id__1073409734;
+    id : Id__1073409734;
+    intakeMileage : Nat;
+    labor : [LaborItem__324369802];
+    motorcycleId : Id__1073409734;
+    orderNumber : Text;
+    parts : [OrderPart__741929472];
+    problem : Text;
+    status : OrderStatus__643407394;
+    statusHistory : [StatusChange__592682872];
+    technicianIds : [Id__1073409734];
+    updatedAt : Timestamp__836802844
+  };
+type NewWorkshopOrder__363033939 =
+  {
+    createdAt : Timestamp__310406396;
+    customerId : Id__338555919;
+    id : Id__338555919;
+    intakeMileage : Nat;
+    labor : [NewLaborItem__749707682];
+    motorcycleId : Id__338555919;
+    orderNumber : Text;
+    parts : [OrderPart__821103568];
+    problem : Text;
+    status : OrderStatus__247311635;
+    statusHistory : [StatusChange__643094622];
+    technicianIds : [Id__338555919];
+    updatedAt : Timestamp__310406396
+  };
+type NewWorkshopOrder__573299842 =
+  {
+    createdAt : Timestamp__486448937;
+    customerId : Id__677737347;
+    id : Id__677737347;
+    intakeMileage : Nat;
+    labor : [NewLaborItem__148620954];
+    motorcycleId : Id__677737347;
+    orderNumber : Text;
+    parts : [OrderPart__655592762];
+    problem : Text;
+    status : OrderStatus__833770585;
+    statusHistory : [StatusChange__988916780];
+    technicianIds : [Id__677737347];
+    updatedAt : Timestamp__486448937
+  };
+type NewWorkshopOrder__81366930 =
+  {
+    cancelReason : ?Text;
+    cancelledAt : ?Timestamp__7607913;
+    createdAt : Timestamp__7607913;
+    customerId : Id__831659287;
+    id : Id__831659287;
+    intakeMileage : Nat;
+    labor : [LaborItem__165158698];
+    motorcycleId : Id__831659287;
+    orderNumber : Text;
+    parts : [OrderPart__524492973];
+    photos : [OrderPhoto__567007113];
+    problem : Text;
+    status : OrderStatus__189538141;
+    statusHistory : [NewStatusChange__380276342];
+    technicianIds : [Id__831659287];
+    updatedAt : Timestamp__7607913
+  };
+type Node__204828119<K, V> =
+  {#internal : Internal__283199666<K, V>; #leaf : Leaf__598469445<K, V>};
+type Node__620761243<T> =
+  {#internal : Internal__23036296<T>; #leaf : Leaf__948582970<T>};
+type OldActor__1033119137 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__1058561351, Appointment__804082241>;
+    businessSettings : {var settings : BusinessSettings__98731410};
+    company : {var profile : CompanyProfile__500616242};
+    counters : Counters__418896284;
+    customers : Map__230067015<Id__1058561351, Customer__794450161>;
+    expenses : Map__230067015<Id__1058561351, Expense__680440412>;
+    invoices : Map__230067015<Id__1058561351, Invoice__714629455>;
+    lots : Map__230067015<Id__1058561351, Lot__347984760>;
+    motorcycles : Map__230067015<Id__1058561351, Motorcycle__449860927>;
+    movements : Map__230067015<Id__1058561351, Movement__179819967>;
+    orders : Map__230067015<Id__1058561351, WorkshopOrder__323831231>;
+    parts : Map__230067015<Id__1058561351, Part__517136355>;
+    payments : Map__230067015<Id__1058561351, Payment__948380800>;
+    posSales : Map__230067015<Id__1058561351, PosSale__460108168>;
+    purchases : Map__230067015<Id__1058561351, Purchase__426948546>;
+    quotes : Map__230067015<Id__1058561351, Quote__95992469>;
+    services : Map__230067015<Id__1058561351, Service__801757779>;
+    suppliers : Map__230067015<Id__1058561351, Supplier__304850569>;
+    technicians : Map__230067015<Id__1058561351, Technician__714662660>;
+    userProfiles : Map__230067015<Principal, UserProfile__46133562>
+  };
+type OldActor__175115580 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__338555919, Appointment__433800605>;
+    businessSettings : {var settings : BusinessSettings__957115348};
+    commissionPayments :
+      Map__230067015<Id__338555919, CommissionPayment__732177830>;
+    company : {var profile : OldCompanyProfile__400423284};
+    counters : Counters__275218943;
+    customers : Map__230067015<Id__338555919, Customer__592776857>;
+    expenses : Map__230067015<Id__338555919, Expense__290139545>;
+    invoices : Map__230067015<Id__338555919, Invoice__60653959>;
+    lots : Map__230067015<Id__338555919, Lot__672476020>;
+    motorcycles : Map__230067015<Id__338555919, Motorcycle__769470110>;
+    movements : Map__230067015<Id__338555919, Movement__721724591>;
+    orders : Map__230067015<Id__338555919, OldWorkshopOrder__781683161>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__183384074>;
+    parts : Map__230067015<Id__338555919, Part__72383151>;
+    payments : Map__230067015<Id__338555919, Payment__628143693>;
+    posSales : Map__230067015<Id__338555919, PosSale__612084270>;
+    purchases : Map__230067015<Id__338555919, Purchase__929551669>;
+    quotes : Map__230067015<Id__338555919, Quote__474464891>;
+    serviceCategories :
+      Map__230067015<Id__338555919, ServiceCategory__55681556>;
+    services : Map__230067015<Id__338555919, Service__103523136>;
+    suppliers : Map__230067015<Id__338555919, Supplier__282669743>;
+    technicianLoans :
+      Map__230067015<Id__338555919, TechnicianLoan__817818258>;
+    technicians : Map__230067015<Id__338555919, Technician__67773430>;
+    userProfiles : Map__230067015<Principal, UserProfile__823120487>
+  };
+type OldActor__241283283 =
+  {
+    accessControlState : AccessControlState__201339279;
+    businessSettings : {var settings : BusinessSettings__682960040};
+    counters : OldCounters__896982284;
+    customers : Map__230067015<Id__1073409734, OldCustomer__964931438>;
+    invoices : Map__230067015<Id__1073409734, OldInvoice__945328483>;
+    lots : Map__230067015<Id__1073409734, Lot__591690177>;
+    motorcycles : Map__230067015<Id__1073409734, Motorcycle__793990364>;
+    movements : Map__230067015<Id__1073409734, Movement__955454396>;
+    orders : Map__230067015<Id__1073409734, OldWorkshopOrder__801490374>;
+    parts : Map__230067015<Id__1073409734, Part__228190784>;
+    payments : Map__230067015<Id__1073409734, Payment__116801709>;
+    purchases : Map__230067015<Id__1073409734, Purchase__1035565964>;
+    suppliers : Map__230067015<Id__1073409734, Supplier__813955406>;
+    userProfiles : Map__230067015<Principal, UserProfile__448324588>
+  };
+type OldActor__263139629 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__835680607, Appointment__32285393>;
+    businessSettings : {var settings : BusinessSettings__167119193};
+    commissionPayments :
+      Map__230067015<Id__835680607, CommissionPayment__426908577>;
+    company : {var profile : CompanyProfile__916775167};
+    counters :
+      {
+        var nextAppointmentId : Nat;
+        var nextCommissionPaymentId : Nat;
+        var nextCustomerId : Nat;
+        var nextExpenseCategoryId : Nat;
+        var nextExpenseId : Nat;
+        var nextInvoiceId : Nat;
+        var nextInvoiceNumber : Nat;
+        var nextLaborId : Nat;
+        var nextLotId : Nat;
+        var nextMotorcycleId : Nat;
+        var nextMovementId : Nat;
+        var nextOrderId : Nat;
+        var nextOrderPartId : Nat;
+        var nextOrderPhotoId : Nat;
+        var nextPartId : Nat;
+        var nextPaymentId : Nat;
+        var nextPosSaleId : Nat;
+        var nextPosSaleNumber : Nat;
+        var nextPurchaseId : Nat;
+        var nextPurchaseItemId : Nat;
+        var nextQuoteId : Nat;
+        var nextQuoteNumber : Nat;
+        var nextQuotePartLineId : Nat;
+        var nextQuoteServiceLineId : Nat;
+        var nextReceivablePaymentId : Nat;
+        var nextServiceCategoryId : Nat;
+        var nextServiceId : Nat;
+        var nextSupplierId : Nat;
+        var nextSupplierOrderId : Nat;
+        var nextTechnicianId : Nat;
+        var nextTechnicianLoanId : Nat
+      };
+    customers : Map__230067015<Id__835680607, Customer__153367834>;
+    driveCredentials : {var credentials : ?DriveCredentials__174240718};
+    expenseCategories :
+      Map__230067015<Id__835680607, ExpenseCategory__22611927>;
+    expenses : Map__230067015<Id__835680607, Expense__783262754>;
+    invoices : Map__230067015<Id__835680607, Invoice__764657985>;
+    lots : Map__230067015<Id__835680607, Lot__672089387>;
+    motorcycles : Map__230067015<Id__835680607, Motorcycle__662803895>;
+    movements : Map__230067015<Id__835680607, Movement__617608149>;
+    orders : Map__230067015<Id__835680607, WorkshopOrder__114653181>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__452801020>;
+    parts : Map__230067015<Id__835680607, Part__23570061>;
+    payments : Map__230067015<Id__835680607, Payment__754004387>;
+    posSales : Map__230067015<Id__835680607, PosSale__1003840985>;
+    purchases : Map__230067015<Id__835680607, Purchase__459594975>;
+    quotes : Map__230067015<Id__835680607, Quote__170431888>;
+    receivablePayments :
+      Map__230067015<Id__835680607, ReceivablePayment__243943556>;
+    serviceCategories :
+      Map__230067015<Id__835680607, ServiceCategory__156119941>;
+    services : Map__230067015<Id__835680607, Service__583051234>;
+    supplierOrders : Map__230067015<Id__835680607, SupplierOrder__611399941>;
+    suppliers : Map__230067015<Id__835680607, Supplier__877273530>;
+    technicianLoans :
+      Map__230067015<Id__835680607, TechnicianLoan__628285280>;
+    technicians : Map__230067015<Id__835680607, Technician__969373623>;
+    userProfiles : Map__230067015<Principal, UserProfile__780622392>
+  };
+type OldActor__362172830 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__831659287, Appointment__261687749>;
+    businessSettings : {var settings : BusinessSettings__605080669};
+    commissionPayments :
+      Map__230067015<Id__831659287, OldCommissionPayment__898454579>;
+    company : {var profile : CompanyProfile__33915540};
+    counters : OldCounters__454466857;
+    customers : Map__230067015<Id__831659287, Customer__47921922>;
+    expenses : Map__230067015<Id__831659287, Expense__377604966>;
+    invoices : Map__230067015<Id__831659287, OldInvoice__463044058>;
+    lots : Map__230067015<Id__831659287, Lot__869509375>;
+    motorcycles : Map__230067015<Id__831659287, Motorcycle__981403685>;
+    movements : Map__230067015<Id__831659287, Movement__933202288>;
+    orders : Map__230067015<Id__831659287, OldWorkshopOrder__258976693>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__996513607>;
+    parts : Map__230067015<Id__831659287, Part__515355909>;
+    payments : Map__230067015<Id__831659287, Payment__781380011>;
+    posSales : Map__230067015<Id__831659287, OldPosSale__229032272>;
+    purchases : Map__230067015<Id__831659287, Purchase__664651860>;
+    quotes : Map__230067015<Id__831659287, Quote__226940507>;
+    serviceCategories :
+      Map__230067015<Id__831659287, ServiceCategory__256926762>;
+    services : Map__230067015<Id__831659287, Service__278837828>;
+    suppliers : Map__230067015<Id__831659287, Supplier__477043678>;
+    technicianLoans :
+      Map__230067015<Id__831659287, TechnicianLoan__236791659>;
+    technicians : Map__230067015<Id__831659287, Technician__797990442>;
+    userProfiles : Map__230067015<Principal, UserProfile__585216708>
+  };
+type OldActor__3928544 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__68706484, Appointment__367507406>;
+    businessSettings : {var settings : BusinessSettings__1021365173};
+    commissionPayments :
+      Map__230067015<Id__68706484, CommissionPayment__946460145>;
+    company : {var profile : CompanyProfile__218571542};
+    counters : OldCounters__718239567;
+    customers : Map__230067015<Id__68706484, Customer__705771782>;
+    expenses : Map__230067015<Id__68706484, OldExpense__24346261>;
+    invoices : Map__230067015<Id__68706484, Invoice__279583182>;
+    lots : Map__230067015<Id__68706484, Lot__393412874>;
+    motorcycles : Map__230067015<Id__68706484, Motorcycle__595545290>;
+    movements : Map__230067015<Id__68706484, Movement__985189546>;
+    orders : Map__230067015<Id__68706484, WorkshopOrder__577649936>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__290848128>;
+    parts : Map__230067015<Id__68706484, Part__279907418>;
+    payments : Map__230067015<Id__68706484, Payment__265641917>;
+    posSales : Map__230067015<Id__68706484, PosSale__1060646934>;
+    purchases : Map__230067015<Id__68706484, Purchase__350716635>;
+    quotes : Map__230067015<Id__68706484, Quote__501845365>;
+    receivablePayments :
+      Map__230067015<Id__68706484, ReceivablePayment__98412797>;
+    serviceCategories :
+      Map__230067015<Id__68706484, ServiceCategory__828605544>;
+    services : Map__230067015<Id__68706484, Service__258576453>;
+    supplierOrders : Map__230067015<Id__68706484, SupplierOrder__1053252473>;
+    suppliers : Map__230067015<Id__68706484, Supplier__524943105>;
+    technicianLoans : Map__230067015<Id__68706484, TechnicianLoan__76053247>;
+    technicians : Map__230067015<Id__68706484, Technician__31894530>;
+    userProfiles : Map__230067015<Principal, UserProfile__1039889572>
+  };
+type OldActor__61572473 =
+  {
+    purchaseInvoices :
+      Map__230067015<Id__766779107, OldPurchaseInvoice__701326455>
+  };
+type OldActor__624391799 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__682458743, Appointment__631065446>;
+    businessSettings : {var settings : BusinessSettings__750133389};
+    commissionPayments :
+      Map__230067015<Id__682458743, CommissionPayment__428300045>;
+    company : {var profile : CompanyProfile__350404412};
+    counters : Counters__503773944;
+    customers : Map__230067015<Id__682458743, Customer__278604873>;
+    expenseCategories :
+      Map__230067015<Id__682458743, ExpenseCategory__890461425>;
+    expenses : Map__230067015<Id__682458743, Expense__129352178>;
+    invoices : Map__230067015<Id__682458743, Invoice__710428744>;
+    lots : Map__230067015<Id__682458743, Lot__433345054>;
+    motorcycles : Map__230067015<Id__682458743, Motorcycle__944420131>;
+    movements : Map__230067015<Id__682458743, Movement__67587889>;
+    orders : Map__230067015<Id__682458743, WorkshopOrder__886828756>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__612890457>;
+    parts : Map__230067015<Id__682458743, Part__316907304>;
+    payments : Map__230067015<Id__682458743, Payment__148980380>;
+    posSales : Map__230067015<Id__682458743, PosSale__465634361>;
+    purchases : Map__230067015<Id__682458743, Purchase__56357781>;
+    quotes : Map__230067015<Id__682458743, Quote__402585726>;
+    receivablePayments :
+      Map__230067015<Id__682458743, ReceivablePayment__841273733>;
+    serviceCategories :
+      Map__230067015<Id__682458743, ServiceCategory__913063150>;
+    services : Map__230067015<Id__682458743, Service__977311090>;
+    supplierOrders : Map__230067015<Id__682458743, SupplierOrder__269635366>;
+    suppliers : Map__230067015<Id__682458743, Supplier__212293571>;
+    technicianLoans : Map__230067015<Id__682458743, TechnicianLoan__95903112>;
+    technicians : Map__230067015<Id__682458743, Technician__56435852>;
+    userProfiles : Map__230067015<Principal, UserProfile__971468964>
+  };
+type OldActor__853359044 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__677737347, Appointment__835580385>;
+    businessSettings : {var settings : BusinessSettings__548099142};
+    company : {var profile : CompanyProfile__1061314079};
+    counters : OldCounters__345014833;
+    customers : Map__230067015<Id__677737347, Customer__134735249>;
+    expenses : Map__230067015<Id__677737347, Expense__60290867>;
+    invoices : Map__230067015<Id__677737347, Invoice__539609799>;
+    lots : Map__230067015<Id__677737347, Lot__1049180505>;
+    motorcycles : Map__230067015<Id__677737347, Motorcycle__398328452>;
+    movements : Map__230067015<Id__677737347, Movement__556930591>;
+    orders : Map__230067015<Id__677737347, OldWorkshopOrder__275262984>;
+    parts : Map__230067015<Id__677737347, Part__788598332>;
+    payments : Map__230067015<Id__677737347, Payment__123063968>;
+    posSales : Map__230067015<Id__677737347, PosSale__685009912>;
+    purchases : Map__230067015<Id__677737347, Purchase__1054274303>;
+    quotes : Map__230067015<Id__677737347, Quote__868861137>;
+    services : Map__230067015<Id__677737347, Service__339164964>;
+    suppliers : Map__230067015<Id__677737347, Supplier__742847255>;
+    technicians : Map__230067015<Id__677737347, OldTechnician__1042617869>;
+    userProfiles : Map__230067015<Principal, UserProfile__24825253>
+  };
+type OldActor__959457706 =
+  {
+    accessControlState : AccessControlState__201339279;
+    appointments : Map__230067015<Id__465323056, Appointment__911734655>;
+    businessSettings : {var settings : BusinessSettings__178864821};
+    commissionPayments :
+      Map__230067015<Id__465323056, CommissionPayment__223593228>;
+    company : {var profile : CompanyProfile__873916824};
+    counters : Counters__139607768;
+    customers : Map__230067015<Id__465323056, Customer__426668004>;
+    expenses : Map__230067015<Id__465323056, Expense__463896208>;
+    invoices : Map__230067015<Id__465323056, Invoice__732995946>;
+    lots : Map__230067015<Id__465323056, Lot__539730214>;
+    motorcycles : Map__230067015<Id__465323056, Motorcycle__1015266968>;
+    movements : Map__230067015<Id__465323056, Movement__115320755>;
+    orders : Map__230067015<Id__465323056, WorkshopOrder__390599908>;
+    paidCommissionLines : Set__70493310<CommissionLineKey__60277288>;
+    parts : Map__230067015<Id__465323056, Part__757259780>;
+    payments : Map__230067015<Id__465323056, Payment__879165932>;
+    posSales : Map__230067015<Id__465323056, PosSale__944485395>;
+    purchases : Map__230067015<Id__465323056, Purchase__1072232786>;
+    quotes : Map__230067015<Id__465323056, Quote__953668230>;
+    serviceCategories :
+      Map__230067015<Id__465323056, ServiceCategory__1000625021>;
+    services : Map__230067015<Id__465323056, Service__230457008>;
+    suppliers : Map__230067015<Id__465323056, Supplier__888557922>;
+    technicianLoans :
+      Map__230067015<Id__465323056, TechnicianLoan__550790875>;
+    technicians : Map__230067015<Id__465323056, Technician__48228132>;
+    userProfiles : Map__230067015<Principal, UserProfile__499403371>
+  };
+type OldCommissionPayment__898454579 =
+  {
+    baseAmount : Money__787739131;
+    commissionAmount : Money__787739131;
+    id : Id__831659287;
+    lineCount : Nat;
+    loans : [CommissionPaymentLoan__45238418];
+    loansDeducted : Money__787739131;
+    netPaid : Money__787739131;
+    paidAt : Timestamp__7607913;
+    paidBy : Principal;
+    period : CommissionPeriod__209051668;
+    technicianCode : Text;
+    technicianId : Id__831659287;
+    technicianName : Text
+  };
+type OldCompanyProfile__400423284 =
+  {
+    address : Text;
+    email : ?Text;
+    legalName : Text;
+    logoUrl : ?Text;
+    phone : Text;
+    taxId : Text;
+    taxRate : TaxRate__57071152;
+    updatedAt : Timestamp__310406396;
+    website : ?Text
+  };
+type OldCounters__345014833 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextTechnicianId : Nat
+  };
+type OldCounters__454466857 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type OldCounters__718239567 =
+  {
+    var nextAppointmentId : Nat;
+    var nextCommissionPaymentId : Nat;
+    var nextCustomerId : Nat;
+    var nextExpenseId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextOrderPhotoId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPosSaleId : Nat;
+    var nextPosSaleNumber : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextQuoteId : Nat;
+    var nextQuoteNumber : Nat;
+    var nextQuotePartLineId : Nat;
+    var nextQuoteServiceLineId : Nat;
+    var nextReceivablePaymentId : Nat;
+    var nextServiceCategoryId : Nat;
+    var nextServiceId : Nat;
+    var nextSupplierId : Nat;
+    var nextSupplierOrderId : Nat;
+    var nextTechnicianId : Nat;
+    var nextTechnicianLoanId : Nat
+  };
+type OldCounters__896982284 =
+  {
+    var nextCustomerId : Nat;
+    var nextInvoiceId : Nat;
+    var nextInvoiceNumber : Nat;
+    var nextLaborId : Nat;
+    var nextLotId : Nat;
+    var nextMotorcycleId : Nat;
+    var nextMovementId : Nat;
+    var nextOrderId : Nat;
+    var nextOrderPartId : Nat;
+    var nextPartId : Nat;
+    var nextPaymentId : Nat;
+    var nextPurchaseId : Nat;
+    var nextPurchaseItemId : Nat;
+    var nextSupplierId : Nat
+  };
+type OldCustomer__964931438 =
+  {
+    createdAt : Timestamp__836802844;
+    document : ?Text;
+    email : ?Text;
+    id : Id__1073409734;
+    name : Text;
+    phone : Text
+  };
+type OldExpenseCategory__917248186 =
+  {#labor; #other; #parts; #rent; #salary; #taxes; #transport; #utilities};
+type OldExpense__24346261 =
+  {
+    amount : Money__532546771;
+    category : OldExpenseCategory__917248186;
+    concept : Text;
+    createdAt : Timestamp__1039836891;
+    date : Timestamp__1039836891;
+    id : Id__68706484;
+    paymentMethod : Text;
+    receiptUrl : ?Text;
+    supplierId : ?Id__68706484;
+    supplierName : ?Text;
+    tax : Money__532546771
+  };
+type OldInvoiceLine__803591465 =
+  {
+    amount : Money__787739131;
+    description : Text;
+    quantity : Nat;
+    unitPrice : Money__787739131
+  };
+type OldInvoice__463044058 =
+  {
+    customerAddress : ?Text;
+    customerId : ?Id__831659287;
+    customerName : Text;
+    customerTaxId : ?Text;
+    discount : Money__787739131;
+    id : Id__831659287;
+    issuedAt : Timestamp__7607913;
+    lines : [OldInvoiceLine__803591465];
+    number : Text;
+    orderId : ?Id__831659287;
+    origin : InvoiceOrigin__74023074;
+    paymentMethod : PaymentMethod__864907580;
+    paymentStatus : PaymentStatus__787074198;
+    posSaleId : ?Id__831659287;
+    subtotal : Money__787739131;
+    tax : Money__787739131;
+    taxRate : TaxRate__799697541;
+    total : Money__787739131
+  };
+type OldInvoice__945328483 =
+  {
+    customerAddress : ?Text;
+    customerId : Id__1073409734;
+    customerName : Text;
+    customerTaxId : ?Text;
+    id : Id__1073409734;
+    issuedAt : Timestamp__836802844;
+    lines : [InvoiceLine__319410059];
+    number : Text;
+    orderId : Id__1073409734;
+    paymentMethod : PaymentMethod__884237940;
+    paymentStatus : PaymentStatus__522605526;
+    subtotal : Money__772428565;
+    tax : Money__772428565;
+    taxRate : TaxRate__709191531;
+    total : Money__772428565
+  };
+type OldLaborItem__69696053 =
+  {
+    description : Text;
+    id : Id__338555919;
+    price : Money__186267775;
+    technicianId : ?Id__338555919
+  };
+type OldLaborItem__942707965 =
+  {description : Text; id : Id__677737347; price : Money__747169860};
+type OldOrderStatus__769879847 = {#delivered; #inRepair; #ready; #received};
+type OldPosSale__229032272 =
+  {
+    amountReceived : Money__787739131;
+    change : Money__787739131;
+    customerId : ?Id__831659287;
+    customerName : ?Text;
+    discount : Money__787739131;
+    id : Id__831659287;
+    invoiceId : Id__831659287;
+    lines : [PosSaleLine__260976166];
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__7607913;
+    soldBy : Principal;
+    subtotal : Money__787739131;
+    tax : Money__787739131;
+    taxRate : TaxRate__799697541;
+    total : Money__787739131
+  };
+type OldPurchaseInvoiceLine__1068660374 =
+  {
+    applyError : ?Text;
+    applyStatus : LineApplyStatus__423954731;
+    code : Text;
+    description : Text;
+    id : Id__766779107;
+    lineNumber : Nat;
+    lotId : ?Id__766779107;
+    matchStatus : LineMatchStatus__979159520;
+    matchedPartId : ?Id__766779107;
+    movementId : ?Id__766779107;
+    quantity : Nat;
+    unitCost : Money__1003075393
+  };
+type OldPurchaseInvoice__701326455 =
+  {
+    confirmedAt : ?Timestamp__444955092;
+    confirmedBy : ?Principal;
+    createdAt : Timestamp__444955092;
+    extractionError : ?Text;
+    extractionStatus : ExtractionStatus__985942684;
+    file : InvoiceFileRef__765607992;
+    id : Id__766779107;
+    invoiceDate : ?Timestamp__444955092;
+    invoiceNumber : ?Text;
+    lines : [OldPurchaseInvoiceLine__1068660374];
+    status : PurchaseInvoiceStatus__862486392;
+    supplierId : ?Id__766779107;
+    supplierName : ?Text;
+    updatedAt : Timestamp__444955092
+  };
+type OldTechnician__1042617869 =
+  {
+    active : Bool;
+    createdAt : Timestamp__486448937;
+    email : ?Text;
+    hourlyRate : Money__747169860;
+    id : Id__677737347;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type OldWorkshopOrder__258976693 =
+  {
+    createdAt : Timestamp__7607913;
+    customerId : Id__831659287;
+    id : Id__831659287;
+    intakeMileage : Nat;
+    labor : [LaborItem__165158698];
+    motorcycleId : Id__831659287;
+    orderNumber : Text;
+    parts : [OrderPart__524492973];
+    problem : Text;
+    status : OldOrderStatus__769879847;
+    statusHistory : [StatusChange__362022884];
+    technicianIds : [Id__831659287];
+    updatedAt : Timestamp__7607913
+  };
+type OldWorkshopOrder__275262984 =
+  {
+    createdAt : Timestamp__486448937;
+    customerId : Id__677737347;
+    id : Id__677737347;
+    intakeMileage : Nat;
+    labor : [OldLaborItem__942707965];
+    motorcycleId : Id__677737347;
+    orderNumber : Text;
+    parts : [OrderPart__655592762];
+    problem : Text;
+    status : OrderStatus__833770585;
+    statusHistory : [StatusChange__988916780];
+    technicianIds : [Id__677737347];
+    updatedAt : Timestamp__486448937
+  };
+type OldWorkshopOrder__781683161 =
+  {
+    createdAt : Timestamp__310406396;
+    customerId : Id__338555919;
+    id : Id__338555919;
+    intakeMileage : Nat;
+    labor : [OldLaborItem__69696053];
+    motorcycleId : Id__338555919;
+    orderNumber : Text;
+    parts : [OrderPart__821103568];
+    problem : Text;
+    status : OrderStatus__247311635;
+    statusHistory : [StatusChange__643094622];
+    technicianIds : [Id__338555919];
+    updatedAt : Timestamp__310406396
+  };
+type OldWorkshopOrder__801490374 =
+  {
+    createdAt : Timestamp__836802844;
+    customerId : Id__1073409734;
+    id : Id__1073409734;
+    intakeMileage : Nat;
+    labor : [LaborItem__324369802];
+    motorcycleId : Id__1073409734;
+    orderNumber : Text;
+    parts : [OrderPart__741929472];
+    problem : Text;
+    status : OrderStatus__643407394;
+    statusHistory : [StatusChange__592682872];
+    updatedAt : Timestamp__836802844
+  };
+type OrderPart__170780969 =
+  {
+    description : Text;
+    id : Id__68706484;
+    lotId : ?Id__68706484;
+    partId : Id__68706484;
+    quantity : Nat;
+    unitCost : Money__532546771;
+    unitPrice : Money__532546771
+  };
+type OrderPart__524492973 =
+  {
+    description : Text;
+    id : Id__831659287;
+    lotId : ?Id__831659287;
+    partId : Id__831659287;
+    quantity : Nat;
+    unitCost : Money__787739131;
+    unitPrice : Money__787739131
+  };
+type OrderPart__612747352 =
+  {
+    description : Text;
+    id : Id__1058561351;
+    lotId : ?Id__1058561351;
+    partId : Id__1058561351;
+    quantity : Nat;
+    unitCost : Money__736808655;
+    unitPrice : Money__736808655
+  };
+type OrderPart__619399700 =
+  {
+    description : Text;
+    id : Id__682458743;
+    lotId : ?Id__682458743;
+    partId : Id__682458743;
+    quantity : Nat;
+    unitCost : Money__657441901;
+    unitPrice : Money__657441901
+  };
+type OrderPart__655592762 =
+  {
+    description : Text;
+    id : Id__677737347;
+    lotId : ?Id__677737347;
+    partId : Id__677737347;
+    quantity : Nat;
+    unitCost : Money__747169860;
+    unitPrice : Money__747169860
+  };
+type OrderPart__726681960 =
+  {
+    description : Text;
+    id : Id__333305353;
+    lotId : ?Id__333305353;
+    partId : Id__333305353;
+    quantity : Nat;
+    unitCost : Money__1031111499;
+    unitPrice : Money__1031111499
+  };
+type OrderPart__741929472 =
+  {
+    description : Text;
+    id : Id__1073409734;
+    lotId : ?Id__1073409734;
+    partId : Id__1073409734;
+    quantity : Nat;
+    unitCost : Money__772428565;
+    unitPrice : Money__772428565
+  };
+type OrderPart__742115062 =
+  {
+    description : Text;
+    id : Id__465323056;
+    lotId : ?Id__465323056;
+    partId : Id__465323056;
+    quantity : Nat;
+    unitCost : Money__990610718;
+    unitPrice : Money__990610718
+  };
+type OrderPart__821103568 =
+  {
+    description : Text;
+    id : Id__338555919;
+    lotId : ?Id__338555919;
+    partId : Id__338555919;
+    quantity : Nat;
+    unitCost : Money__186267775;
+    unitPrice : Money__186267775
+  };
+type OrderPart__837429173 =
+  {
+    description : Text;
+    id : Id__835680607;
+    lotId : ?Id__835680607;
+    partId : Id__835680607;
+    quantity : Nat;
+    unitCost : Money__418178358;
+    unitPrice : Money__418178358
+  };
+type OrderPart__958156848 =
+  {
+    description : Text;
+    id : Id__181169964;
+    lotId : ?Id__181169964;
+    partId : Id__181169964;
+    quantity : Nat;
+    unitCost : Money__376147918;
+    unitPrice : Money__376147918
+  };
+type OrderPhoto__1039435868 =
+  {
+    blob : ExternalBlob__220559234;
+    filename : Text;
+    id : Id__333305353;
+    mimeType : Text;
+    uploadedAt : Timestamp__1068123972;
+    uploadedBy : Principal
+  };
+type OrderPhoto__198140667 =
+  {
+    blob : Blob;
+    filename : Text;
+    id : Id__682458743;
+    mimeType : Text;
+    uploadedAt : Timestamp__205116725;
+    uploadedBy : Principal
+  };
+type OrderPhoto__567007113 =
+  {
+    blob : Blob;
+    filename : Text;
+    id : Id__831659287;
+    mimeType : Text;
+    uploadedAt : Timestamp__7607913;
+    uploadedBy : Principal
+  };
+type OrderPhoto__602184385 =
+  {
+    blob : Blob;
+    filename : Text;
+    id : Id__835680607;
+    mimeType : Text;
+    uploadedAt : Timestamp__605599695;
+    uploadedBy : Principal
+  };
+type OrderPhoto__633509447 =
+  {
+    blob : Blob;
+    filename : Text;
+    id : Id__68706484;
+    mimeType : Text;
+    uploadedAt : Timestamp__1039836891;
+    uploadedBy : Principal
+  };
+type OrderPhoto__909915866 =
+  {
+    blob : Blob;
+    filename : Text;
+    id : Id__465323056;
+    mimeType : Text;
+    uploadedAt : Timestamp__613503416;
+    uploadedBy : Principal
+  };
+type OrderStatus__1064551749 =
+  {#cancelled; #delivered; #inRepair; #ready; #received};
+type OrderStatus__189538141 =
+  {#cancelled; #delivered; #inRepair; #ready; #received};
+type OrderStatus__247311635 = {#delivered; #inRepair; #ready; #received};
+type OrderStatus__275090583 =
+  {#cancelled; #delivered; #inRepair; #ready; #received};
+type OrderStatus__443040343 =
+  {#cancelled; #delivered; #inRepair; #ready; #received};
+type OrderStatus__546458542 = {#delivered; #inRepair; #ready; #received};
+type OrderStatus__643407394 = {#delivered; #inRepair; #ready; #received};
+type OrderStatus__72374967 =
+  {#cancelled; #delivered; #inRepair; #ready; #received};
+type OrderStatus__757363646 =
+  {#cancelled; #delivered; #inRepair; #ready; #received};
+type OrderStatus__80563634 = {#delivered; #inRepair; #ready; #received};
+type OrderStatus__833770585 = {#delivered; #inRepair; #ready; #received};
+type Part__228190784 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__772428565;
+    createdAt : Timestamp__836802844;
+    id : Id__1073409734;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__772428565;
+    sku : Text;
+    unit : Text
+  };
+type Part__23570061 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__418178358;
+    createdAt : Timestamp__605599695;
+    id : Id__835680607;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__418178358;
+    sku : Text;
+    unit : Text
+  };
+type Part__279907418 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__532546771;
+    createdAt : Timestamp__1039836891;
+    id : Id__68706484;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__532546771;
+    sku : Text;
+    unit : Text
+  };
+type Part__316907304 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__657441901;
+    createdAt : Timestamp__205116725;
+    id : Id__682458743;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__657441901;
+    sku : Text;
+    unit : Text
+  };
+type Part__351611452 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__37724346;
+    createdAt : Timestamp__288252184;
+    id : Id__407182025;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__37724346;
+    sku : Text;
+    unit : Text
+  };
+type Part__369032184 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__376147918;
+    createdAt : Timestamp__214345855;
+    id : Id__181169964;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__376147918;
+    sku : Text;
+    unit : Text
+  };
+type Part__515355909 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__787739131;
+    createdAt : Timestamp__7607913;
+    id : Id__831659287;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__787739131;
+    sku : Text;
+    unit : Text
+  };
+type Part__517136355 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__736808655;
+    createdAt : Timestamp__1028304436;
+    id : Id__1058561351;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__736808655;
+    sku : Text;
+    unit : Text
+  };
+type Part__72383151 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__186267775;
+    createdAt : Timestamp__310406396;
+    id : Id__338555919;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__186267775;
+    sku : Text;
+    unit : Text
+  };
+type Part__757259780 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__990610718;
+    createdAt : Timestamp__613503416;
+    id : Id__465323056;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__990610718;
+    sku : Text;
+    unit : Text
+  };
+type Part__788598332 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__747169860;
+    createdAt : Timestamp__486448937;
+    id : Id__677737347;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__747169860;
+    sku : Text;
+    unit : Text
+  };
+type PaymentCondition__1023797934 = {#cash; #credit};
+type PaymentCondition__176429006 = {#cash; #credit};
+type PaymentCondition__311088440 = {#cash; #credit};
+type PaymentCondition__332245540 = {#cash; #credit};
+type PaymentCondition__530547511 = {#cash; #credit};
+type PaymentCondition__998272709 = {#cash; #credit};
+type PaymentMethod__1022097888 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__1064906414 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__194147893 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__393737467 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__468337666 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__621175407 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__688764164 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__864907580 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__869464483 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__870826488 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__884237940 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__909990948 = {#card; #cash; #mixed; #transfer};
+type PaymentStatus__1001547300 = {#paid; #pending};
+type PaymentStatus__204123592 = {#paid; #pending};
+type PaymentStatus__284385023 = {#paid; #pending};
+type PaymentStatus__320648863 = {#paid; #pending};
+type PaymentStatus__522605526 = {#paid; #pending};
+type PaymentStatus__627353604 = {#paid; #pending};
+type PaymentStatus__671551282 = {#paid; #pending};
+type PaymentStatus__761496442 = {#paid; #pending};
+type PaymentStatus__787074198 = {#paid; #pending};
+type PaymentStatus__865880690 = {#paid; #pending};
+type PaymentStatus__944876930 = {#paid; #pending};
+type Payment__116801709 =
+  {
+    amount : Money__772428565;
+    at : Timestamp__836802844;
+    id : Id__1073409734;
+    method : PaymentMethod__884237940;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__1073409734;
+    supplierId : Id__1073409734
+  };
+type Payment__123063968 =
+  {
+    amount : Money__747169860;
+    at : Timestamp__486448937;
+    id : Id__677737347;
+    method : PaymentMethod__870826488;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__677737347;
+    supplierId : Id__677737347
+  };
+type Payment__148980380 =
+  {
+    amount : Money__657441901;
+    at : Timestamp__205116725;
+    id : Id__682458743;
+    method : PaymentMethod__621175407;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__682458743;
+    supplierId : Id__682458743
+  };
+type Payment__265641917 =
+  {
+    amount : Money__532546771;
+    at : Timestamp__1039836891;
+    id : Id__68706484;
+    method : PaymentMethod__869464483;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__68706484;
+    supplierId : Id__68706484
+  };
+type Payment__354812840 =
+  {
+    amount : Money__376147918;
+    at : Timestamp__214345855;
+    id : Id__181169964;
+    method : PaymentMethod__688764164;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__181169964;
+    supplierId : Id__181169964
+  };
+type Payment__358131554 =
+  {
+    amount : Money__956068342;
+    at : Timestamp__905264509;
+    id : Id__713514965;
+    method : PaymentMethod__1064906414;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__713514965;
+    supplierId : Id__713514965
+  };
+type Payment__628143693 =
+  {
+    amount : Money__186267775;
+    at : Timestamp__310406396;
+    id : Id__338555919;
+    method : PaymentMethod__393737467;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__338555919;
+    supplierId : Id__338555919
+  };
+type Payment__754004387 =
+  {
+    amount : Money__418178358;
+    at : Timestamp__605599695;
+    id : Id__835680607;
+    method : PaymentMethod__194147893;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__835680607;
+    supplierId : Id__835680607
+  };
+type Payment__781380011 =
+  {
+    amount : Money__787739131;
+    at : Timestamp__7607913;
+    id : Id__831659287;
+    method : PaymentMethod__864907580;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__831659287;
+    supplierId : Id__831659287
+  };
+type Payment__879165932 =
+  {
+    amount : Money__990610718;
+    at : Timestamp__613503416;
+    id : Id__465323056;
+    method : PaymentMethod__909990948;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__465323056;
+    supplierId : Id__465323056
+  };
+type Payment__948380800 =
+  {
+    amount : Money__736808655;
+    at : Timestamp__1028304436;
+    id : Id__1058561351;
+    method : PaymentMethod__468337666;
+    note : ?Text;
+    performedBy : Principal;
+    purchaseId : ?Id__1058561351;
+    supplierId : Id__1058561351
+  };
+type PosSaleLine__1017292940 =
+  {
+    amount : Money__527404733;
+    description : Text;
+    discount : Money__527404733;
+    partId : Id__554453025;
+    quantity : Nat;
+    unitPrice : Money__527404733
+  };
+type PosSaleLine__182331076 =
+  {
+    amount : Money__747169860;
+    description : Text;
+    discount : Money__747169860;
+    partId : Id__677737347;
+    quantity : Nat;
+    unitPrice : Money__747169860
+  };
+type PosSaleLine__260976166 =
+  {
+    amount : Money__787739131;
+    description : Text;
+    discount : Money__787739131;
+    partId : Id__831659287;
+    quantity : Nat;
+    unitPrice : Money__787739131
+  };
+type PosSaleLine__270231651 =
+  {
+    amount : Money__186267775;
+    description : Text;
+    discount : Money__186267775;
+    partId : Id__338555919;
+    quantity : Nat;
+    unitPrice : Money__186267775
+  };
+type PosSaleLine__387132555 =
+  {
+    amount : Money__657441901;
+    description : Text;
+    discount : Money__657441901;
+    partId : Id__682458743;
+    quantity : Nat;
+    unitPrice : Money__657441901
+  };
+type PosSaleLine__506225098 =
+  {
+    amount : Money__772428565;
+    description : Text;
+    discount : Money__772428565;
+    partId : Id__1073409734;
+    quantity : Nat;
+    unitPrice : Money__772428565
+  };
+type PosSaleLine__570078932 =
+  {
+    amount : Money__418178358;
+    description : Text;
+    discount : Money__418178358;
+    partId : Id__835680607;
+    quantity : Nat;
+    unitPrice : Money__418178358
+  };
+type PosSaleLine__708434414 =
+  {
+    amount : Money__990610718;
+    description : Text;
+    discount : Money__990610718;
+    partId : Id__465323056;
+    quantity : Nat;
+    unitPrice : Money__990610718
+  };
+type PosSaleLine__748216292 =
+  {
+    amount : Money__532546771;
+    description : Text;
+    discount : Money__532546771;
+    partId : Id__68706484;
+    quantity : Nat;
+    unitPrice : Money__532546771
+  };
+type PosSaleLine__90475889 =
+  {
+    amount : Money__736808655;
+    description : Text;
+    discount : Money__736808655;
+    partId : Id__1058561351;
+    quantity : Nat;
+    unitPrice : Money__736808655
+  };
+type PosSale__1003840985 =
+  {
+    amountReceived : Money__418178358;
+    change : Money__418178358;
+    customerId : ?Id__835680607;
+    customerName : ?Text;
+    discount : Money__418178358;
+    id : Id__835680607;
+    invoiceId : Id__835680607;
+    lines : [PosSaleLine__570078932];
+    paymentCondition : PaymentCondition__530547511;
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__605599695;
+    soldBy : Principal;
+    subtotal : Money__418178358;
+    tax : Money__418178358;
+    taxRate : Nat;
+    total : Money__418178358
+  };
+type PosSale__1060646934 =
+  {
+    amountReceived : Money__532546771;
+    change : Money__532546771;
+    customerId : ?Id__68706484;
+    customerName : ?Text;
+    discount : Money__532546771;
+    id : Id__68706484;
+    invoiceId : Id__68706484;
+    lines : [PosSaleLine__748216292];
+    paymentCondition : PaymentCondition__176429006;
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__1039836891;
+    soldBy : Principal;
+    subtotal : Money__532546771;
+    tax : Money__532546771;
+    taxRate : Nat;
+    total : Money__532546771
+  };
+type PosSale__460108168 =
+  {
+    amountReceived : Money__736808655;
+    change : Money__736808655;
+    customerId : ?Id__1058561351;
+    customerName : ?Text;
+    discount : Money__736808655;
+    id : Id__1058561351;
+    invoiceId : Id__1058561351;
+    lines : [PosSaleLine__90475889];
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__1028304436;
+    soldBy : Principal;
+    subtotal : Money__736808655;
+    tax : Money__736808655;
+    taxRate : TaxRate__336751505;
+    total : Money__736808655
+  };
+type PosSale__465634361 =
+  {
+    amountReceived : Money__657441901;
+    change : Money__657441901;
+    customerId : ?Id__682458743;
+    customerName : ?Text;
+    discount : Money__657441901;
+    id : Id__682458743;
+    invoiceId : Id__682458743;
+    lines : [PosSaleLine__387132555];
+    paymentCondition : PaymentCondition__311088440;
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__205116725;
+    soldBy : Principal;
+    subtotal : Money__657441901;
+    tax : Money__657441901;
+    taxRate : Nat;
+    total : Money__657441901
+  };
+type PosSale__505432431 =
+  {
+    amountReceived : Money__527404733;
+    change : Money__527404733;
+    customerId : ?Id__554453025;
+    customerName : ?Text;
+    discount : Money__527404733;
+    id : Id__554453025;
+    invoiceId : Id__554453025;
+    lines : [PosSaleLine__1017292940];
+    paymentCondition : PaymentCondition__1023797934;
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__731026236;
+    soldBy : Principal;
+    subtotal : Money__527404733;
+    tax : Money__527404733;
+    taxRate : TaxRate__947511011;
+    total : Money__527404733
+  };
+type PosSale__612084270 =
+  {
+    amountReceived : Money__186267775;
+    change : Money__186267775;
+    customerId : ?Id__338555919;
+    customerName : ?Text;
+    discount : Money__186267775;
+    id : Id__338555919;
+    invoiceId : Id__338555919;
+    lines : [PosSaleLine__270231651];
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__310406396;
+    soldBy : Principal;
+    subtotal : Money__186267775;
+    tax : Money__186267775;
+    taxRate : TaxRate__57071152;
+    total : Money__186267775
+  };
+type PosSale__685009912 =
+  {
+    amountReceived : Money__747169860;
+    change : Money__747169860;
+    customerId : ?Id__677737347;
+    customerName : ?Text;
+    discount : Money__747169860;
+    id : Id__677737347;
+    invoiceId : Id__677737347;
+    lines : [PosSaleLine__182331076];
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__486448937;
+    soldBy : Principal;
+    subtotal : Money__747169860;
+    tax : Money__747169860;
+    taxRate : TaxRate__585784217;
+    total : Money__747169860
+  };
+type PosSale__915857909 =
+  {
+    amountReceived : Money__772428565;
+    change : Money__772428565;
+    customerId : ?Id__1073409734;
+    customerName : ?Text;
+    discount : Money__772428565;
+    id : Id__1073409734;
+    invoiceId : Id__1073409734;
+    lines : [PosSaleLine__506225098];
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__836802844;
+    soldBy : Principal;
+    subtotal : Money__772428565;
+    tax : Money__772428565;
+    taxRate : TaxRate__709191531;
+    total : Money__772428565
+  };
+type PosSale__944485395 =
+  {
+    amountReceived : Money__990610718;
+    change : Money__990610718;
+    customerId : ?Id__465323056;
+    customerName : ?Text;
+    discount : Money__990610718;
+    id : Id__465323056;
+    invoiceId : Id__465323056;
+    lines : [PosSaleLine__708434414];
+    paymentCondition : PaymentCondition__332245540;
+    paymentMethod : Text;
+    saleNumber : Text;
+    soldAt : Timestamp__613503416;
+    soldBy : Principal;
+    subtotal : Money__990610718;
+    tax : Money__990610718;
+    taxRate : Nat;
+    total : Money__990610718
+  };
+type PurchaseInvoiceLine__342199958 =
+  {
+    applyError : ?Text;
+    applyStatus : LineApplyStatus__423954731;
+    code : Text;
+    description : Text;
+    discountRate : Nat;
+    id : Id__766779107;
+    lineNumber : Nat;
+    lotId : ?Id__766779107;
+    matchStatus : LineMatchStatus__979159520;
+    matchedPartId : ?Id__766779107;
+    movementId : ?Id__766779107;
+    quantity : Nat;
+    taxRate : Nat;
+    total : Money__1003075393;
+    unitCost : Money__1003075393
+  };
+type PurchaseInvoiceLine__715216937 =
+  {
+    applyError : ?Text;
+    applyStatus : LineApplyStatus__394038133;
+    code : Text;
+    description : Text;
+    id : Id__835680607;
+    lineNumber : Nat;
+    lotId : ?Id__835680607;
+    matchStatus : LineMatchStatus__868221502;
+    matchedPartId : ?Id__835680607;
+    movementId : ?Id__835680607;
+    quantity : Nat;
+    unitCost : Money__418178358
+  };
+type PurchaseInvoiceLine__91238866 =
+  {
+    applyError : ?Text;
+    applyStatus : LineApplyStatus__608310481;
+    code : Text;
+    description : Text;
+    discountRate : Nat;
+    id : Id__838600906;
+    lineNumber : Nat;
+    lotId : ?Id__838600906;
+    matchStatus : LineMatchStatus__372498633;
+    matchedPartId : ?Id__838600906;
+    movementId : ?Id__838600906;
+    quantity : Nat;
+    taxRate : Nat;
+    total : Money__386013016;
+    unitCost : Money__386013016
+  };
+type PurchaseInvoiceStatus__230943299 = {#confirmed; #pending; #withErrors};
+type PurchaseInvoiceStatus__778035624 = {#confirmed; #pending; #withErrors};
+type PurchaseInvoiceStatus__862486392 = {#confirmed; #pending; #withErrors};
+type PurchaseInvoice__21425276 =
+  {
+    confirmedAt : ?Timestamp__444955092;
+    confirmedBy : ?Principal;
+    createdAt : Timestamp__444955092;
+    extractionError : ?Text;
+    extractionStatus : ExtractionStatus__985942684;
+    file : InvoiceFileRef__765607992;
+    id : Id__766779107;
+    invoiceDate : ?Timestamp__444955092;
+    invoiceNumber : ?Text;
+    lines : [PurchaseInvoiceLine__342199958];
+    paymentMeans : Text;
+    paymentMethod : Text;
+    status : PurchaseInvoiceStatus__862486392;
+    supplierId : ?Id__766779107;
+    supplierName : ?Text;
+    supplierTaxId : Text;
+    updatedAt : Timestamp__444955092
+  };
+type PurchaseInvoice__386646187 =
+  {
+    confirmedAt : ?Timestamp__605599695;
+    confirmedBy : ?Principal;
+    createdAt : Timestamp__605599695;
+    extractionError : ?Text;
+    extractionStatus : ExtractionStatus__127890801;
+    file : InvoiceFileRef__795615373;
+    id : Id__835680607;
+    invoiceDate : ?Timestamp__605599695;
+    invoiceNumber : ?Text;
+    lines : [PurchaseInvoiceLine__715216937];
+    status : PurchaseInvoiceStatus__230943299;
+    supplierId : ?Id__835680607;
+    supplierName : ?Text;
+    updatedAt : Timestamp__605599695
+  };
+type PurchaseInvoice__991269810 =
+  {
+    confirmedAt : ?Timestamp__344700625;
+    confirmedBy : ?Principal;
+    createdAt : Timestamp__344700625;
+    extractionError : ?Text;
+    extractionStatus : ExtractionStatus__74602302;
+    file : InvoiceFileRef__338810805;
+    id : Id__838600906;
+    invoiceDate : ?Timestamp__344700625;
+    invoiceNumber : ?Text;
+    lines : [PurchaseInvoiceLine__91238866];
+    paymentMeans : Text;
+    paymentMethod : Text;
+    status : PurchaseInvoiceStatus__778035624;
+    supplierId : ?Id__838600906;
+    supplierName : ?Text;
+    supplierTaxId : Text;
+    updatedAt : Timestamp__344700625
+  };
+type PurchaseItem__1053946700 =
+  {
+    id : Id__831659287;
+    lotNumber : Text;
+    partId : Id__831659287;
+    quantity : Nat;
+    unitCost : Money__787739131
+  };
+type PurchaseItem__106490295 =
+  {
+    id : Id__835680607;
+    lotNumber : Text;
+    partId : Id__835680607;
+    quantity : Nat;
+    unitCost : Money__418178358
+  };
+type PurchaseItem__201506342 =
+  {
+    id : Id__677737347;
+    lotNumber : Text;
+    partId : Id__677737347;
+    quantity : Nat;
+    unitCost : Money__747169860
+  };
+type PurchaseItem__361326607 =
+  {
+    id : Id__713514965;
+    lotNumber : Text;
+    partId : Id__713514965;
+    quantity : Nat;
+    unitCost : Money__956068342
+  };
+type PurchaseItem__377590174 =
+  {
+    id : Id__338555919;
+    lotNumber : Text;
+    partId : Id__338555919;
+    quantity : Nat;
+    unitCost : Money__186267775
+  };
+type PurchaseItem__496264400 =
+  {
+    id : Id__465323056;
+    lotNumber : Text;
+    partId : Id__465323056;
+    quantity : Nat;
+    unitCost : Money__990610718
+  };
+type PurchaseItem__50199566 =
+  {
+    id : Id__181169964;
+    lotNumber : Text;
+    partId : Id__181169964;
+    quantity : Nat;
+    unitCost : Money__376147918
+  };
+type PurchaseItem__507083577 =
+  {
+    id : Id__68706484;
+    lotNumber : Text;
+    partId : Id__68706484;
+    quantity : Nat;
+    unitCost : Money__532546771
+  };
+type PurchaseItem__777660447 =
+  {
+    id : Id__682458743;
+    lotNumber : Text;
+    partId : Id__682458743;
+    quantity : Nat;
+    unitCost : Money__657441901
+  };
+type PurchaseItem__795673321 =
+  {
+    id : Id__1058561351;
+    lotNumber : Text;
+    partId : Id__1058561351;
+    quantity : Nat;
+    unitCost : Money__736808655
+  };
+type PurchaseItem__836053930 =
+  {
+    id : Id__1073409734;
+    lotNumber : Text;
+    partId : Id__1073409734;
+    quantity : Nat;
+    unitCost : Money__772428565
+  };
+type Purchase__1035565964 =
+  {
+    createdAt : Timestamp__836802844;
+    id : Id__1073409734;
+    items : [PurchaseItem__836053930];
+    paidAmount : Money__772428565;
+    supplierId : Id__1073409734;
+    total : Money__772428565
+  };
+type Purchase__1054274303 =
+  {
+    createdAt : Timestamp__486448937;
+    id : Id__677737347;
+    items : [PurchaseItem__201506342];
+    paidAmount : Money__747169860;
+    supplierId : Id__677737347;
+    total : Money__747169860
+  };
+type Purchase__1072232786 =
+  {
+    createdAt : Timestamp__613503416;
+    id : Id__465323056;
+    items : [PurchaseItem__496264400];
+    paidAmount : Money__990610718;
+    supplierId : Id__465323056;
+    total : Money__990610718
+  };
+type Purchase__137422891 =
+  {
+    createdAt : Timestamp__214345855;
+    id : Id__181169964;
+    items : [PurchaseItem__50199566];
+    paidAmount : Money__376147918;
+    supplierId : Id__181169964;
+    total : Money__376147918
+  };
+type Purchase__350716635 =
+  {
+    createdAt : Timestamp__1039836891;
+    id : Id__68706484;
+    items : [PurchaseItem__507083577];
+    paidAmount : Money__532546771;
+    supplierId : Id__68706484;
+    total : Money__532546771
+  };
+type Purchase__426948546 =
+  {
+    createdAt : Timestamp__1028304436;
+    id : Id__1058561351;
+    items : [PurchaseItem__795673321];
+    paidAmount : Money__736808655;
+    supplierId : Id__1058561351;
+    total : Money__736808655
+  };
+type Purchase__459594975 =
+  {
+    createdAt : Timestamp__605599695;
+    id : Id__835680607;
+    items : [PurchaseItem__106490295];
+    paidAmount : Money__418178358;
+    supplierId : Id__835680607;
+    total : Money__418178358
+  };
+type Purchase__56357781 =
+  {
+    createdAt : Timestamp__205116725;
+    id : Id__682458743;
+    items : [PurchaseItem__777660447];
+    paidAmount : Money__657441901;
+    supplierId : Id__682458743;
+    total : Money__657441901
+  };
+type Purchase__664651860 =
+  {
+    createdAt : Timestamp__7607913;
+    id : Id__831659287;
+    items : [PurchaseItem__1053946700];
+    paidAmount : Money__787739131;
+    supplierId : Id__831659287;
+    total : Money__787739131
+  };
+type Purchase__798005954 =
+  {
+    createdAt : Timestamp__905264509;
+    id : Id__713514965;
+    items : [PurchaseItem__361326607];
+    paidAmount : Money__956068342;
+    supplierId : Id__713514965;
+    total : Money__956068342
+  };
+type Purchase__929551669 =
+  {
+    createdAt : Timestamp__310406396;
+    id : Id__338555919;
+    items : [PurchaseItem__377590174];
+    paidAmount : Money__186267775;
+    supplierId : Id__338555919;
+    total : Money__186267775
+  };
+type QuotePartLine__1002739082 =
+  {
+    description : Text;
+    id : Id__831659287;
+    partId : Id__831659287;
+    quantity : Nat;
+    unitPrice : Money__787739131
+  };
+type QuotePartLine__1037256401 =
+  {
+    description : Text;
+    id : Id__465323056;
+    partId : Id__465323056;
+    quantity : Nat;
+    unitPrice : Money__990610718
+  };
+type QuotePartLine__132981007 =
+  {
+    description : Text;
+    id : Id__682458743;
+    partId : Id__682458743;
+    quantity : Nat;
+    unitPrice : Money__657441901
+  };
+type QuotePartLine__26720271 =
+  {
+    description : Text;
+    id : Id__1058561351;
+    partId : Id__1058561351;
+    quantity : Nat;
+    unitPrice : Money__736808655
+  };
+type QuotePartLine__471450739 =
+  {
+    description : Text;
+    id : Id__68706484;
+    partId : Id__68706484;
+    quantity : Nat;
+    unitPrice : Money__532546771
+  };
+type QuotePartLine__500854178 =
+  {
+    description : Text;
+    id : Id__677737347;
+    partId : Id__677737347;
+    quantity : Nat;
+    unitPrice : Money__747169860
+  };
+type QuotePartLine__515707818 =
+  {
+    description : Text;
+    id : Id__338555919;
+    partId : Id__338555919;
+    quantity : Nat;
+    unitPrice : Money__186267775
+  };
+type QuotePartLine__57910765 =
+  {
+    description : Text;
+    id : Id__493596235;
+    partId : Id__493596235;
+    quantity : Nat;
+    unitPrice : Money__1029900408
+  };
+type QuotePartLine__72388787 =
+  {
+    description : Text;
+    id : Id__835680607;
+    partId : Id__835680607;
+    quantity : Nat;
+    unitPrice : Money__418178358
+  };
+type QuotePartLine__964486225 =
+  {
+    description : Text;
+    id : Id__1073409734;
+    partId : Id__1073409734;
+    quantity : Nat;
+    unitPrice : Money__772428565
+  };
+type QuoteServiceLine__124638943 =
+  {
+    description : Text;
+    id : Id__682458743;
+    quantity : Nat;
+    serviceId : ?Id__682458743;
+    unitPrice : Money__657441901
+  };
+type QuoteServiceLine__314842581 =
+  {
+    description : Text;
+    id : Id__831659287;
+    quantity : Nat;
+    serviceId : ?Id__831659287;
+    unitPrice : Money__787739131
+  };
+type QuoteServiceLine__452811037 =
+  {
+    description : Text;
+    id : Id__1058561351;
+    quantity : Nat;
+    serviceId : ?Id__1058561351;
+    unitPrice : Money__736808655
+  };
+type QuoteServiceLine__65694712 =
+  {
+    description : Text;
+    id : Id__465323056;
+    quantity : Nat;
+    serviceId : ?Id__465323056;
+    unitPrice : Money__990610718
+  };
+type QuoteServiceLine__66574956 =
+  {
+    description : Text;
+    id : Id__493596235;
+    quantity : Nat;
+    serviceId : ?Id__493596235;
+    unitPrice : Money__1029900408
+  };
+type QuoteServiceLine__679159939 =
+  {
+    description : Text;
+    id : Id__1073409734;
+    quantity : Nat;
+    serviceId : ?Id__1073409734;
+    unitPrice : Money__772428565
+  };
+type QuoteServiceLine__691506281 =
+  {
+    description : Text;
+    id : Id__835680607;
+    quantity : Nat;
+    serviceId : ?Id__835680607;
+    unitPrice : Money__418178358
+  };
+type QuoteServiceLine__77975714 =
+  {
+    description : Text;
+    id : Id__68706484;
+    quantity : Nat;
+    serviceId : ?Id__68706484;
+    unitPrice : Money__532546771
+  };
+type QuoteServiceLine__807539236 =
+  {
+    description : Text;
+    id : Id__338555919;
+    quantity : Nat;
+    serviceId : ?Id__338555919;
+    unitPrice : Money__186267775
+  };
+type QuoteServiceLine__901357977 =
+  {
+    description : Text;
+    id : Id__677737347;
+    quantity : Nat;
+    serviceId : ?Id__677737347;
+    unitPrice : Money__747169860
+  };
+type QuoteStatus__334283908 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__34044860 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__484010718 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__495496499 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__544028323 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__548542745 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__732674487 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__753106510 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__810720974 = {#accepted; #draft; #expired; #rejected; #sent};
+type QuoteStatus__943020214 = {#accepted; #draft; #expired; #rejected; #sent};
+type Quote__170431888 =
+  {
+    createdAt : Timestamp__605599695;
+    customerId : Id__835680607;
+    discount : Money__418178358;
+    id : Id__835680607;
+    motorcycleId : Id__835680607;
+    notes : ?Text;
+    partLines : [QuotePartLine__72388787];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__691506281];
+    status : QuoteStatus__495496499;
+    taxRate : Nat;
+    updatedAt : Timestamp__605599695
+  };
+type Quote__226940507 =
+  {
+    createdAt : Timestamp__7607913;
+    customerId : Id__831659287;
+    discount : Money__787739131;
+    id : Id__831659287;
+    motorcycleId : Id__831659287;
+    notes : ?Text;
+    partLines : [QuotePartLine__1002739082];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__314842581];
+    status : QuoteStatus__548542745;
+    taxRate : TaxRate__799697541;
+    updatedAt : Timestamp__7607913
+  };
+type Quote__360373269 =
+  {
+    createdAt : Timestamp__365108338;
+    customerId : Id__493596235;
+    discount : Money__1029900408;
+    id : Id__493596235;
+    motorcycleId : Id__493596235;
+    notes : ?Text;
+    partLines : [QuotePartLine__57910765];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__66574956];
+    status : QuoteStatus__732674487;
+    taxRate : TaxRate__830785855;
+    updatedAt : Timestamp__365108338
+  };
+type Quote__402585726 =
+  {
+    createdAt : Timestamp__205116725;
+    customerId : Id__682458743;
+    discount : Money__657441901;
+    id : Id__682458743;
+    motorcycleId : Id__682458743;
+    notes : ?Text;
+    partLines : [QuotePartLine__132981007];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__124638943];
+    status : QuoteStatus__753106510;
+    taxRate : Nat;
+    updatedAt : Timestamp__205116725
+  };
+type Quote__474464891 =
+  {
+    createdAt : Timestamp__310406396;
+    customerId : Id__338555919;
+    discount : Money__186267775;
+    id : Id__338555919;
+    motorcycleId : Id__338555919;
+    notes : ?Text;
+    partLines : [QuotePartLine__515707818];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__807539236];
+    status : QuoteStatus__544028323;
+    taxRate : TaxRate__57071152;
+    updatedAt : Timestamp__310406396
+  };
+type Quote__501845365 =
+  {
+    createdAt : Timestamp__1039836891;
+    customerId : Id__68706484;
+    discount : Money__532546771;
+    id : Id__68706484;
+    motorcycleId : Id__68706484;
+    notes : ?Text;
+    partLines : [QuotePartLine__471450739];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__77975714];
+    status : QuoteStatus__810720974;
+    taxRate : Nat;
+    updatedAt : Timestamp__1039836891
+  };
+type Quote__678999130 =
+  {
+    createdAt : Timestamp__836802844;
+    customerId : Id__1073409734;
+    discount : Money__772428565;
+    id : Id__1073409734;
+    motorcycleId : Id__1073409734;
+    notes : ?Text;
+    partLines : [QuotePartLine__964486225];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__679159939];
+    status : QuoteStatus__334283908;
+    taxRate : TaxRate__709191531;
+    updatedAt : Timestamp__836802844
+  };
+type Quote__868861137 =
+  {
+    createdAt : Timestamp__486448937;
+    customerId : Id__677737347;
+    discount : Money__747169860;
+    id : Id__677737347;
+    motorcycleId : Id__677737347;
+    notes : ?Text;
+    partLines : [QuotePartLine__500854178];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__901357977];
+    status : QuoteStatus__943020214;
+    taxRate : TaxRate__585784217;
+    updatedAt : Timestamp__486448937
+  };
+type Quote__953668230 =
+  {
+    createdAt : Timestamp__613503416;
+    customerId : Id__465323056;
+    discount : Money__990610718;
+    id : Id__465323056;
+    motorcycleId : Id__465323056;
+    notes : ?Text;
+    partLines : [QuotePartLine__1037256401];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__65694712];
+    status : QuoteStatus__34044860;
+    taxRate : Nat;
+    updatedAt : Timestamp__613503416
+  };
+type Quote__95992469 =
+  {
+    createdAt : Timestamp__1028304436;
+    customerId : Id__1058561351;
+    discount : Money__736808655;
+    id : Id__1058561351;
+    motorcycleId : Id__1058561351;
+    notes : ?Text;
+    partLines : [QuotePartLine__26720271];
+    quoteNumber : Text;
+    serviceLines : [QuoteServiceLine__452811037];
+    status : QuoteStatus__484010718;
+    taxRate : TaxRate__336751505;
+    updatedAt : Timestamp__1028304436
+  };
+type ReceivablePayment__151011044 =
+  {
+    amount : Money__528897802;
+    at : Timestamp__833512101;
+    id : Id__907387011;
+    invoiceId : Id__907387011;
+    method : Text;
+    note : ?Text;
+    performedBy : Principal
+  };
+type ReceivablePayment__23407358 =
+  {
+    amount : Money__990610718;
+    at : Timestamp__613503416;
+    id : Id__465323056;
+    invoiceId : Id__465323056;
+    method : Text;
+    note : ?Text;
+    performedBy : Principal
+  };
+type ReceivablePayment__243943556 =
+  {
+    amount : Money__418178358;
+    at : Timestamp__605599695;
+    id : Id__835680607;
+    invoiceId : Id__835680607;
+    method : Text;
+    note : ?Text;
+    performedBy : Principal
+  };
+type ReceivablePayment__841273733 =
+  {
+    amount : Money__657441901;
+    at : Timestamp__205116725;
+    id : Id__682458743;
+    invoiceId : Id__682458743;
+    method : Text;
+    note : ?Text;
+    performedBy : Principal
+  };
+type ReceivablePayment__98412797 =
+  {
+    amount : Money__532546771;
+    at : Timestamp__1039836891;
+    id : Id__68706484;
+    invoiceId : Id__68706484;
+    method : Text;
+    note : ?Text;
+    performedBy : Principal
+  };
+type ServiceCategory__1000625021 =
+  {
+    createdAt : Timestamp__613503416;
+    description : Text;
+    id : Id__465323056;
+    name : Text
+  };
+type ServiceCategory__156119941 =
+  {
+    createdAt : Timestamp__605599695;
+    description : Text;
+    id : Id__835680607;
+    name : Text
+  };
+type ServiceCategory__256926762 =
+  {
+    createdAt : Timestamp__7607913;
+    description : Text;
+    id : Id__831659287;
+    name : Text
+  };
+type ServiceCategory__55681556 =
+  {
+    createdAt : Timestamp__310406396;
+    description : Text;
+    id : Id__338555919;
+    name : Text
+  };
+type ServiceCategory__598913783 =
+  {
+    createdAt : Timestamp__486448937;
+    description : Text;
+    id : Id__677737347;
+    name : Text
+  };
+type ServiceCategory__648716726 =
+  {
+    createdAt : Timestamp__1013091471;
+    description : Text;
+    id : Id__811848263;
+    name : Text
+  };
+type ServiceCategory__828605544 =
+  {
+    createdAt : Timestamp__1039836891;
+    description : Text;
+    id : Id__68706484;
+    name : Text
+  };
+type ServiceCategory__913063150 =
+  {
+    createdAt : Timestamp__205116725;
+    description : Text;
+    id : Id__682458743;
+    name : Text
+  };
+type Service__103523136 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__310406396;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__338555919;
+    laborRate : Money__186267775;
+    name : Text
+  };
+type Service__230457008 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__613503416;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__465323056;
+    laborRate : Money__990610718;
+    name : Text
+  };
+type Service__258576453 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__1039836891;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__68706484;
+    laborRate : Money__532546771;
+    name : Text
+  };
+type Service__278837828 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__7607913;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__831659287;
+    laborRate : Money__787739131;
+    name : Text
+  };
+type Service__320489677 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__836802844;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__1073409734;
+    laborRate : Money__772428565;
+    name : Text
+  };
+type Service__339164964 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__486448937;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__677737347;
+    laborRate : Money__747169860;
+    name : Text
+  };
+type Service__583051234 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__605599695;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__835680607;
+    laborRate : Money__418178358;
+    name : Text
+  };
+type Service__801757779 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__1028304436;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__1058561351;
+    laborRate : Money__736808655;
+    name : Text
+  };
+type Service__977311090 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__205116725;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__682458743;
+    laborRate : Money__657441901;
+    name : Text
+  };
+type Service__980514341 =
+  {
+    active : Bool;
+    category : Text;
+    code : Text;
+    createdAt : Timestamp__980149596;
+    description : Text;
+    estimatedMinutes : Nat;
+    id : Id__451026835;
+    laborRate : Money__100584181;
+    name : Text
+  };
+type Set__1053317950<T> =
+  {var root : Node__620761243<T>; var size : Nat__227979830};
+type Set__70493310<T> = Set__1053317950<T>;
+type StatusChange__267153055 =
+  {
+    at : Timestamp__1039836891;
+    from : ?OrderStatus__757363646;
+    performedBy : Principal;
+    to : OrderStatus__757363646
+  };
+type StatusChange__294757473 =
+  {
+    at : Timestamp__605599695;
+    from : ?OrderStatus__1064551749;
+    performedBy : Principal;
+    to : OrderStatus__1064551749
+  };
+type StatusChange__311284501 =
+  {
+    at : Timestamp__1068123972;
+    from : ?OrderStatus__443040343;
+    performedBy : Principal;
+    to : OrderStatus__443040343
+  };
+type StatusChange__362022884 =
+  {
+    at : Timestamp__7607913;
+    from : ?OldOrderStatus__769879847;
+    performedBy : Principal;
+    to : OldOrderStatus__769879847
+  };
+type StatusChange__592682872 =
+  {
+    at : Timestamp__836802844;
+    from : ?OrderStatus__643407394;
+    performedBy : Principal;
+    to : OrderStatus__643407394
+  };
+type StatusChange__643094622 =
+  {
+    at : Timestamp__310406396;
+    from : ?OrderStatus__247311635;
+    performedBy : Principal;
+    to : OrderStatus__247311635
+  };
+type StatusChange__707892306 =
+  {
+    at : Timestamp__205116725;
+    from : ?OrderStatus__275090583;
+    performedBy : Principal;
+    to : OrderStatus__275090583
+  };
+type StatusChange__757443335 =
+  {
+    at : Timestamp__1028304436;
+    from : ?OrderStatus__80563634;
+    performedBy : Principal;
+    to : OrderStatus__80563634
+  };
+type StatusChange__795958285 =
+  {
+    at : Timestamp__613503416;
+    from : ?OrderStatus__72374967;
+    performedBy : Principal;
+    to : OrderStatus__72374967
+  };
+type StatusChange__944654922 =
+  {
+    at : Timestamp__214345855;
+    from : ?OrderStatus__546458542;
+    performedBy : Principal;
+    to : OrderStatus__546458542
+  };
+type StatusChange__988916780 =
+  {
+    at : Timestamp__486448937;
+    from : ?OrderStatus__833770585;
+    performedBy : Principal;
+    to : OrderStatus__833770585
+  };
+type SupplierOrder__1048636395 =
+  {
+    createdAt : Timestamp__119754329;
+    createdBy : Principal;
+    description : Text;
+    id : Id__752432860;
+    quantity : Nat;
+    sku : Text;
+    supplierId : Id__752432860
+  };
+type SupplierOrder__1053252473 =
+  {
+    createdAt : Timestamp__1039836891;
+    createdBy : Principal;
+    description : Text;
+    id : Id__68706484;
+    quantity : Nat;
+    sku : Text;
+    supplierId : Id__68706484
+  };
+type SupplierOrder__21263843 =
+  {
+    createdAt : Timestamp__613503416;
+    createdBy : Principal;
+    description : Text;
+    id : Id__465323056;
+    quantity : Nat;
+    sku : Text;
+    supplierId : Id__465323056
+  };
+type SupplierOrder__269635366 =
+  {
+    createdAt : Timestamp__205116725;
+    createdBy : Principal;
+    description : Text;
+    id : Id__682458743;
+    quantity : Nat;
+    sku : Text;
+    supplierId : Id__682458743
+  };
+type SupplierOrder__611399941 =
+  {
+    createdAt : Timestamp__605599695;
+    createdBy : Principal;
+    description : Text;
+    id : Id__835680607;
+    quantity : Nat;
+    sku : Text;
+    supplierId : Id__835680607
+  };
+type Supplier__212293571 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__205116725;
+    email : ?Text;
+    id : Id__682458743;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__282669743 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__310406396;
+    email : ?Text;
+    id : Id__338555919;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__301325231 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__905264509;
+    email : ?Text;
+    id : Id__713514965;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__304850569 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__1028304436;
+    email : ?Text;
+    id : Id__1058561351;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__477043678 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__7607913;
+    email : ?Text;
+    id : Id__831659287;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__524943105 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__1039836891;
+    email : ?Text;
+    id : Id__68706484;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__616715695 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__214345855;
+    email : ?Text;
+    id : Id__181169964;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__742847255 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__486448937;
+    email : ?Text;
+    id : Id__677737347;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__813955406 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__836802844;
+    email : ?Text;
+    id : Id__1073409734;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__877273530 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__605599695;
+    email : ?Text;
+    id : Id__835680607;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type Supplier__888557922 =
+  {
+    address : ?Text;
+    contactName : ?Text;
+    createdAt : Timestamp__613503416;
+    email : ?Text;
+    id : Id__465323056;
+    name : Text;
+    phone : Text;
+    taxId : ?Text
+  };
+type TaxRate__1029385262 = TaxRate__669710387;
+type TaxRate__336751505 = Nat;
+type TaxRate__57071152 = Nat;
+type TaxRate__585784217 = Nat;
+type TaxRate__636293663 = Nat;
+type TaxRate__645727838 = TaxRate__669710387;
+type TaxRate__669710387 = Nat;
+type TaxRate__709191531 = Nat;
+type TaxRate__799697541 = Nat;
+type TaxRate__830785855 = TaxRate__669710387;
+type TaxRate__947511011 = TaxRate__669710387;
+type TaxResponsibility__1042508987 =
+  {
+    #agenteRetencionIva;
+    #autorretenedor;
+    #granContribuyente;
+    #noAplica;
+    #regimenSimple
+  };
+type TaxResponsibility__291465541 =
+  {
+    #agenteRetencionIva;
+    #autorretenedor;
+    #granContribuyente;
+    #noAplica;
+    #regimenSimple
+  };
+type TaxResponsibility__400906732 =
+  {
+    #agenteRetencionIva;
+    #autorretenedor;
+    #granContribuyente;
+    #noAplica;
+    #regimenSimple
+  };
+type TaxResponsibility__423642647 =
+  {
+    #agenteRetencionIva;
+    #autorretenedor;
+    #granContribuyente;
+    #noAplica;
+    #regimenSimple
+  };
+type TaxResponsibility__520356442 =
+  {
+    #agenteRetencionIva;
+    #autorretenedor;
+    #granContribuyente;
+    #noAplica;
+    #regimenSimple
+  };
+type TaxResponsibility__524330732 =
+  {
+    #agenteRetencionIva;
+    #autorretenedor;
+    #granContribuyente;
+    #noAplica;
+    #regimenSimple
+  };
+type TaxResponsibility__985372525 =
+  {
+    #agenteRetencionIva;
+    #autorretenedor;
+    #granContribuyente;
+    #noAplica;
+    #regimenSimple
+  };
+type TechnicianLoan__1043118014 =
+  {
+    amount : Money__1052153277;
+    commissionPaymentId : ?Id__323312187;
+    createdAt : Timestamp__881976031;
+    date : Timestamp__881976031;
+    deducted : Bool;
+    deductedAt : ?Timestamp__881976031;
+    id : Id__323312187;
+    note : ?Text;
+    technicianId : Id__323312187
+  };
+type TechnicianLoan__236791659 =
+  {
+    amount : Money__787739131;
+    commissionPaymentId : ?Id__831659287;
+    createdAt : Timestamp__7607913;
+    date : Timestamp__7607913;
+    deducted : Bool;
+    deductedAt : ?Timestamp__7607913;
+    id : Id__831659287;
+    note : ?Text;
+    technicianId : Id__831659287
+  };
+type TechnicianLoan__550790875 =
+  {
+    amount : Money__990610718;
+    commissionPaymentId : ?Id__465323056;
+    createdAt : Timestamp__613503416;
+    date : Timestamp__613503416;
+    deducted : Bool;
+    deductedAt : ?Timestamp__613503416;
+    id : Id__465323056;
+    note : ?Text;
+    technicianId : Id__465323056
+  };
+type TechnicianLoan__628285280 =
+  {
+    amount : Money__418178358;
+    commissionPaymentId : ?Id__835680607;
+    createdAt : Timestamp__605599695;
+    date : Timestamp__605599695;
+    deducted : Bool;
+    deductedAt : ?Timestamp__605599695;
+    id : Id__835680607;
+    note : ?Text;
+    technicianId : Id__835680607
+  };
+type TechnicianLoan__711232200 =
+  {
+    amount : Money__747169860;
+    commissionPaymentId : ?Id__677737347;
+    createdAt : Timestamp__486448937;
+    date : Timestamp__486448937;
+    deducted : Bool;
+    deductedAt : ?Timestamp__486448937;
+    id : Id__677737347;
+    note : ?Text;
+    technicianId : Id__677737347
+  };
+type TechnicianLoan__76053247 =
+  {
+    amount : Money__532546771;
+    commissionPaymentId : ?Id__68706484;
+    createdAt : Timestamp__1039836891;
+    date : Timestamp__1039836891;
+    deducted : Bool;
+    deductedAt : ?Timestamp__1039836891;
+    id : Id__68706484;
+    note : ?Text;
+    technicianId : Id__68706484
+  };
+type TechnicianLoan__817818258 =
+  {
+    amount : Money__186267775;
+    commissionPaymentId : ?Id__338555919;
+    createdAt : Timestamp__310406396;
+    date : Timestamp__310406396;
+    deducted : Bool;
+    deductedAt : ?Timestamp__310406396;
+    id : Id__338555919;
+    note : ?Text;
+    technicianId : Id__338555919
+  };
+type TechnicianLoan__95903112 =
+  {
+    amount : Money__657441901;
+    commissionPaymentId : ?Id__682458743;
+    createdAt : Timestamp__205116725;
+    date : Timestamp__205116725;
+    deducted : Bool;
+    deductedAt : ?Timestamp__205116725;
+    id : Id__682458743;
+    note : ?Text;
+    technicianId : Id__682458743
+  };
+type Technician__31894530 =
+  {
+    active : Bool;
+    code : Text;
+    commissionRate : Nat;
+    createdAt : Timestamp__1039836891;
+    email : ?Text;
+    hourlyRate : Money__532546771;
+    id : Id__68706484;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Technician__404587213 =
+  {
+    active : Bool;
+    createdAt : Timestamp__836802844;
+    email : ?Text;
+    hourlyRate : Money__772428565;
+    id : Id__1073409734;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Technician__48228132 =
+  {
+    active : Bool;
+    code : Text;
+    commissionRate : Nat;
+    createdAt : Timestamp__613503416;
+    email : ?Text;
+    hourlyRate : Money__990610718;
+    id : Id__465323056;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Technician__56435852 =
+  {
+    active : Bool;
+    code : Text;
+    commissionRate : Nat;
+    createdAt : Timestamp__205116725;
+    email : ?Text;
+    hourlyRate : Money__657441901;
+    id : Id__682458743;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Technician__67773430 =
+  {
+    active : Bool;
+    code : Text;
+    commissionRate : Nat;
+    createdAt : Timestamp__310406396;
+    email : ?Text;
+    hourlyRate : Money__186267775;
+    id : Id__338555919;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Technician__714662660 =
+  {
+    active : Bool;
+    createdAt : Timestamp__1028304436;
+    email : ?Text;
+    hourlyRate : Money__736808655;
+    id : Id__1058561351;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Technician__797990442 =
+  {
+    active : Bool;
+    code : Text;
+    commissionRate : Nat;
+    createdAt : Timestamp__7607913;
+    email : ?Text;
+    hourlyRate : Money__787739131;
+    id : Id__831659287;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Technician__969373623 =
+  {
+    active : Bool;
+    code : Text;
+    commissionRate : Nat;
+    createdAt : Timestamp__605599695;
+    email : ?Text;
+    hourlyRate : Money__418178358;
+    id : Id__835680607;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Technician__993081514 =
+  {
+    active : Bool;
+    code : Text;
+    commissionRate : Nat;
+    createdAt : Timestamp__272335516;
+    email : ?Text;
+    hourlyRate : Money__441407701;
+    id : Id__314374337;
+    name : Text;
+    phone : Text;
+    specialty : Text
+  };
+type Timestamp__1013091471 = Timestamp__301639476;
+type Timestamp__1028304436 = Int;
+type Timestamp__1039836891 = Int;
+type Timestamp__1061877594 = Timestamp__301639476;
+type Timestamp__1068123972 = Timestamp__301639476;
+type Timestamp__119754329 = Timestamp__301639476;
+type Timestamp__177202075 = Timestamp__301639476;
+type Timestamp__205116725 = Int;
+type Timestamp__214345855 = Int;
+type Timestamp__272335516 = Timestamp__301639476;
+type Timestamp__288252184 = Timestamp__301639476;
+type Timestamp__301639476 = Int;
+type Timestamp__310406396 = Int;
+type Timestamp__344700625 = Timestamp__301639476;
+type Timestamp__365108338 = Timestamp__301639476;
+type Timestamp__43627346 = Timestamp__301639476;
+type Timestamp__444955092 = Int;
+type Timestamp__486448937 = Int;
+type Timestamp__520310395 = Timestamp__301639476;
+type Timestamp__605599695 = Int;
+type Timestamp__613503416 = Int;
+type Timestamp__641042506 = Timestamp__301639476;
+type Timestamp__704461902 = Timestamp__301639476;
+type Timestamp__731026236 = Timestamp__301639476;
+type Timestamp__7607913 = Int;
+type Timestamp__778030842 = Timestamp__301639476;
+type Timestamp__833512101 = Timestamp__301639476;
+type Timestamp__836802844 = Int;
+type Timestamp__881976031 = Timestamp__301639476;
+type Timestamp__905264509 = Timestamp__301639476;
+type Timestamp__980149596 = Timestamp__301639476;
+type UserProfile__1039889572 =
+  {
+    createdAt : Timestamp__1039836891;
+    name : Text;
+    role : UserRole__185837558
+  };
+type UserProfile__24825253 =
+  {createdAt : Timestamp__486448937; name : Text; role : UserRole__12351986};
+type UserProfile__277265826 =
+  {createdAt : Timestamp__778030842; name : Text; role : UserRole__41952412};
+type UserProfile__448324588 =
+  {createdAt : Timestamp__836802844; name : Text; role : UserRole__193228061};
+type UserProfile__46133562 =
+  {
+    createdAt : Timestamp__1028304436;
+    name : Text;
+    role : UserRole__587377084
+  };
+type UserProfile__499403371 =
+  {createdAt : Timestamp__613503416; name : Text; role : UserRole__669453259};
+type UserProfile__585216708 =
+  {createdAt : Timestamp__7607913; name : Text; role : UserRole__221139166};
+type UserProfile__780622392 =
+  {createdAt : Timestamp__605599695; name : Text; role : UserRole__869643639};
+type UserProfile__823120487 =
+  {createdAt : Timestamp__310406396; name : Text; role : UserRole__693728699};
+type UserProfile__958225441 =
+  {createdAt : Timestamp__214345855; name : Text; role : UserRole__782166656};
+type UserProfile__971468964 =
+  {createdAt : Timestamp__205116725; name : Text; role : UserRole__216570494};
+type UserRole__12351986 = {#admin; #guest; #user};
+type UserRole__185837558 = {#admin; #guest; #user};
+type UserRole__193228061 = {#admin; #guest; #user};
+type UserRole__216570494 = {#admin; #guest; #user};
+type UserRole__221139166 = {#admin; #guest; #user};
+type UserRole__41952412 = UserRole__451090586;
+type UserRole__451090586 = {#admin; #guest; #user};
+type UserRole__587377084 = {#admin; #guest; #user};
+type UserRole__669453259 = {#admin; #guest; #user};
+type UserRole__693728699 = {#admin; #guest; #user};
+type UserRole__782166656 = {#admin; #guest; #user};
+type UserRole__869643639 = {#admin; #guest; #user};
+type UserRole__91647283 = {#admin; #guest; #user};
+type WorkshopOrder__1046213111 =
+  {
+    createdAt : Timestamp__214345855;
+    customerId : Id__181169964;
+    id : Id__181169964;
+    intakeMileage : Nat;
+    labor : [LaborItem__1058309565];
+    motorcycleId : Id__181169964;
+    orderNumber : Text;
+    parts : [OrderPart__958156848];
+    problem : Text;
+    status : OrderStatus__546458542;
+    statusHistory : [StatusChange__944654922];
+    updatedAt : Timestamp__214345855
+  };
+type WorkshopOrder__114653181 =
+  {
+    cancelReason : ?Text;
+    cancelledAt : ?Timestamp__605599695;
+    createdAt : Timestamp__605599695;
+    customerId : Id__835680607;
+    id : Id__835680607;
+    intakeMileage : Nat;
+    labor : [LaborItem__420109074];
+    motorcycleId : Id__835680607;
+    orderNumber : Text;
+    parts : [OrderPart__837429173];
+    photos : [OrderPhoto__602184385];
+    problem : Text;
+    status : OrderStatus__1064551749;
+    statusHistory : [StatusChange__294757473];
+    technicianIds : [Id__835680607];
+    updatedAt : Timestamp__605599695
+  };
+type WorkshopOrder__323831231 =
+  {
+    createdAt : Timestamp__1028304436;
+    customerId : Id__1058561351;
+    id : Id__1058561351;
+    intakeMileage : Nat;
+    labor : [LaborItem__71422969];
+    motorcycleId : Id__1058561351;
+    orderNumber : Text;
+    parts : [OrderPart__612747352];
+    problem : Text;
+    status : OrderStatus__80563634;
+    statusHistory : [StatusChange__757443335];
+    technicianIds : [Id__1058561351];
+    updatedAt : Timestamp__1028304436
+  };
+type WorkshopOrder__390599908 =
+  {
+    cancelReason : ?Text;
+    cancelledAt : ?Timestamp__613503416;
+    createdAt : Timestamp__613503416;
+    customerId : Id__465323056;
+    id : Id__465323056;
+    intakeMileage : Nat;
+    labor : [LaborItem__1061830807];
+    motorcycleId : Id__465323056;
+    orderNumber : Text;
+    parts : [OrderPart__742115062];
+    photos : [OrderPhoto__909915866];
+    problem : Text;
+    status : OrderStatus__72374967;
+    statusHistory : [StatusChange__795958285];
+    technicianIds : [Id__465323056];
+    updatedAt : Timestamp__613503416
+  };
+type WorkshopOrder__577649936 =
+  {
+    cancelReason : ?Text;
+    cancelledAt : ?Timestamp__1039836891;
+    createdAt : Timestamp__1039836891;
+    customerId : Id__68706484;
+    id : Id__68706484;
+    intakeMileage : Nat;
+    labor : [LaborItem__916521912];
+    motorcycleId : Id__68706484;
+    orderNumber : Text;
+    parts : [OrderPart__170780969];
+    photos : [OrderPhoto__633509447];
+    problem : Text;
+    status : OrderStatus__757363646;
+    statusHistory : [StatusChange__267153055];
+    technicianIds : [Id__68706484];
+    updatedAt : Timestamp__1039836891
+  };
+type WorkshopOrder__886828756 =
+  {
+    cancelReason : ?Text;
+    cancelledAt : ?Timestamp__205116725;
+    createdAt : Timestamp__205116725;
+    customerId : Id__682458743;
+    id : Id__682458743;
+    intakeMileage : Nat;
+    labor : [LaborItem__892824816];
+    motorcycleId : Id__682458743;
+    orderNumber : Text;
+    parts : [OrderPart__619399700];
+    photos : [OrderPhoto__198140667];
+    problem : Text;
+    status : OrderStatus__275090583;
+    statusHistory : [StatusChange__707892306];
+    technicianIds : [Id__682458743];
+    updatedAt : Timestamp__205116725
+  };
+type WorkshopOrder__99849144 =
+  {
+    cancelReason : ?Text;
+    cancelledAt : ?Timestamp__1068123972;
+    createdAt : Timestamp__1068123972;
+    customerId : Id__333305353;
+    id : Id__333305353;
+    intakeMileage : Nat;
+    labor : [LaborItem__703101035];
+    motorcycleId : Id__333305353;
+    orderNumber : Text;
+    parts : [OrderPart__726681960];
+    photos : [OrderPhoto__1039435868];
+    problem : Text;
+    status : OrderStatus__443040343;
+    statusHistory : [StatusChange__311284501];
+    technicianIds : [Id__333305353];
+    updatedAt : Timestamp__1068123972
+  };
+{
+  "20260920_000000" : (_old : {}) -> NewActor__248761742;
+  "20260921_000000" : (old : OldActor__241283283) -> NewActor__426998186;
+  "20260921_120000" : (old : OldActor__1033119137) -> NewActor__193197324;
+  "20260921_180000" : (old : OldActor__853359044) -> NewActor__732283469;
+  "20260922_000000" : (old : OldActor__175115580) -> NewActor__619974250;
+  "20260923_000000" : (old : OldActor__362172830) -> NewActor__480550677;
+  "20260924_000000" : (old : OldActor__959457706) -> NewActor__1053168963;
+  "20260925_000000" : (old : OldActor__3928544) -> NewActor__963881556;
+  "20260926_000000" : (old : OldActor__624391799) -> NewActor__341238509;
+  "20260927_000000" : (old : OldActor__263139629) -> NewActor__949499829;
+  "20260928_000000" : (old : OldActor__61572473) -> NewActor__486559717
+}
+actor  {
+  stable accessControlState :
+    {
+      var adminAssigned : Bool;
+      userRoles : Map__230067015<Principal, UserRole__91647283>
+    };
+  stable appointments :
+    {
+      var root : Node__204828119<Id__389469852, Appointment__77617247>;
+      var size : Nat__227979830
+    };
+  stable businessSettings : {var settings : BusinessSettings__949434397};
+  stable commissionPayments :
+    {
+      var root : Node__204828119<Id__389469852, CommissionPayment__799068375>;
+      var size : Nat__227979830
+    };
+  stable company : {var profile : CompanyProfile__17980882};
+  stable counters :
+    {
+      var nextAppointmentId : Nat;
+      var nextCommissionPaymentId : Nat;
+      var nextCustomerId : Nat;
+      var nextExpenseCategoryId : Nat;
+      var nextExpenseId : Nat;
+      var nextInvoiceId : Nat;
+      var nextInvoiceNumber : Nat;
+      var nextLaborId : Nat;
+      var nextLotId : Nat;
+      var nextMotorcycleId : Nat;
+      var nextMovementId : Nat;
+      var nextOrderId : Nat;
+      var nextOrderPartId : Nat;
+      var nextOrderPhotoId : Nat;
+      var nextPartId : Nat;
+      var nextPaymentId : Nat;
+      var nextPosSaleId : Nat;
+      var nextPosSaleNumber : Nat;
+      var nextPurchaseId : Nat;
+      var nextPurchaseInvoiceId : Nat;
+      var nextPurchaseInvoiceLineId : Nat;
+      var nextPurchaseItemId : Nat;
+      var nextQuoteId : Nat;
+      var nextQuoteNumber : Nat;
+      var nextQuotePartLineId : Nat;
+      var nextQuoteServiceLineId : Nat;
+      var nextReceivablePaymentId : Nat;
+      var nextServiceCategoryId : Nat;
+      var nextServiceId : Nat;
+      var nextSupplierId : Nat;
+      var nextSupplierOrderId : Nat;
+      var nextTechnicianId : Nat;
+      var nextTechnicianLoanId : Nat
+    };
+  stable customers :
+    {
+      var root : Node__204828119<Id__389469852, Customer__225412617>;
+      var size : Nat__227979830
+    };
+  stable driveCredentials : {var credentials : ?DriveCredentials__382368730};
+  stable expenseCategories :
+    {
+      var root : Node__204828119<Id__389469852, ExpenseCategory__641894987>;
+      var size : Nat__227979830
+    };
+  stable expenses :
+    {
+      var root : Node__204828119<Id__389469852, Expense__809941540>;
+      var size : Nat__227979830
+    };
+  stable invoices :
+    {
+      var root : Node__204828119<Id__389469852, Invoice__752737744>;
+      var size : Nat__227979830
+    };
+  stable lots :
+    {
+      var root : Node__204828119<Id__389469852, Lot__726608520>;
+      var size : Nat__227979830
+    };
+  stable motorcycles :
+    {
+      var root : Node__204828119<Id__389469852, Motorcycle__456522821>;
+      var size : Nat__227979830
+    };
+  stable movements :
+    {
+      var root : Node__204828119<Id__389469852, Movement__924796070>;
+      var size : Nat__227979830
+    };
+  stable orders :
+    {
+      var root : Node__204828119<Id__389469852, WorkshopOrder__99849144>;
+      var size : Nat__227979830
+    };
+  stable paidCommissionLines :
+    {
+      var root : Node__620761243<CommissionLineKey__325001514>;
+      var size : Nat__227979830
+    };
+  stable parts :
+    {
+      var root : Node__204828119<Id__389469852, Part__351611452>;
+      var size : Nat__227979830
+    };
+  stable payments :
+    {
+      var root : Node__204828119<Id__389469852, Payment__358131554>;
+      var size : Nat__227979830
+    };
+  stable posSales :
+    {
+      var root : Node__204828119<Id__389469852, PosSale__505432431>;
+      var size : Nat__227979830
+    };
+  stable purchaseInvoices :
+    {
+      var root : Node__204828119<Id__389469852, PurchaseInvoice__991269810>;
+      var size : Nat__227979830
+    };
+  stable purchases :
+    {
+      var root : Node__204828119<Id__389469852, Purchase__798005954>;
+      var size : Nat__227979830
+    };
+  stable quotes :
+    {
+      var root : Node__204828119<Id__389469852, Quote__360373269>;
+      var size : Nat__227979830
+    };
+  stable receivablePayments :
+    {
+      var root : Node__204828119<Id__389469852, ReceivablePayment__151011044>;
+      var size : Nat__227979830
+    };
+  stable serviceCategories :
+    {
+      var root : Node__204828119<Id__389469852, ServiceCategory__648716726>;
+      var size : Nat__227979830
+    };
+  stable services :
+    {
+      var root : Node__204828119<Id__389469852, Service__980514341>;
+      var size : Nat__227979830
+    };
+  stable supplierOrders :
+    {
+      var root : Node__204828119<Id__389469852, SupplierOrder__1048636395>;
+      var size : Nat__227979830
+    };
+  stable suppliers :
+    {
+      var root : Node__204828119<Id__389469852, Supplier__301325231>;
+      var size : Nat__227979830
+    };
+  stable technicianLoans :
+    {
+      var root : Node__204828119<Id__389469852, TechnicianLoan__1043118014>;
+      var size : Nat__227979830
+    };
+  stable technicians :
+    {
+      var root : Node__204828119<Id__389469852, Technician__993081514>;
+      var size : Nat__227979830
+    };
+  stable userProfiles :
+    {
+      var root : Node__204828119<Principal, UserProfile__277265826>;
+      var size : Nat__227979830
+    }
+};

@@ -1,0 +1,1915 @@
+type _ImmutableObjectStorageRefillResult = 
+ record {
+   success: opt bool;
+   topped_up_amount: opt nat;
+ };
+type _ImmutableObjectStorageRefillInformation = record {
+                                                  proposed_top_up_amount:
+                                                   opt nat;};
+type _ImmutableObjectStorageCreateCertificateResult = 
+ record {
+   blob_hash: text;
+   method: text;
+ };
+type ZeroServicesResult = record {deleted: nat;};
+type ZeroInventoryResult = record {affected: nat;};
+type WorkshopOrder = 
+ record {
+   cancelReason: opt text;
+   cancelledAt: opt Timestamp;
+   createdAt: Timestamp;
+   customerId: Id;
+   id: Id;
+   intakeMileage: nat;
+   labor: vec LaborItem;
+   motorcycleId: Id;
+   orderNumber: text;
+   parts: vec OrderPart;
+   photos: vec OrderPhoto;
+   problem: text;
+   status: OrderStatus;
+   statusHistory: vec StatusChange;
+   technicianIds: vec Id;
+   updatedAt: Timestamp;
+ };
+type WhatsAppMessageResult = 
+ record {
+   contactId: Id;
+   contactKind: WhatsAppContactKind;
+   contactName: text;
+   hasPhone: bool;
+   message: text;
+   phone: opt text;
+ };
+type WhatsAppMessageInput = 
+ record {
+   contactId: Id;
+   contactKind: WhatsAppContactKind;
+   context: WhatsAppContext;
+   referenceId: opt Id;
+ };
+type WhatsAppContext = 
+ variant {
+   appointment;
+   invoice;
+   order;
+   quote;
+   receivable;
+   "service";
+ };
+type WhatsAppContactKind = 
+ variant {
+   customer;
+   supplier;
+ };
+type Value = 
+ variant {
+   "bool": bool;
+   float: float64;
+   "int": int;
+   "nat": nat;
+   "null";
+   "text": text;
+ };
+type UserView = 
+ record {
+   createdAt: Timestamp;
+   name: text;
+   "principal": Principal;
+   role: UserRole;
+ };
+type UserRole = 
+ variant {
+   admin;
+   guest;
+   user;
+ };
+type UserProfile = 
+ record {
+   createdAt: Timestamp;
+   name: text;
+   role: UserRole;
+ };
+type TransformationOutput = 
+ record {
+   body: blob;
+   headers: vec HttpHeader;
+   status: nat;
+ };
+type TransformationInput = 
+ record {
+   context: blob;
+   response: HttpRequestResult;
+ };
+type Timestamp = int;
+type TechnicianWorkload = 
+ record {
+   activeOrders: nat;
+   orderIds: vec Id;
+   technician: Technician;
+ };
+type TechnicianLoanInput = 
+ record {
+   amount: Money;
+   date: Timestamp;
+   note: opt text;
+   technicianId: Id;
+ };
+type TechnicianLoanFilter = 
+ record {
+   pendingOnly: opt bool;
+   technicianId: opt Id;
+ };
+type TechnicianLoan = 
+ record {
+   amount: Money;
+   commissionPaymentId: opt Id;
+   createdAt: Timestamp;
+   date: Timestamp;
+   deducted: bool;
+   deductedAt: opt Timestamp;
+   id: Id;
+   note: opt text;
+   technicianId: Id;
+ };
+type TechnicianInput = 
+ record {
+   active: bool;
+   code: text;
+   commissionRate: nat;
+   email: opt text;
+   hourlyRate: Money;
+   name: text;
+   phone: text;
+   specialty: text;
+ };
+type TechnicianFilter = 
+ record {
+   activeOnly: opt bool;
+   search: opt text;
+   specialty: opt text;
+ };
+type TechnicianCommissionSummary = 
+ record {
+   baseAmount: Money;
+   commissionAmount: Money;
+   commissionRate: nat;
+   lineCount: nat;
+   netPayable: Money;
+   pendingLoanCount: nat;
+   pendingLoansAmount: Money;
+   technicianCode: text;
+   technicianId: Id;
+   technicianName: text;
+ };
+type Technician = 
+ record {
+   active: bool;
+   code: text;
+   commissionRate: nat;
+   createdAt: Timestamp;
+   email: opt text;
+   hourlyRate: Money;
+   id: Id;
+   name: text;
+   phone: text;
+   specialty: text;
+ };
+type TaxResponsibility = 
+ variant {
+   agenteRetencionIva;
+   autorretenedor;
+   granContribuyente;
+   noAplica;
+   regimenSimple;
+ };
+type TaxRate = nat;
+type SupplierOrderInput = 
+ record {
+   description: text;
+   quantity: nat;
+   sku: text;
+   supplierId: Id;
+ };
+type SupplierOrderFilter = 
+ record {
+   search: opt text;
+   supplierId: opt Id;
+ };
+type SupplierOrder = 
+ record {
+   createdAt: Timestamp;
+   createdBy: principal;
+   description: text;
+   id: Id;
+   quantity: nat;
+   sku: text;
+   supplierId: Id;
+ };
+type SupplierInput = 
+ record {
+   address: opt text;
+   contactName: opt text;
+   email: opt text;
+   name: text;
+   phone: text;
+   taxId: opt text;
+ };
+type Supplier = 
+ record {
+   address: opt text;
+   contactName: opt text;
+   createdAt: Timestamp;
+   email: opt text;
+   id: Id;
+   name: text;
+   phone: text;
+   taxId: opt text;
+ };
+type StatusChange = 
+ record {
+   at: Timestamp;
+   from: opt OrderStatus;
+   performedBy: principal;
+   to: OrderStatus;
+ };
+type ServiceSort = 
+ variant {
+   category;
+   code;
+   laborRate;
+   name;
+ };
+type ServiceProfitLine = 
+ record {
+   charged: Money;
+   commission: Money;
+   description: text;
+   invoiceId: Id;
+   invoiceNumber: text;
+   orderId: opt Id;
+   profit: int;
+   serviceId: opt Id;
+   technicianId: opt Id;
+   technicianName: text;
+ };
+type ServicePage = 
+ record {
+   items: vec Service;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type ServiceInput = 
+ record {
+   active: bool;
+   category: text;
+   code: text;
+   description: text;
+   estimatedMinutes: nat;
+   laborRate: Money;
+   name: text;
+ };
+type ServiceFilter = 
+ record {
+   activeOnly: opt bool;
+   category: opt text;
+   search: opt text;
+ };
+type ServiceCategoryUsage = 
+ record {
+   activeServiceCount: nat;
+   category: ServiceCategory;
+   serviceCount: nat;
+ };
+type ServiceCategoryInput = 
+ record {
+   description: text;
+   name: text;
+ };
+type ServiceCategoryFilter = record {search: opt text;};
+type ServiceCategory = 
+ record {
+   createdAt: Timestamp;
+   description: text;
+   id: Id;
+   name: text;
+ };
+type Service = 
+ record {
+   active: bool;
+   category: text;
+   code: text;
+   createdAt: Timestamp;
+   description: text;
+   estimatedMinutes: nat;
+   id: Id;
+   laborRate: Money;
+   name: text;
+ };
+type Result__1 = 
+ variant {
+   err: Error;
+   ok;
+ };
+type Result = 
+ record {
+   hasMore: bool;
+   rows: vec vec Cell;
+ };
+type ReceivableSummary = 
+ record {
+   openCount: nat;
+   totalOutstanding: Money;
+   totalOverdue: Money;
+ };
+type ReceivableStatus = 
+ variant {
+   overdue;
+   paid;
+   pending;
+ };
+type ReceivablePaymentInput = 
+ record {
+   amount: Money;
+   invoiceId: Id;
+   method: text;
+   note: opt text;
+ };
+type ReceivablePayment = 
+ record {
+   amount: Money;
+   at: Timestamp;
+   id: Id;
+   invoiceId: Id;
+   method: text;
+   note: opt text;
+   performedBy: principal;
+ };
+type ReceivableFilter = 
+ record {
+   search: opt text;
+   status: opt ReceivableStatus;
+ };
+type Receivable = 
+ record {
+   balance: Money;
+   customerId: opt Id;
+   customerName: text;
+   dueDate: Timestamp;
+   invoiceId: Id;
+   invoiceNumber: text;
+   issuedAt: Timestamp;
+   paidAmount: Money;
+   status: ReceivableStatus;
+   total: Money;
+ };
+type QuoteView = 
+ record {
+   quote: Quote;
+   totals: QuoteTotals;
+ };
+type QuoteTotals = 
+ record {
+   discount: Money;
+   partsSubtotal: Money;
+   servicesSubtotal: Money;
+   subtotal: Money;
+   tax: Money;
+   taxRate: TaxRate;
+   taxableBase: Money;
+   total: Money;
+ };
+type QuoteStatus = 
+ variant {
+   accepted;
+   draft;
+   expired;
+   rejected;
+   sent;
+ };
+type QuoteSort = 
+ variant {
+   createdAt;
+   customer;
+   number;
+   total;
+ };
+type QuoteServiceLineInput = 
+ record {
+   description: text;
+   quantity: nat;
+   serviceId: opt Id;
+   unitPrice: Money;
+ };
+type QuoteServiceLine = 
+ record {
+   description: text;
+   id: Id;
+   quantity: nat;
+   serviceId: opt Id;
+   unitPrice: Money;
+ };
+type QuotePartLineInput = 
+ record {
+   partId: Id;
+   quantity: nat;
+   unitPrice: Money;
+ };
+type QuotePartLine = 
+ record {
+   description: text;
+   id: Id;
+   partId: Id;
+   quantity: nat;
+   unitPrice: Money;
+ };
+type QuotePage = 
+ record {
+   items: vec QuoteView;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type QuoteInput = 
+ record {
+   customerId: Id;
+   discount: Money;
+   motorcycleId: Id;
+   notes: opt text;
+   partLines: vec QuotePartLineInput;
+   serviceLines: vec QuoteServiceLineInput;
+ };
+type QuoteFilter = 
+ record {
+   search: opt text;
+   status: opt QuoteStatus;
+ };
+type Quote = 
+ record {
+   createdAt: Timestamp;
+   customerId: Id;
+   discount: Money;
+   id: Id;
+   motorcycleId: Id;
+   notes: opt text;
+   partLines: vec QuotePartLine;
+   quoteNumber: text;
+   serviceLines: vec QuoteServiceLine;
+   status: QuoteStatus;
+   taxRate: TaxRate;
+   updatedAt: Timestamp;
+ };
+type PurchaseItemInput = 
+ record {
+   lotNumber: text;
+   partId: Id;
+   quantity: nat;
+   unitCost: Money;
+ };
+type PurchaseItem = 
+ record {
+   id: Id;
+   lotNumber: text;
+   partId: Id;
+   quantity: nat;
+   unitCost: Money;
+ };
+type PurchaseInvoiceStatus = 
+ variant {
+   confirmed;
+   pending;
+   withErrors;
+ };
+type PurchaseInvoiceLine = 
+ record {
+   applyError: opt text;
+   applyStatus: LineApplyStatus;
+   code: text;
+   description: text;
+   discountRate: nat;
+   id: Id;
+   lineNumber: nat;
+   lotId: opt Id;
+   matchStatus: LineMatchStatus;
+   matchedPartId: opt Id;
+   movementId: opt Id;
+   quantity: nat;
+   taxRate: nat;
+   total: Money;
+   unitCost: Money;
+ };
+type PurchaseInvoice = 
+ record {
+   confirmedAt: opt Timestamp;
+   confirmedBy: opt principal;
+   createdAt: Timestamp;
+   extractionError: opt text;
+   extractionStatus: ExtractionStatus;
+   file: InvoiceFileRef;
+   id: Id;
+   invoiceDate: opt Timestamp;
+   invoiceNumber: opt text;
+   lines: vec PurchaseInvoiceLine;
+   paymentMeans: text;
+   paymentMethod: text;
+   status: PurchaseInvoiceStatus;
+   supplierId: opt Id;
+   supplierName: opt text;
+   supplierTaxId: text;
+   updatedAt: Timestamp;
+ };
+type PurchaseInput = 
+ record {
+   items: vec PurchaseItemInput;
+   supplierId: Id;
+ };
+type Purchase = 
+ record {
+   createdAt: Timestamp;
+   id: Id;
+   items: vec PurchaseItem;
+   paidAmount: Money;
+   supplierId: Id;
+   total: Money;
+ };
+type ProfitBreakdown = 
+ record {
+   parts: ProfitBlock;
+   serviceLines: vec ServiceProfitLine;
+   services: ProfitBlock;
+   total: ProfitBlock;
+ };
+type ProfitBlock = 
+ record {
+   commission: Money;
+   cost: Money;
+   income: Money;
+   margin: int;
+   marginBps: BasisPoints;
+ };
+type Principal = principal;
+type PosSalePage = 
+ record {
+   items: vec PosSale;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type PosSaleLineInput = 
+ record {
+   discount: Money;
+   partId: Id;
+   quantity: nat;
+ };
+type PosSaleLine = 
+ record {
+   amount: Money;
+   description: text;
+   discount: Money;
+   partId: Id;
+   quantity: nat;
+   unitPrice: Money;
+ };
+type PosSaleInput = 
+ record {
+   amountReceived: Money;
+   creditPlan: opt CreditPlanInput;
+   customerId: opt Id;
+   lines: vec PosSaleLineInput;
+   paymentCondition: PaymentCondition;
+   paymentMethod: text;
+ };
+type PosSaleFilter = 
+ record {
+   from: opt Timestamp;
+   search: opt text;
+   to: opt Timestamp;
+ };
+type PosSale = 
+ record {
+   amountReceived: Money;
+   change: Money;
+   customerId: opt Id;
+   customerName: opt text;
+   discount: Money;
+   id: Id;
+   invoiceId: Id;
+   lines: vec PosSaleLine;
+   paymentCondition: PaymentCondition;
+   paymentMethod: text;
+   saleNumber: text;
+   soldAt: Timestamp;
+   soldBy: principal;
+   subtotal: Money;
+   tax: Money;
+   taxRate: TaxRate;
+   total: Money;
+ };
+type PaymentStatus = 
+ variant {
+   paid;
+   pending;
+ };
+type PaymentMethodBreakdown = 
+ record {
+   method: text;
+   total: Money;
+ };
+type PaymentMethod = 
+ variant {
+   card;
+   cash;
+   mixed;
+   transfer;
+ };
+type PaymentInput = 
+ record {
+   amount: Money;
+   method: PaymentMethod;
+   note: opt text;
+   purchaseId: opt Id;
+   supplierId: Id;
+ };
+type PaymentCondition = 
+ variant {
+   cash;
+   credit;
+ };
+type Payment = 
+ record {
+   amount: Money;
+   at: Timestamp;
+   id: Id;
+   method: PaymentMethod;
+   note: opt text;
+   performedBy: principal;
+   purchaseId: opt Id;
+   supplierId: Id;
+ };
+type PayableStatus = 
+ variant {
+   overdue;
+   paid;
+   pending;
+ };
+type Payable = 
+ record {
+   balance: Money;
+   dueDate: Timestamp;
+   status: PayableStatus;
+   supplierId: Id;
+   supplierName: text;
+   totalPaid: Money;
+   totalPurchased: Money;
+ };
+type PartView = 
+ record {
+   brand: text;
+   category: text;
+   costPrice: Money;
+   createdAt: Timestamp;
+   id: Id;
+   lowStock: bool;
+   lowStockThreshold: nat;
+   name: text;
+   salePrice: Money;
+   sku: text;
+   totalStock: nat;
+   unit: text;
+ };
+type PartSort = 
+ variant {
+   createdAt;
+   name;
+   sku;
+   stock;
+ };
+type PartPage = 
+ record {
+   items: vec PartView;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type PartInput = 
+ record {
+   brand: text;
+   category: text;
+   costPrice: Money;
+   lowStockThreshold: nat;
+   name: text;
+   salePrice: Money;
+   sku: text;
+   unit: text;
+ };
+type PartFilter = 
+ record {
+   brand: opt text;
+   category: opt text;
+   lowStockOnly: opt bool;
+   search: opt text;
+ };
+type PartFacets = 
+ record {
+   brands: vec text;
+   categories: vec text;
+ };
+type OrderView = 
+ record {
+   order: WorkshopOrder;
+   totals: OrderTotals;
+ };
+type OrderTotals = 
+ record {
+   laborSubtotal: Money;
+   partsSubtotal: Money;
+   subtotal: Money;
+   tax: Money;
+   taxRate: TaxRate;
+   total: Money;
+ };
+type OrderStatusCount = 
+ record {
+   count: nat;
+   status: text;
+ };
+type OrderStatus = 
+ variant {
+   cancelled;
+   delivered;
+   inRepair;
+   ready;
+   received;
+ };
+type OrderPhotoInput = 
+ record {
+   "blob": ExternalBlob;
+   filename: text;
+   mimeType: text;
+ };
+type OrderPhoto = 
+ record {
+   "blob": ExternalBlob;
+   filename: text;
+   id: Id;
+   mimeType: text;
+   uploadedAt: Timestamp;
+   uploadedBy: principal;
+ };
+type OrderPartInput = 
+ record {
+   lotId: opt Id;
+   partId: Id;
+   quantity: nat;
+ };
+type OrderPart = 
+ record {
+   description: text;
+   id: Id;
+   lotId: opt Id;
+   partId: Id;
+   quantity: nat;
+   unitCost: Money;
+   unitPrice: Money;
+ };
+type OrderPage = 
+ record {
+   items: vec OrderView;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type OrderInput = 
+ record {
+   customerId: Id;
+   intakeMileage: nat;
+   motorcycleId: Id;
+   problem: text;
+   technicianIds: vec Id;
+ };
+type OrderFilter = 
+ record {
+   search: opt text;
+   status: opt OrderStatus;
+ };
+type NotificationSource = 
+ variant {
+   invoice;
+   order;
+   pos;
+   quote;
+   "service";
+ };
+type MovementKind = 
+ variant {
+   adjustment;
+   purchase;
+   sale;
+ };
+type Movement = 
+ record {
+   at: Timestamp;
+   id: Id;
+   kind: MovementKind;
+   lotId: opt Id;
+   partId: Id;
+   performedBy: principal;
+   quantity: nat;
+   reason: opt text;
+   referenceId: opt Id;
+   unitCost: opt Money;
+ };
+type MotorcycleSort = 
+ variant {
+   brand;
+   customerName;
+   plate;
+   year;
+ };
+type MotorcyclePage = 
+ record {
+   items: vec MotorcycleListItem;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type MotorcycleListItem = 
+ record {
+   brand: text;
+   createdAt: Timestamp;
+   customerId: Id;
+   customerName: text;
+   customerPhone: text;
+   id: Id;
+   mileage: nat;
+   model: text;
+   plate: text;
+   year: nat;
+ };
+type MotorcycleInput = 
+ record {
+   brand: text;
+   customerId: Id;
+   mileage: nat;
+   model: text;
+   plate: text;
+   year: nat;
+ };
+type MotorcycleFilter = 
+ record {
+   brand: opt text;
+   search: opt text;
+ };
+type Motorcycle = 
+ record {
+   brand: text;
+   createdAt: Timestamp;
+   customerId: Id;
+   id: Id;
+   mileage: nat;
+   model: text;
+   plate: text;
+   year: nat;
+ };
+type Money = nat;
+type LowStockItem = 
+ record {
+   lowStockThreshold: nat;
+   name: text;
+   partId: Id;
+   sku: text;
+   totalStock: nat;
+ };
+type Lot = 
+ record {
+   id: Id;
+   lotNumber: text;
+   partId: Id;
+   purchaseId: opt Id;
+   quantity: nat;
+   receivedAt: Timestamp;
+   supplierId: opt Id;
+   unitCost: Money;
+ };
+type LocalBackup = 
+ record {
+   fileName: text;
+   generatedAt: int;
+   json: text;
+ };
+type LineMatchStatus = 
+ variant {
+   existing;
+   new;
+ };
+type LineApplyStatus = 
+ variant {
+   created;
+   error;
+   pending;
+   updated;
+ };
+type LedgerEntryKind = 
+ variant {
+   expense;
+   income;
+ };
+type LedgerEntry = 
+ record {
+   amount: Money;
+   category: text;
+   concept: text;
+   date: Timestamp;
+   id: Id;
+   kind: LedgerEntryKind;
+   referenceId: opt Id;
+   referenceType: opt text;
+ };
+type LaborItem = 
+ record {
+   description: text;
+   id: Id;
+   price: Money;
+   serviceId: opt Id;
+   technicianId: opt Id;
+ };
+type LaborInput = 
+ record {
+   description: text;
+   price: Money;
+   serviceId: opt Id;
+   technicianId: opt Id;
+ };
+type InvoiceSort = 
+ variant {
+   createdAt;
+   invoiceDate;
+   invoiceNumber;
+ };
+type InvoiceReviewInput = 
+ record {
+   header: InvoiceHeaderInput;
+   lines: vec InvoiceLineInput;
+ };
+type InvoicePage__1 = 
+ record {
+   items: vec Invoice;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type InvoicePage = 
+ record {
+   items: vec PurchaseInvoice;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type InvoiceOrigin = 
+ variant {
+   pos;
+   quote;
+   workshopOrder;
+ };
+type InvoiceLineKind = 
+ variant {
+   part;
+   "service";
+ };
+type InvoiceLineInput = 
+ record {
+   code: text;
+   description: text;
+   discountRate: nat;
+   id: opt Id;
+   quantity: nat;
+   taxRate: nat;
+   total: Money;
+   unitCost: Money;
+ };
+type InvoiceLine = 
+ record {
+   amount: Money;
+   description: text;
+   kind: InvoiceLineKind;
+   quantity: nat;
+   unitCost: Money;
+   unitPrice: Money;
+ };
+type InvoiceHeaderInput = 
+ record {
+   invoiceDate: opt Timestamp;
+   invoiceNumber: opt text;
+   paymentMeans: text;
+   paymentMethod: text;
+   supplierId: opt Id;
+   supplierName: opt text;
+   supplierTaxId: text;
+ };
+type InvoiceFilter__1 = 
+ record {
+   from: opt Timestamp;
+   search: opt text;
+   to: opt Timestamp;
+ };
+type InvoiceFilter = 
+ record {
+   search: opt text;
+   status: opt PurchaseInvoiceStatus;
+   supplierId: opt Id;
+ };
+type InvoiceFileRef = 
+ record {
+   fileName: text;
+   gatewayUrl: opt text;
+   kind: InvoiceFileKind;
+   mimeType: text;
+   objectId: text;
+   projectId: opt text;
+   sizeBytes: nat;
+   uploadedAt: Timestamp;
+ };
+type InvoiceFileKind = 
+ variant {
+   image;
+   pdf;
+ };
+type InvoiceApplyResult = 
+ record {
+   created: nat;
+   failed: nat;
+   invoiceId: Id;
+   lines: vec InvoiceApplyLineResult;
+   status: PurchaseInvoiceStatus;
+   updated: nat;
+ };
+type InvoiceApplyLineResult = 
+ record {
+   code: text;
+   error: opt text;
+   lineId: Id;
+   lineNumber: nat;
+   lotId: opt Id;
+   movementId: opt Id;
+   partId: opt Id;
+   status: LineApplyStatus;
+ };
+type Invoice = 
+ record {
+   customerAddress: opt text;
+   customerId: opt Id;
+   customerName: text;
+   customerTaxId: opt text;
+   discount: Money;
+   id: Id;
+   installments: opt InstallmentPlan;
+   issuedAt: Timestamp;
+   lines: vec InvoiceLine;
+   number: text;
+   orderId: opt Id;
+   origin: InvoiceOrigin;
+   paymentCondition: PaymentCondition;
+   paymentMethod: PaymentMethod;
+   paymentStatus: PaymentStatus;
+   posSaleId: opt Id;
+   subtotal: Money;
+   tax: Money;
+   taxRate: TaxRate;
+   total: Money;
+ };
+type InventoryValuationTotals = 
+ record {
+   marginBps: BasisPoints;
+   partCount: nat;
+   totalCostValue: Money;
+   totalMargin: int;
+   totalSaleValue: Money;
+   totalUnits: nat;
+ };
+type InventoryValuationRow = 
+ record {
+   category: text;
+   costValue: Money;
+   margin: int;
+   marginBps: BasisPoints;
+   name: text;
+   partId: Id;
+   saleValue: Money;
+   sku: text;
+   units: nat;
+ };
+type InventoryValuationCategory = 
+ record {
+   category: text;
+   costValue: Money;
+   margin: int;
+   marginBps: BasisPoints;
+   partCount: nat;
+   saleValue: Money;
+   units: nat;
+ };
+type InventoryValuation = 
+ record {
+   byCategory: vec InventoryValuationCategory;
+   rows: vec InventoryValuationRow;
+   totals: InventoryValuationTotals;
+ };
+type InventoryImportRowResult = 
+ record {
+   error: opt text;
+   id: opt Id;
+   rowNumber: nat;
+   sku: text;
+   status: ImportRowStatus;
+ };
+type InventoryImportRow = 
+ record {
+   brand: text;
+   category: text;
+   costPrice: Money;
+   lowStockThreshold: nat;
+   name: text;
+   quantity: nat;
+   rowNumber: nat;
+   salePrice: Money;
+   sku: text;
+   unit: text;
+ };
+type InventoryImportResult = 
+ record {
+   created: nat;
+   failed: nat;
+   rows: vec InventoryImportRowResult;
+   updated: nat;
+ };
+type InventoryCsvRow = 
+ record {
+   brand: text;
+   category: text;
+   costPrice: Money;
+   lowStockThreshold: nat;
+   name: text;
+   quantity: nat;
+   salePrice: Money;
+   sku: text;
+   unit: text;
+ };
+type InstallmentPlan = 
+ record {
+   firstDueDate: Timestamp;
+   installmentCount: nat;
+   installments: vec Installment;
+ };
+type Installment = 
+ record {
+   amount: Money;
+   dueDate: Timestamp;
+   number: nat;
+   paid: bool;
+   paidAt: opt Timestamp;
+ };
+type ImportRowStatus = 
+ variant {
+   created;
+   error;
+   updated;
+ };
+type Id = nat;
+type HttpRequestResult = 
+ record {
+   body: blob;
+   headers: vec HttpHeader;
+   status: nat;
+ };
+type HttpHeader = 
+ record {
+   name: text;
+   value: text;
+ };
+type FiscalRegime = 
+ variant {
+   noResponsableIva;
+   responsableIva;
+ };
+type ExtractionStatus = 
+ variant {
+   extracted;
+   extracting;
+   failed;
+   pending;
+ };
+type ExternalBlob = blob;
+type ExpenseSummary = 
+ record {
+   byCategory: vec ExpenseCategoryTotal;
+   count: nat;
+   total: Money;
+ };
+type ExpensePage = 
+ record {
+   items: vec Expense;
+   limit: nat;
+   offset: nat;
+   summary: ExpenseSummary;
+   total: nat;
+ };
+type ExpenseInput = 
+ record {
+   amount: Money;
+   categoryId: Id;
+   concept: text;
+   date: Timestamp;
+   paymentMethod: text;
+   receiptUrl: opt text;
+   supplierId: opt Id;
+   tax: Money;
+ };
+type ExpenseFilter = 
+ record {
+   categoryId: opt Id;
+   from: opt Timestamp;
+   paymentMethod: opt text;
+   search: opt text;
+   to: opt Timestamp;
+ };
+type ExpenseCategoryUsage = 
+ record {
+   category: ExpenseCategory;
+   expenseCount: nat;
+ };
+type ExpenseCategoryTotal = 
+ record {
+   categoryId: Id;
+   categoryName: text;
+   total: Money;
+ };
+type ExpenseCategoryInput = 
+ record {
+   description: text;
+   name: text;
+ };
+type ExpenseCategoryFilter = record {search: opt text;};
+type ExpenseCategory = 
+ record {
+   createdAt: Timestamp;
+   description: text;
+   id: Id;
+   name: text;
+ };
+type Expense = 
+ record {
+   amount: Money;
+   categoryId: Id;
+   categoryName: text;
+   concept: text;
+   createdAt: Timestamp;
+   date: Timestamp;
+   id: Id;
+   paymentMethod: text;
+   receiptUrl: opt text;
+   supplierId: opt Id;
+   supplierName: opt text;
+   tax: Money;
+ };
+type Error = 
+ variant {
+   AmbiguousAttribute: record {
+                         field: text;
+                         sources: vec text;
+                       };
+   FrontendOriginMismatch: record {
+                             expected: vec text;
+                             got: text;
+                           };
+   FrontendOriginsNotConfigured;
+   MalformedCandid;
+   MissingField: text;
+   MixedSsoSources: record {
+                      otherKeys: vec text;
+                      ssoKeys: vec text;
+                    };
+   NoAttributes;
+   Stale: record {ageNs: nat;};
+   UnknownNonce;
+   UntrustedSsoSource: record {domain: text;};
+ };
+type DriveConnectionStatus = 
+ record {
+   accountEmail: opt text;
+   configuration: DriveConfigStatus;
+   connected: bool;
+   connectedAt: opt int;
+ };
+type DriveConfigStatus = 
+ record {
+   configured: bool;
+   missingVariables: vec text;
+ };
+type DriveAuthStart = 
+ record {
+   authorizationUrl: text;
+   state: text;
+ };
+type DriveAuthResult = 
+ record {
+   accountEmail: opt text;
+   connected: bool;
+ };
+type DocumentType = 
+ variant {
+   cedulaCiudadania;
+   cedulaExtranjeria;
+   nit;
+ };
+type DashboardSummary = 
+ record {
+   activeOrders: vec OrderStatusCount;
+   lowStock: vec LowStockItem;
+   pendingPayablesCount: nat;
+   pendingPayablesTotal: Money;
+ };
+type CustomerSort = 
+ variant {
+   createdAt;
+   motorcycleCount;
+   name;
+ };
+type CustomerPage = 
+ record {
+   items: vec CustomerListItem;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type CustomerOrderSummary = 
+ record {
+   createdAt: Timestamp;
+   motorcyclePlate: text;
+   orderId: Id;
+   orderNumber: text;
+   status: text;
+   total: nat;
+ };
+type CustomerNotificationResult = 
+ record {
+   customerId: Id;
+   email: text;
+   sent: bool;
+ };
+type CustomerNotificationInput = 
+ record {
+   customerId: Id;
+   message: text;
+   referenceId: opt Id;
+   source: NotificationSource;
+   subject: text;
+ };
+type CustomerListItem = 
+ record {
+   address: opt text;
+   createdAt: Timestamp;
+   document: opt text;
+   email: opt text;
+   id: Id;
+   motorcycleCount: nat;
+   name: text;
+   phone: text;
+ };
+type CustomerInput = 
+ record {
+   address: opt text;
+   document: opt text;
+   email: opt text;
+   name: text;
+   phone: text;
+ };
+type CustomerFilter = 
+ record {
+   hasMotorcycles: opt bool;
+   search: opt text;
+ };
+type CustomerExportRow = 
+ record {
+   customer: Customer;
+   motorcycles: vec Motorcycle;
+ };
+type CustomerDetail = 
+ record {
+   customer: Customer;
+   motorcycles: vec Motorcycle;
+   orders: vec CustomerOrderSummary;
+ };
+type Customer = 
+ record {
+   address: opt text;
+   createdAt: Timestamp;
+   document: opt text;
+   email: opt text;
+   id: Id;
+   name: text;
+   phone: text;
+ };
+type CreditPlanInput = 
+ record {
+   firstDueDate: Timestamp;
+   installmentCount: nat;
+ };
+type CreateInvoiceInput = 
+ record {
+   fileName: text;
+   gatewayUrl: opt text;
+   kind: InvoiceFileKind;
+   mimeType: text;
+   objectId: text;
+   projectId: opt text;
+   sizeBytes: nat;
+ };
+type CompanyProfileRawInput = 
+ record {
+   address: text;
+   checkDigit: opt nat;
+   city: text;
+   documentType: text;
+   email: opt text;
+   fiscalRegime: text;
+   legalName: text;
+   logoUrl: opt text;
+   phone: text;
+   taxId: text;
+   taxRate: TaxRate;
+   taxResponsibility: text;
+   tradeName: opt text;
+   website: opt text;
+ };
+type CompanyProfile = 
+ record {
+   address: text;
+   checkDigit: opt nat;
+   city: text;
+   documentType: DocumentType;
+   email: opt text;
+   fiscalRegime: FiscalRegime;
+   legalName: text;
+   logoUrl: opt text;
+   phone: text;
+   taxId: text;
+   taxRate: TaxRate;
+   taxResponsibility: TaxResponsibility;
+   tradeName: opt text;
+   updatedAt: Timestamp;
+   website: opt text;
+ };
+type CommissionReport = 
+ record {
+   period: CommissionPeriod;
+   technicians: vec TechnicianCommissionSummary;
+   totalBase: Money;
+   totalCommission: Money;
+   totalNetPayable: Money;
+   totalPendingLoans: Money;
+ };
+type CommissionPeriod = 
+ record {
+   from: opt Timestamp;
+   to: opt Timestamp;
+ };
+type CommissionPaymentLoan = 
+ record {
+   amount: Money;
+   date: Timestamp;
+   loanId: Id;
+   note: opt text;
+ };
+type CommissionPaymentInput = 
+ record {
+   period: CommissionPeriod;
+   technicianId: Id;
+ };
+type CommissionPaymentFilter = 
+ record {
+   from: opt Timestamp;
+   technicianId: opt Id;
+   to: opt Timestamp;
+ };
+type CommissionPayment = 
+ record {
+   baseAmount: Money;
+   commissionAmount: Money;
+   id: Id;
+   lineCount: nat;
+   lines: vec CommissionLine;
+   loans: vec CommissionPaymentLoan;
+   loansDeducted: Money;
+   netPaid: Money;
+   paidAt: Timestamp;
+   paidBy: principal;
+   period: CommissionPeriod;
+   technicianCode: text;
+   technicianId: Id;
+   technicianName: text;
+ };
+type CommissionLine = 
+ record {
+   at: Timestamp;
+   baseAmount: Money;
+   commissionAmount: Money;
+   commissionRate: nat;
+   description: text;
+   laborId: Id;
+   motorcycleBrand: text;
+   motorcycleModel: text;
+   motorcyclePlate: text;
+   orderId: Id;
+   orderNumber: text;
+   serviceDate: Timestamp;
+   serviceId: Id;
+   serviceName: text;
+   technicianCode: text;
+   technicianId: Id;
+   technicianName: text;
+ };
+type Cell = 
+ record {
+   name: text;
+   value: Value;
+ };
+type CategoryBreakdown = 
+ record {
+   category: text;
+   total: Money;
+ };
+type BusinessSettings = 
+ record {
+   address: text;
+   name: text;
+   phone: text;
+   taxId: text;
+   taxRate: TaxRate;
+ };
+type BulkRowResult = 
+ record {
+   error: opt text;
+   id: opt Id;
+   index: nat;
+   ok: bool;
+ };
+type BulkResult = 
+ record {
+   created: nat;
+   failed: nat;
+   rows: vec BulkRowResult;
+   skipped: nat;
+   updated: nat;
+ };
+type BasisPoints = nat;
+type BackupResult = 
+ record {
+   createdAt: int;
+   fileId: text;
+   name: text;
+   size: nat;
+   webViewLink: text;
+ };
+type BackupOutcome = 
+ variant {
+   err: BackupError;
+   ok: BackupResult;
+ };
+type BackupListOutcome = 
+ variant {
+   err: BackupError;
+   ok: vec BackupFile;
+ };
+type BackupFile = 
+ record {
+   createdAt: int;
+   fileId: text;
+   name: text;
+   size: nat;
+   webViewLink: text;
+ };
+type BackupError = 
+ variant {
+   driveFailed: text;
+   notAuthorized;
+   notConnected;
+ };
+type AppointmentStatus = 
+ variant {
+   attended;
+   cancelled;
+   confirmed;
+   noShow;
+   scheduled;
+ };
+type AppointmentInput = 
+ record {
+   customerId: Id;
+   durationMinutes: nat;
+   motorcycleId: Id;
+   reason: text;
+   scheduledAt: Timestamp;
+   technicianId: opt Id;
+ };
+type AppointmentFilter = 
+ record {
+   from: opt Timestamp;
+   status: opt AppointmentStatus;
+   technicianId: opt Id;
+   to: opt Timestamp;
+ };
+type Appointment = 
+ record {
+   createdAt: Timestamp;
+   customerId: Id;
+   durationMinutes: nat;
+   id: Id;
+   motorcycleId: Id;
+   reason: text;
+   scheduledAt: Timestamp;
+   status: AppointmentStatus;
+   technicianId: opt Id;
+   updatedAt: Timestamp;
+ };
+type AdjustmentInput = 
+ record {
+   direction: AdjustmentDirection;
+   lotId: opt Id;
+   partId: Id;
+   quantity: nat;
+   reason: text;
+ };
+type AdjustmentDirection = 
+ variant {
+   in;
+   out;
+ };
+type AccountingSummary = 
+ record {
+   expenseCount: nat;
+   from: opt Timestamp;
+   invoiceCount: nat;
+   profit: int;
+   to: opt Timestamp;
+   totalExpenses: Money;
+   totalIncome: Money;
+ };
+type AccountingReport = 
+ record {
+   byExpenseCategory: vec CategoryBreakdown;
+   byPaymentMethod: vec PaymentMethodBreakdown;
+   entries: vec LedgerEntry;
+   profit: ProfitBreakdown;
+   summary: AccountingSummary;
+ };
+type AccountingPeriod = 
+ record {
+   from: opt Timestamp;
+   to: opt Timestamp;
+ };
+service : {
+  _immutableObjectStorageBlobsAreLive: (hashes: vec blob) -> (vec bool) query;
+  _immutableObjectStorageBlobsToDelete: () -> (vec blob) query;
+  _immutableObjectStorageConfirmBlobDeletion: (blobs: vec blob) -> ();
+  _immutableObjectStorageCreateCertificate: (blobHash: text) ->
+   (_ImmutableObjectStorageCreateCertificateResult);
+  _immutableObjectStorageRefillCashier: (refillInformation:
+   opt _ImmutableObjectStorageRefillInformation) ->
+   (_ImmutableObjectStorageRefillResult);
+  _immutableObjectStorageUpdateGatewayPrincipals: () -> ();
+  _initialize_access_control: () -> ();
+  _internet_identity_sign_in_finish: () -> (Result__1);
+  _internet_identity_sign_in_start: () -> (blob);
+  addLabor: (id: Id, input: LaborInput) -> (OrderView);
+  addOrderPart: (id: Id, input: OrderPartInput) -> (OrderView);
+  addOrderPhoto: (id: Id, input: OrderPhotoInput) -> (OrderView);
+  adjustStock: (input: AdjustmentInput) -> (Movement);
+  assignCallerUserRole: (user: principal, role: UserRole) -> ();
+  assignTechnician: (id: Id, technicianId: Id) -> (OrderView);
+  bulkCreateCustomers: (inputs: vec CustomerInput) -> (BulkResult);
+  bulkCreateParts: (inputs: vec PartInput) -> (BulkResult);
+  bulkCreateServices: (inputs: vec ServiceInput) -> (vec Service);
+  bulkUpdateCustomers: (updates: vec record {
+                                       Id;
+                                       CustomerInput;
+                                     }) -> (BulkResult);
+  bulkUpdateParts: (updates: vec record {
+                                   Id;
+                                   PartInput;
+                                 }) -> (BulkResult);
+  bulkUpdateServices: (updates: vec record {
+                                      Id;
+                                      ServiceInput;
+                                    }) -> (vec Service);
+  cancelOrder: (id: Id, reason: text) -> (OrderView);
+  /// Completa la autorización OAuth con el código devuelto por Google.
+  completeDriveAuthorization: (code: text, state: text) -> (DriveAuthResult);
+  confirmPurchaseInvoice: (invoiceId: Id) -> (InvoiceApplyResult);
+  convertAppointmentToOrder: (id: Id) -> (OrderView);
+  convertQuoteToInvoice: (id: Id, paymentMethod: PaymentMethod) -> (Invoice);
+  convertQuoteToOrder: (id: Id) -> (OrderView);
+  createAppointment: (input: AppointmentInput) -> (Appointment);
+  /// Genera el respaldo y lo sube al Drive del administrador.
+  createBackup: () -> (BackupOutcome);
+  createCustomer: (input: CustomerInput) -> (Customer);
+  createExpense: (input: ExpenseInput) -> (Expense);
+  createExpenseCategory: (input: ExpenseCategoryInput) -> (ExpenseCategory);
+  createInvoiceFromOrder: (orderId: Id, paymentMethod: PaymentMethod,
+   paymentCondition: PaymentCondition, creditPlan: opt CreditPlanInput) ->
+   (Invoice);
+  createInvoiceFromPosSale: (posSaleId: Id, customerId: opt Id, customerName:
+   opt text, lines: vec InvoiceLine, discount: Money, paymentMethod:
+   PaymentMethod, paymentCondition: PaymentCondition, creditPlan:
+   opt CreditPlanInput) -> (Invoice);
+  createInvoiceFromQuote: (quoteId: Id, customerId: Id, lines:
+   vec InvoiceLine, discount: Money, paymentMethod: PaymentMethod,
+   paymentCondition: PaymentCondition, creditPlan: opt CreditPlanInput) ->
+   (Invoice);
+  createMotorcycle: (input: MotorcycleInput) -> (Motorcycle);
+  createOrder: (input: OrderInput) -> (OrderView);
+  createPart: (input: PartInput) -> (PartView);
+  createPosSale: (input: PosSaleInput) -> (PosSale);
+  createPurchase: (input: PurchaseInput) -> (Purchase);
+  createPurchaseInvoiceDraft: (input: CreateInvoiceInput) ->
+   (PurchaseInvoice);
+  createQuote: (input: QuoteInput) -> (QuoteView);
+  createService: (input: ServiceInput) -> (Service);
+  createServiceCategory: (input: ServiceCategoryInput) -> (ServiceCategory);
+  createSupplier: (input: SupplierInput) -> (Supplier);
+  createSupplierOrder: (input: SupplierOrderInput) -> (SupplierOrder);
+  createTechnician: (input: TechnicianInput) -> (Technician);
+  createTechnicianLoan: (input: TechnicianLoanInput) -> (TechnicianLoan);
+  deleteAppointment: (id: Id) -> (bool);
+  deleteExpense: (id: Id) -> (bool);
+  deleteExpenseCategory: (id: Id) -> (bool);
+  deleteOrder: (id: Id) -> (bool);
+  deleteQuote: (id: Id) -> (bool);
+  deleteService: (id: Id) -> (bool);
+  deleteServiceCategory: (id: Id) -> (bool);
+  deleteTechnician: (id: Id) -> (bool);
+  deleteTechnicianLoan: (id: Id) -> (bool);
+  /// Revoca la conexión con Google Drive del administrador.
+  disconnectDrive: () -> ();
+  /// Genera la copia de seguridad local: devuelve el mismo JSON que el
+  /// respaldo a Drive y el nombre del archivo con fecha y hora, para que el
+  /// frontend lo descargue en el equipo del usuario. Es una **consulta** de
+  /// solo lectura: no espera a ningún canister ni muta estado.
+  downloadLocalBackup: () -> (LocalBackup) query;
+  execute: (qJson: text) -> (Result) query;
+  exportCustomersAggregated: () -> (vec CustomerExportRow) query;
+  exportInventoryCsv: () -> (vec InventoryCsvRow) query;
+  findTechnicianByCode: (code: text) -> (opt Technician) query;
+  getAccountingReport: (period: AccountingPeriod) -> (AccountingReport) query;
+  getAccountingSummary: (period: AccountingPeriod) ->
+   (AccountingSummary) query;
+  getApiDoc: () -> (text) query;
+  getAppointment: (id: Id) -> (opt Appointment) query;
+  getBusinessSettings: () -> (BusinessSettings) query;
+  getCallerUserProfile: () -> (opt UserProfile) query;
+  getCallerUserRole: () -> (UserRole) query;
+  getCommissionPayment: (id: Id) -> (opt CommissionPayment) query;
+  getCommissionReport: (period: CommissionPeriod) -> (CommissionReport) query;
+  getCompanyProfile: () -> (CompanyProfile) query;
+  getCustomer: (id: Id) -> (opt Customer) query;
+  getCustomerDetail: (id: Id) -> (opt CustomerDetail) query;
+  getDashboardSummary: () -> (DashboardSummary) query;
+  /// Estado de la conexión con Google Drive del administrador. Es tolerante a
+  /// credenciales ausentes: nunca lanza un trap por configuración faltante y
+  /// siempre incluye `configuration` con las variables ausentes. Es una
+  /// actualización (no consulta) porque lee las variables de entorno del
+  /// canister, que requieren la capacidad `<system>`.
+  getDriveConnectionStatus: () -> (DriveConnectionStatus);
+  getExpense: (id: Id) -> (opt Expense) query;
+  getExpenseCategory: (id: Id) -> (opt ExpenseCategory) query;
+  getExpenseSummary: (filter: ExpenseFilter) -> (ExpenseSummary) query;
+  getInventoryValuation: () -> (InventoryValuation) query;
+  getInvoice: (id: Id) -> (opt Invoice) query;
+  getOrder: (id: Id) -> (opt OrderView) query;
+  getPart: (id: Id) -> (opt PartView) query;
+  getPayable: (supplierId: Id) -> (opt Payable) query;
+  getPosSale: (id: Id) -> (opt PosSale) query;
+  getPurchaseInvoice: (invoiceId: Id) -> (opt PurchaseInvoice) query;
+  getQuote: (id: Id) -> (opt QuoteView) query;
+  getReceivableSummary: () -> (ReceivableSummary) query;
+  getService: (id: Id) -> (opt Service) query;
+  getServiceCategory: (id: Id) -> (opt ServiceCategory) query;
+  getSupplier: (id: Id) -> (opt Supplier) query;
+  getTechnician: (id: Id) -> (opt Technician) query;
+  getTechnicianCommissionSummary: (technicianId: Id, period:
+   CommissionPeriod) -> (opt TechnicianCommissionSummary) query;
+  getTechnicianLoan: (id: Id) -> (opt TechnicianLoan) query;
+  getTechnicianWorkload: (technicianId: Id) -> (opt TechnicianWorkload) query;
+  importInventoryCsv: (rows: vec InventoryImportRow) ->
+   (InventoryImportResult);
+  isCallerAdmin: () -> (bool) query;
+  listAppointments: (filter: AppointmentFilter) -> (vec Appointment) query;
+  /// Lista los respaldos recientes desde el Drive del administrador.
+  listBackups: () -> (BackupListOutcome);
+  listCommissionLines: (technicianId: opt Id, period: CommissionPeriod) ->
+   (vec CommissionLine) query;
+  listCommissionPayments: (filter: CommissionPaymentFilter) ->
+   (vec CommissionPayment) query;
+  listCustomers: (search: opt text) -> (vec Customer) query;
+  listCustomersPage: (filter: CustomerFilter, sort: CustomerSort, offset:
+   nat, limit: nat) -> (CustomerPage) query;
+  listCustomersPageDir: (filter: CustomerFilter, sort: CustomerSort,
+   descending: bool, offset: nat, limit: nat) -> (CustomerPage) query;
+  listExpenseCategories: (filter: ExpenseCategoryFilter) ->
+   (vec ExpenseCategoryUsage) query;
+  listExpenses: (filter: ExpenseFilter, offset: nat, limit: nat) ->
+   (ExpensePage) query;
+  listInvoices: (filter: InvoiceFilter__1, offset: nat, limit: nat) ->
+   (InvoicePage__1) query;
+  listLedgerEntries: (period: AccountingPeriod) -> (vec LedgerEntry) query;
+  listLots: (partId: Id) -> (vec Lot) query;
+  listMotorcycleCountsByCustomers: (ids: vec Id) ->
+   (vec record {
+          Id;
+          nat;
+        }) query;
+  listMotorcycles: (customerId: Id) -> (vec Motorcycle) query;
+  listMotorcyclesPage: (filter: MotorcycleFilter, sort: MotorcycleSort,
+   offset: nat, limit: nat) -> (MotorcyclePage) query;
+  listMotorcyclesPageDir: (filter: MotorcycleFilter, sort: MotorcycleSort,
+   descending: bool, offset: nat, limit: nat) -> (MotorcyclePage) query;
+  listMovements: (partId: Id) -> (vec Movement) query;
+  listOrders: (filter: OrderFilter, offset: nat, limit: nat) ->
+   (OrderPage) query;
+  listPartFacets: () -> (PartFacets) query;
+  listParts: (filter: PartFilter, sort: PartSort, offset: nat, limit: 
+   nat) -> (PartPage) query;
+  listPartsDir: (filter: PartFilter, sort: PartSort, descending: bool,
+   offset: nat, limit: nat) -> (PartPage) query;
+  listPayables: () -> (vec Payable) query;
+  listPayments: (supplierId: opt Id) -> (vec Payment) query;
+  listPosSales: (filter: PosSaleFilter, offset: nat, limit: nat) ->
+   (PosSalePage) query;
+  listPurchaseInvoices: (filter: InvoiceFilter, sort: InvoiceSort, offset:
+   nat, limit: nat) -> (InvoicePage) query;
+  listPurchases: (supplierId: opt Id) -> (vec Purchase) query;
+  listQuotes: (filter: QuoteFilter, sort: QuoteSort, offset: nat, limit:
+   nat) -> (QuotePage) query;
+  listReceivables: (filter: ReceivableFilter) -> (vec Receivable) query;
+  listServiceCategories: (filter: ServiceCategoryFilter) ->
+   (vec ServiceCategoryUsage) query;
+  listServices: (filter: ServiceFilter, sort: ServiceSort, offset: nat,
+   limit: nat) -> (ServicePage) query;
+  listSupplierOrders: (filter: SupplierOrderFilter) ->
+   (vec SupplierOrder) query;
+  listSuppliers: (search: opt text) -> (vec Supplier) query;
+  listTechnicianLoans: (filter: TechnicianLoanFilter) ->
+   (vec TechnicianLoan) query;
+  listTechnicianWorkload: () -> (vec TechnicianWorkload) query;
+  listTechnicians: (filter: TechnicianFilter) -> (vec Technician) query;
+  listUsers: () -> (vec UserView) query;
+  lowStockParts: () -> (vec PartView) query;
+  markInvoicePaid: (id: Id, paymentMethod: PaymentMethod) -> (Invoice);
+  notifyCustomer: (input: CustomerNotificationInput) ->
+   (CustomerNotificationResult);
+  payTechnicianCommission: (input: CommissionPaymentInput) ->
+   (CommissionPayment);
+  prepareWhatsAppMessage: (input: WhatsAppMessageInput) ->
+   (WhatsAppMessageResult) query;
+  registerInstallmentPayment: (id: Id, installmentNumber: nat) -> (Invoice);
+  registerPayment: (input: PaymentInput) -> (Payment);
+  registerReceivablePayment: (input: ReceivablePaymentInput) ->
+   (ReceivablePayment);
+  removeLabor: (id: Id, laborId: Id) -> (OrderView);
+  removeOrderPart: (id: Id, orderPartId: Id) -> (OrderView);
+  removeOrderPhoto: (id: Id, photoId: Id) -> (OrderView);
+  runPurchaseInvoiceExtraction: (invoiceId: Id) -> (PurchaseInvoice);
+  saveCallerUserProfile: (name: text) -> (UserProfile);
+  schema: () -> (text) query;
+  setUserRole: (user: principal, role: UserRole) -> (UserView);
+  /// Inicia la autorización OAuth (PKCE) de la cuenta propia del
+  /// administrador.
+  startDriveAuthorization: () -> (DriveAuthStart);
+  transform: (input: TransformationInput) -> (TransformationOutput) query;
+  unassignTechnician: (id: Id, technicianId: Id) -> (OrderView);
+  updateAppointment: (id: Id, input: AppointmentInput) -> (Appointment);
+  updateAppointmentStatus: (id: Id, status: AppointmentStatus) ->
+   (Appointment);
+  updateBusinessSettings: (settings: BusinessSettings) -> (BusinessSettings);
+  updateCompanyProfile: (input: CompanyProfileRawInput) -> (CompanyProfile);
+  updateCustomer: (id: Id, input: CustomerInput) -> (Customer);
+  updateExpense: (id: Id, input: ExpenseInput) -> (Expense);
+  updateExpenseCategory: (id: Id, input: ExpenseCategoryInput) ->
+   (ExpenseCategory);
+  updateLaborTechnician: (id: Id, laborId: Id, technicianId: opt Id) ->
+   (OrderView);
+  updateMotorcycle: (id: Id, input: MotorcycleInput) -> (Motorcycle);
+  updateOrderStatus: (id: Id, status: OrderStatus) -> (OrderView);
+  updatePart: (id: Id, input: PartInput) -> (PartView);
+  updatePurchaseInvoiceReview: (invoiceId: Id, input: InvoiceReviewInput) ->
+   (PurchaseInvoice);
+  updateQuote: (id: Id, input: QuoteInput) -> (QuoteView);
+  updateQuoteStatus: (id: Id, status: QuoteStatus) -> (QuoteView);
+  updateService: (id: Id, input: ServiceInput) -> (Service);
+  updateServiceCategory: (id: Id, input: ServiceCategoryInput) ->
+   (ServiceCategory);
+  updateSupplier: (id: Id, input: SupplierInput) -> (Supplier);
+  updateTechnician: (id: Id, input: TechnicianInput) -> (Technician);
+  zeroInventory: () -> (ZeroInventoryResult);
+  zeroServices: () -> (ZeroServicesResult);
+}

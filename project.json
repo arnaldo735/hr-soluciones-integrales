@@ -1,0 +1,20 @@
+{
+  "overview": "A workshop and spare-parts management app for a mechanical shop, with customers, motorcycles, inventory, orders, quotes and invoicing.",
+  "features": [
+    "Manage customers and their motorcycles",
+    "Track spare-parts inventory with stock levels",
+    "Create workshop orders, quotes and invoices",
+    "Import and export data in Excel",
+    "Print documents in A4 and 80mm receipt formats",
+    "Fast paginated listings with search, filters and sorting"
+  ],
+  "category": "business-management",
+  "tags": [
+    "workshop",
+    "inventory",
+    "invoicing",
+    "customers",
+    "spare-parts"
+  ],
+  "last_updated": "2026-09-24T19:14:46.552Z"
+}
