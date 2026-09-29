@@ -1,3 +1,4 @@
+import List "mo:core/List";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
@@ -5,6 +6,7 @@ import Runtime "mo:core/Runtime";
 import Time "mo:core/Time";
 import Types "../types/purchasing";
 import InventoryTypes "../types/inventory";
+import Search "../lib/search";
 
 module {
   public type State = {
@@ -24,7 +26,7 @@ module {
   };
 
   func matches(haystack : Text, needle : Text) : Bool {
-    haystack.toLower().contains(#text needle);
+    Search.contains(haystack, needle);
   };
 
   func supplierMatches(s : Types.Supplier, needle : Text) : Bool {
@@ -48,7 +50,7 @@ module {
       case (?term) {
         let trimmed = term.trim(#predicate (func (c : Char) : Bool = c == ' '));
         if (trimmed == "") { all } else {
-          let needle = trimmed.toLower();
+          let needle = Search.normalize(trimmed);
           all.filter(func s = supplierMatches(s, needle));
         };
       };
@@ -127,6 +129,7 @@ module {
       items;
       total;
       paidAmount = 0;
+      accepted = false;
       createdAt = now;
     };
     state.purchases.add(purchaseId, purchase);
@@ -164,6 +167,48 @@ module {
     };
 
     purchase;
+  };
+
+  // Elimina una compra solo mientras no haya sido aceptada/confirmada. Al
+  // eliminarla se revierten sus lotes y movimientos de inventario asociados.
+  // Falla si la compra ya fue aceptada, tiene pagos o ya afectó inventario.
+  public func deletePurchase(state : State, id : Types.Id, performedBy : Principal) : Bool {
+    ignore performedBy;
+    let purchase = state.purchases.get(id) ?? Runtime.trap("Compra no encontrada");
+    if (purchase.accepted) {
+      Runtime.trap("No se puede eliminar una compra ya aceptada");
+    };
+    if (purchase.paidAmount > 0) {
+      Runtime.trap("No se puede eliminar una compra con pagos registrados");
+    };
+    for (payment in state.payments.values()) {
+      if (payment.purchaseId == ?id) {
+        Runtime.trap("No se puede eliminar una compra con pagos registrados");
+      };
+    };
+
+    // Revierte los lotes creados por la compra.
+    let lotIds = List.empty<Types.Id>();
+    for (lot in state.lots.values()) {
+      if (lot.purchaseId == ?id) { lotIds.add(lot.id) };
+    };
+    for (lotId in lotIds.values()) {
+      state.lots.remove(lotId);
+    };
+
+    // Revierte los movimientos de inventario de tipo `#purchase` de la compra.
+    let movementIds = List.empty<Types.Id>();
+    for (movement in state.movements.values()) {
+      if (movement.kind == #purchase and movement.referenceId == ?id) {
+        movementIds.add(movement.id);
+      };
+    };
+    for (movementId in movementIds.values()) {
+      state.movements.remove(movementId);
+    };
+
+    state.purchases.remove(id);
+    true;
   };
 
   public func listPayments(state : State, supplierId : ?Types.Id) : [Types.Payment] {

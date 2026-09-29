@@ -45,6 +45,10 @@ function roleState(isAdmin: boolean) {
     isAdmin,
     isLoading: false,
     isError: false,
+    // `null` means "no module restriction", so the sidebar falls back to the
+    // administrator rule for the admin-only modules.
+    modules: null,
+    roleName: isAdmin ? "Administrador" : "Mecánico",
     refetch: vi.fn(),
   };
 }

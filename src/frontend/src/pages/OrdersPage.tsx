@@ -15,6 +15,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import {
   ORDER_STATUS_BADGE,
@@ -82,6 +83,7 @@ function TableSkeleton() {
  */
 function useOrderCustomerEmails(customerIds: Id[]) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const key = customerIds
     .map((id) => id.toString())
     .sort()
@@ -97,7 +99,7 @@ function useOrderCustomerEmails(customerIds: Id[]) {
       );
       const results = await Promise.all(
         unique.map(async (id) => {
-          const customer = await actor.getCustomer(BigInt(id));
+          const customer = await actor.getCustomer(token, BigInt(id));
           return { id, email: customer?.email?.trim() ?? "" };
         }),
       );

@@ -33,12 +33,17 @@ module {
     unitCost : Money;
   };
 
+  // Compra a proveedor. `accepted` indica si la compra ya fue
+  // aceptada/confirmada: una compra no aceptada (`accepted = false`) puede
+  // eliminarse y revierte sus lotes y movimientos de inventario; una compra
+  // aceptada ya afectó el inventario y no se puede eliminar.
   public type Purchase = {
     id : Id;
     supplierId : Id;
     items : [PurchaseItem];
     total : Money;
     paidAmount : Money;
+    accepted : Bool;
     createdAt : Timestamp;
   };
 
@@ -94,5 +99,8 @@ module {
     #notFound : Id;
     #invalidAmount;
     #notAuthorized;
+    // La compra no se puede eliminar porque ya fue aceptada, tiene pagos o ya
+    // afectó el inventario.
+    #purchaseAccepted;
   };
 };

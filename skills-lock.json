@@ -104,7 +104,7 @@
     "extension-invite-links": {
       "source": "caffeinelabs/skills",
       "sourceType": "github",
-      "computedHash": "cbeeaaca7beee7fe61175038888613a935a1e6c56f1e70e9e201b5ea6c7d6396"
+      "computedHash": "260bf3fccb26cedebc6c982c707cfd4ab8601b7596b1bff6c04d4907bc01501d"
     },
     "extension-object-storage": {
       "source": "caffeinelabs/skills",
@@ -144,7 +144,7 @@
     "extension-user-approval": {
       "source": "caffeinelabs/skills",
       "sourceType": "github",
-      "computedHash": "3b4a0f7fdea33367cdbad94172c0e196e94797b701b77a0a43e76d61456b2808"
+      "computedHash": "0d8c6f3c5d8c04c91738de51361c755e93a821f13df5dfcf1bc9291442d5b709"
     }
   }
 }

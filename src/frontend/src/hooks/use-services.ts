@@ -1,4 +1,5 @@
 import type { ZeroServicesResult } from "@/backend";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Id,
@@ -18,13 +19,21 @@ export interface ServiceListParams {
   sort: ServiceSort;
   page: number;
   pageSize: number;
+  /**
+   * When `false`, the query stays idle. Type-to-narrow pickers pass
+   * `enabled: term.length > 0` so the catalog is only queried once the user
+   * types a term; paginated list pages omit it and keep loading normally.
+   */
+  enabled?: boolean;
 }
 
 export function useServices(params: ServiceListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const offset = BigInt((params.page - 1) * params.pageSize);
   const limit = BigInt(params.pageSize);
   const search = params.search.trim();
+  const enabled = params.enabled ?? true;
 
   return useQuery({
     queryKey: [
@@ -43,20 +52,21 @@ export function useServices(params: ServiceListParams) {
         category: params.category ?? undefined,
         activeOnly: params.activeOnly ? true : undefined,
       };
-      return actor.listServices(filter, params.sort, offset, limit);
+      return actor.listServices(token, filter, params.sort, offset, limit);
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && enabled,
   });
 }
 
 export function useService(id: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["service", id?.toString() ?? "none"],
     queryFn: async (): Promise<Service | null> => {
       if (!actor || id === null) return null;
-      return actor.getService(id);
+      return actor.getService(token, id);
     },
     enabled: !!actor && !isFetching && id !== null,
   });
@@ -64,12 +74,13 @@ export function useService(id: Id | null) {
 
 export function useCreateService() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: ServiceInput): Promise<Service> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createService(input);
+      return actor.createService(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["services"] });
@@ -79,6 +90,7 @@ export function useCreateService() {
 
 export function useUpdateService() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -90,7 +102,7 @@ export function useUpdateService() {
       input: ServiceInput;
     }): Promise<Service> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateService(id, input);
+      return actor.updateService(token, id, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["services"] });
@@ -100,12 +112,13 @@ export function useUpdateService() {
 
 export function useDeleteService() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: Id): Promise<boolean> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.deleteService(id);
+      return actor.deleteService(token, id);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["services"] });
@@ -119,12 +132,13 @@ export function useDeleteService() {
  */
 export function useZeroServices() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (): Promise<ZeroServicesResult> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.zeroServices();
+      return actor.zeroServices(token);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["services"] });

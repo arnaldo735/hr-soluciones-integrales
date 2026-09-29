@@ -6,6 +6,7 @@ import type {
 import {
   DocumentType,
   FiscalRegime,
+  HopeMode,
   OrderStatus,
   TaxResponsibility,
   WhatsAppContactKind,
@@ -23,6 +24,7 @@ const removePartMock = vi.fn();
 const removeLaborMock = vi.fn();
 const getCompanyProfileMock = vi.fn();
 const prepareWhatsAppMessageMock = vi.fn();
+const getDailyHopeMessageMock = vi.fn();
 
 vi.mock("@/hooks/use-orders", async (importOriginal) => {
   const actual = await importOriginal<typeof import("@/hooks/use-orders")>();
@@ -58,6 +60,7 @@ vi.mock("@/hooks/use-backend", () => ({
       ]),
       getCompanyProfile: getCompanyProfileMock,
       prepareWhatsAppMessage: prepareWhatsAppMessageMock,
+      getDailyHopeMessage: getDailyHopeMessageMock,
     },
     isFetching: false,
   }),
@@ -175,10 +178,18 @@ describe("OrderDetailPage", () => {
     removeLaborMock.mockReset();
     getCompanyProfileMock.mockReset();
     prepareWhatsAppMessageMock.mockReset();
+    getDailyHopeMessageMock.mockReset();
     updateStatusMock.mockReturnValue(idleMutation());
     removePartMock.mockReturnValue(idleMutation());
     removeLaborMock.mockReturnValue(idleMutation());
     getCompanyProfileMock.mockResolvedValue(companyProfile());
+    getDailyHopeMessageMock.mockResolvedValue({
+      enabled: true,
+      mode: HopeMode.auto,
+      text: "El Señor es mi pastor; nada me faltará.",
+      citation: "Salmos 23:1",
+      referenceDate: "26/09/2026",
+    });
   });
 
   it("shows parts, labor and the taxed total", async () => {
@@ -405,5 +416,64 @@ describe("OrderDetailPage", () => {
       await within(dialog).findByTestId("whatsapp.no_phone_state"),
     ).toHaveTextContent("no tiene un teléfono registrado");
     expect(within(dialog).getByTestId("whatsapp.send_button")).toBeDisabled();
+  });
+
+  // --- Characterization: the daily hope promise in the document footer ------
+  //
+  // The accepted change appends the daily Biblical-hope promise to the footer
+  // of every printable document. These tests protect the page-level seam that
+  // must survive it: the order detail reads the promise from the backend and
+  // renders it in the document preview, and renders no block at all when the
+  // promise is absent or disabled.
+
+  it("renders the daily hope promise in the document footer", async () => {
+    useOrderMock.mockReturnValue({
+      data: orderView(),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<OrderDetailPage />);
+    await screen.findByText("OT-0001");
+
+    // The document preview lives in the print dialog.
+    await userEvent.click(screen.getByTestId("order_detail.print_button"));
+
+    const hope = await screen.findByTestId(
+      "order_detail.document.hope_message",
+    );
+    expect(hope).toHaveTextContent("El Señor es mi pastor; nada me faltará.");
+    expect(hope).toHaveTextContent("Salmos 23:1");
+    expect(getDailyHopeMessageMock).toHaveBeenCalled();
+  });
+
+  it("renders no hope block when the promise is disabled", async () => {
+    getDailyHopeMessageMock.mockResolvedValue({
+      enabled: false,
+      mode: HopeMode.auto,
+      text: "El Señor es mi pastor; nada me faltará.",
+      citation: "Salmos 23:1",
+      referenceDate: "26/09/2026",
+    });
+    useOrderMock.mockReturnValue({
+      data: orderView(),
+      isLoading: false,
+      isError: false,
+      refetch: vi.fn(),
+    });
+
+    renderWithProviders(<OrderDetailPage />);
+    await screen.findByText("OT-0001");
+
+    await userEvent.click(screen.getByTestId("order_detail.print_button"));
+
+    // The document body still renders; no empty hope block is reserved.
+    expect(
+      await screen.findByTestId("order_detail.document"),
+    ).toBeInTheDocument();
+    expect(
+      screen.queryByTestId("order_detail.document.hope_message"),
+    ).not.toBeInTheDocument();
   });
 });

@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   InventoryCsvRow,
@@ -10,11 +11,12 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 /** Exports the whole inventory as flat CSV rows. */
 export function useExportInventoryCsv() {
   const { actor } = useBackend();
+  const { token } = useAuth();
 
   return useMutation({
     mutationFn: async (): Promise<InventoryCsvRow[]> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.exportInventoryCsv();
+      return actor.exportInventoryCsv(token);
     },
   });
 }
@@ -22,6 +24,7 @@ export function useExportInventoryCsv() {
 /** Imports inventory rows and reports per-row created/updated/failed status. */
 export function useImportInventoryCsv() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -29,7 +32,7 @@ export function useImportInventoryCsv() {
       rows: InventoryImportRow[],
     ): Promise<InventoryImportResult> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.importInventoryCsv(rows);
+      return actor.importInventoryCsv(token, rows);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["parts"] });
@@ -48,12 +51,13 @@ export function useImportInventoryCsv() {
  */
 export function useZeroInventory() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (): Promise<ZeroInventoryResult> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.zeroInventory();
+      return actor.zeroInventory(token);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["parts"] });

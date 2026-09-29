@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Customer,
@@ -62,10 +63,11 @@ export function errorMessage(error: unknown): string {
 
 /**
  * Page size for the type-to-narrow part pickers (quote lines, workshop-order
- * repuesto dialog, POS). A small page keeps each search cheap; the user narrows
- * the term instead of scrolling the whole catalog.
+ * repuesto dialog, POS). The pickers no longer truncate: they request a page
+ * large enough to cover the whole catalog and render every match in a
+ * scrollable panel, so no valid option is silently dropped.
  */
-export const PICKER_PAGE_SIZE = 50n;
+export const PICKER_PAGE_SIZE = 1000n;
 
 export interface OrderListParams {
   status: OrderStatus | null;
@@ -76,6 +78,7 @@ export interface OrderListParams {
 
 export function useOrders(params: OrderListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const offset = BigInt((params.page - 1) * params.pageSize);
   const limit = BigInt(params.pageSize);
   const search = params.search.trim();
@@ -94,7 +97,7 @@ export function useOrders(params: OrderListParams) {
         status: params.status ?? undefined,
         search: search.length > 0 ? search : undefined,
       };
-      return actor.listOrders(filter, offset, limit);
+      return actor.listOrders(token, filter, offset, limit);
     },
     enabled: !!actor && !isFetching,
   });
@@ -102,12 +105,13 @@ export function useOrders(params: OrderListParams) {
 
 export function useOrder(id: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["order", id?.toString() ?? "none"],
     queryFn: async (): Promise<OrderView | null> => {
       if (!actor || id === null) return null;
-      return actor.getOrder(id);
+      return actor.getOrder(token, id);
     },
     enabled: !!actor && !isFetching && id !== null,
   });
@@ -115,13 +119,14 @@ export function useOrder(id: Id | null) {
 
 export function useCustomers(search: string) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const term = search.trim();
 
   return useQuery({
     queryKey: ["customers", term],
     queryFn: async (): Promise<Customer[]> => {
       if (!actor) return [];
-      return actor.listCustomers(term.length > 0 ? term : null);
+      return actor.listCustomers(token, term.length > 0 ? term : null);
     },
     enabled: !!actor && !isFetching,
   });
@@ -136,6 +141,7 @@ export function useCustomers(search: string) {
  */
 export function useOrderLookups(customerIds: Id[], motorcycleIds: Id[]) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const customerKey = customerIds
     .map((id) => id.toString())
     .sort()
@@ -162,8 +168,8 @@ export function useOrderLookups(customerIds: Id[], motorcycleIds: Id[]) {
       const results = await Promise.all(
         uniqueCustomers.map(async (id) => {
           const [customer, motos] = await Promise.all([
-            actor.getCustomer(BigInt(id)),
-            actor.listMotorcycles(BigInt(id)),
+            actor.getCustomer(token, BigInt(id)),
+            actor.listMotorcycles(token, BigInt(id)),
           ]);
           return { id, name: customer?.name ?? null, motos };
         }),
@@ -184,25 +190,27 @@ export function useOrderLookups(customerIds: Id[], motorcycleIds: Id[]) {
 
 export function useMotorcycles(customerId: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["motorcycles", customerId?.toString() ?? "none"],
     queryFn: async (): Promise<Motorcycle[]> => {
       if (!actor || customerId === null) return [];
-      return actor.listMotorcycles(customerId);
+      return actor.listMotorcycles(token, customerId);
     },
     enabled: !!actor && !isFetching && customerId !== null,
   });
 }
 
 /**
- * Picker search over the parts catalog. The picker is a type-to-narrow control,
- * so a single small page is enough: the user refines the term instead of
- * scrolling a huge result set. Requesting a small page keeps each keystroke
- * cheap for the backend.
+ * Picker search over the parts catalog. The picker is a type-to-narrow control:
+ * it only queries the backend once the user types a term, so the catalog is
+ * never listed in full by default. The broad page size returns every match for
+ * the typed term in a scrollable panel, so no valid option is dropped.
  */
 export function useParts(search: string) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const term = search.trim();
 
   return useQuery({
@@ -210,45 +218,48 @@ export function useParts(search: string) {
     queryFn: async (): Promise<PartPage> => {
       if (!actor) throw new Error("Backend no disponible");
       return actor.listParts(
+        token,
         { search: term.length > 0 ? term : undefined },
         PartSort.name,
         0n,
         PICKER_PAGE_SIZE,
       );
     },
-    enabled: !!actor && !isFetching,
+    enabled: !!actor && !isFetching && term.length > 0,
   });
 }
 
 /**
- * Resolves a single part by its exact SKU against the full catalog. The POS
- * barcode scanner cannot rely on the small picker page, so it queries the
- * backend directly with the scanned code and matches the SKU case-insensitively.
+ * Resolves a scanned or manually typed code to a catalog part through the
+ * backend `findPartByCode`, which matches both the barcode and the SKU. Used by
+ * the workshop-order barcode flow so a scan adds the exact product to the line.
+ *
+ * Returns the resolved `PartView` when the code exists and `null` when it does
+ * not, matching the other flows (POS, cotizaciones, compras, facturas).
  */
-export async function findPartBySku(
-  actor: NonNullable<ReturnType<typeof useBackend>["actor"]>,
-  sku: string,
-): Promise<PartView | null> {
-  const code = sku.trim();
-  if (code === "") return null;
-  const page = await actor.listParts(
-    { search: code },
-    PartSort.name,
-    0n,
-    PICKER_PAGE_SIZE,
-  );
-  const target = code.toLowerCase();
-  return page.items.find((part) => part.sku.toLowerCase() === target) ?? null;
+export function useFindPartByCode() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: async (code: string): Promise<PartView | null> => {
+      const value = code.trim();
+      if (value === "" || !actor) return null;
+      const result = await actor.findPartByCode(token, value);
+      return result.__kind__ === "found" ? result.found : null;
+    },
+  });
 }
 
 export function useLots(partId: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["lots", partId?.toString() ?? "none"],
     queryFn: async (): Promise<Lot[]> => {
       if (!actor || partId === null) return [];
-      return actor.listLots(partId);
+      return actor.listLots(token, partId);
     },
     enabled: !!actor && !isFetching && partId !== null,
   });
@@ -256,6 +267,7 @@ export function useLots(partId: Id | null) {
 
 export function useCreateOrder() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -267,7 +279,7 @@ export function useCreateOrder() {
       problem: string;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createOrder(input);
+      return actor.createOrder(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -277,6 +289,7 @@ export function useCreateOrder() {
 
 export function useUpdateOrderStatus() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -285,7 +298,7 @@ export function useUpdateOrderStatus() {
       status: OrderStatus;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateOrderStatus(input.id, input.status);
+      return actor.updateOrderStatus(token, input.id, input.status);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -298,6 +311,7 @@ export function useUpdateOrderStatus() {
 
 export function useAddOrderPart() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -306,7 +320,7 @@ export function useAddOrderPart() {
       part: OrderPartInput;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.addOrderPart(input.id, input.part);
+      return actor.addOrderPart(token, input.id, input.part);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -319,6 +333,7 @@ export function useAddOrderPart() {
 
 export function useRemoveOrderPart() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -327,7 +342,7 @@ export function useRemoveOrderPart() {
       orderPartId: Id;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.removeOrderPart(input.id, input.orderPartId);
+      return actor.removeOrderPart(token, input.id, input.orderPartId);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -340,6 +355,7 @@ export function useRemoveOrderPart() {
 
 export function useAddLabor() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -348,7 +364,7 @@ export function useAddLabor() {
       labor: LaborInput;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.addLabor(input.id, input.labor);
+      return actor.addLabor(token, input.id, input.labor);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -361,6 +377,7 @@ export function useAddLabor() {
 
 export function useRemoveLabor() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -369,7 +386,7 @@ export function useRemoveLabor() {
       laborId: Id;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.removeLabor(input.id, input.laborId);
+      return actor.removeLabor(token, input.id, input.laborId);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -387,6 +404,7 @@ export function useRemoveLabor() {
  */
 export function useCancelOrder() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -395,7 +413,7 @@ export function useCancelOrder() {
       reason: string;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.cancelOrder(input.id, input.reason);
+      return actor.cancelOrder(token, input.id, input.reason);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -414,12 +432,13 @@ export function useCancelOrder() {
  */
 export function useDeleteOrder() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: Id): Promise<boolean> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.deleteOrder(id);
+      return actor.deleteOrder(token, id);
     },
     onSuccess: (_deleted, id) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -438,6 +457,7 @@ export function useDeleteOrder() {
  */
 export function useAddOrderPhoto() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -446,7 +466,7 @@ export function useAddOrderPhoto() {
       photo: OrderPhotoInput;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.addOrderPhoto(input.id, input.photo);
+      return actor.addOrderPhoto(token, input.id, input.photo);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -460,6 +480,7 @@ export function useAddOrderPhoto() {
 /** Removes a process-evidence photo from a workshop order. */
 export function useRemoveOrderPhoto() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -468,7 +489,7 @@ export function useRemoveOrderPhoto() {
       photoId: Id;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.removeOrderPhoto(input.id, input.photoId);
+      return actor.removeOrderPhoto(token, input.id, input.photoId);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });

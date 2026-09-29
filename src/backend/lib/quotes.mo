@@ -15,6 +15,7 @@ import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
 import ServiceTypes "../types/services";
 import InventoryTypes "../types/inventory";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -128,11 +129,11 @@ module {
   };
 
   func matchesSearch(state : State, quote : Types.Quote, term : Text) : Bool {
-    let needle = term.toLower();
-    if (quote.quoteNumber.toLower().contains(#text needle)) { return true };
+    let needle = Search.normalize(term);
+    if (Search.contains(quote.quoteNumber, needle)) { return true };
     switch (state.customers.get(quote.customerId)) {
       case (?customer) {
-        if (customer.name.toLower().contains(#text needle)) { return true };
+        if (Search.contains(customer.name, needle)) { return true };
       };
       case null {};
     };
@@ -144,11 +145,11 @@ module {
       case (#number) { Text.compare(a.quoteNumber, b.quoteNumber) };
       case (#customer) {
         let nameA = switch (state.customers.get(a.customerId)) {
-          case (?customer) { customer.name.toLower() };
+          case (?customer) { Search.sortKey(customer.name) };
           case null { "" };
         };
         let nameB = switch (state.customers.get(b.customerId)) {
-          case (?customer) { customer.name.toLower() };
+          case (?customer) { Search.sortKey(customer.name) };
           case null { "" };
         };
         Text.compare(nameA, nameB);

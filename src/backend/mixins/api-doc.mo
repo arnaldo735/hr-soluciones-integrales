@@ -4,7 +4,7 @@
 
 mixin () {
   public query func getApiDoc() : async Text {
-    let doc : Text = "# API — Taller y Almacén de Repuestos de Motos
+    "# API — Taller y Almacén de Repuestos de Motos
 
 Backend Motoko para la gestión de un taller de motos y su almacén de
 repuestos: inventario por lote/serie, clientes y motos, órdenes de taller,
@@ -23,14 +23,44 @@ formatea dividiendo entre `100`.
 
 ## Autenticación e identidad
 
-Los métodos de escritura y los métodos de lectura administrativos exigen un
-llamador **firmado (no anónimo)**. El frontend fija un *derivation origin* de
-Internet Identity, publicado en `/.well-known/ii-derivation-origin` cuando
-está disponible; un agente que ya tiene la autorización de Internet Identity
-del usuario deriva el principal correcto por aplicación contra ese origen
-(por ejemplo `icp identity link web <nombre> --app <host>`). Esa delegación
-actúa con la autoridad completa del usuario en esta aplicación hasta que
-expira.
+La aplicación tiene **dos vías de acceso**:
+
+1. **Usuario y contraseña** (vía principal). El usuario llama a `login` y
+   recibe un token de sesión opaco que envía en las llamadas posteriores. Los
+   endpoints de administración aceptan este token cuando el rol del usuario es
+   `Administrador`. Ver «Acceso con usuario y contraseña».
+2. **Internet Identity** (vía alternativa). Los métodos de escritura y los
+   métodos de lectura administrativos exigen un llamador **firmado (no
+   anónimo)**. El frontend fija un *derivation origin* de Internet Identity,
+   publicado en `/.well-known/ii-derivation-origin` cuando está disponible; un
+   agente que ya tiene la autorización de Internet Identity del usuario deriva
+   el principal correcto por aplicación contra ese origen (por ejemplo
+   `icp identity link web <nombre> --app <host>`). Esa delegación actúa con la
+   autoridad completa del usuario en esta aplicación hasta que expira.
+
+Un administrador por Internet Identity (`AccessControl.isAdmin`) conserva
+acceso completo sin cambios. Un administrador por contraseña se reconoce por
+su token de sesión con rol `Administrador`. **Todos** los endpoints
+administrativos y con alcance de módulo aceptan cualquiera de las dos vías: la
+autorización se resuelve con `UsersLib.isAdmin` (administrador) o
+`UsersLib.canAccessModule` (módulo), que devuelven `true` para un administrador
+por Internet Identity o para un token de sesión válido cuyo rol cumpla la
+condición.
+
+### Parámetro `token : ?Text`
+
+Los endpoints administrativos y con alcance de módulo reciben el token de
+sesión en su **primer parámetro** `token : ?Text`:
+
+- Envíe el token devuelto por `login` para autorizar por la vía de usuario y
+  contraseña.
+- Envíe `null` cuando la autorización sea por Internet Identity (el llamador
+  firmado se resuelve por `{ caller }`).
+
+El token es opaco y se resuelve en el backend contra las sesiones vigentes; un
+token ausente, desconocido o vencido no autoriza nada. Los endpoints de sesión
+y de perfil (`login`, `logout`, `getSession`, `changeOwnPassword`,
+`updateCallerName`) reciben el token como `Text` obligatorio, no como `?Text`.
 
 ### Registro previo (obligatorio)
 
@@ -68,6 +98,49 @@ frontend registró.
   contabilidad, configuración de empresa o el panel de resumen.
 - `#guest` — llamador anónimo; sin acceso a endpoints protegidos.
 
+### Módulos y autorización por módulo
+
+Además de los roles integrados, el administrador puede crear **roles
+personalizados** con una selección de módulos. El rol asignado determina qué
+módulos y páginas ve cada usuario, y esa decisión se aplica **también en el
+backend**: los endpoints con alcance de módulo exigen que el rol del usuario de
+la sesión incluya la clave de módulo correspondiente, mediante
+`UsersLib.canAccessModule`. Un administrador por Internet Identity
+(`AccessControl.isAdmin`) siempre pasa la comprobación.
+
+Las claves de módulo (`ModuleKey`, un `Text`) son el vocabulario de navegación
+de la aplicación:
+
+- `dashboard` — panel de resumen.
+- `workshop` — órdenes de taller; `appointments` — citas; `technicians` —
+  técnicos.
+- `inventory` — inventario; `services` — servicios; `serviceCategories` —
+  categorías de servicios; `customers` — clientes; `motorcycles` —
+  motocicletas; `suppliers` — proveedores.
+- `quotes` — cotizaciones; `billing` — facturas; `pos` — POS mostrador.
+- `purchases` — compras; `supplierOrders` — pedidos a proveedor;
+  `purchaseInvoices` — facturas de compra; `payables` — cuentas por pagar.
+- `company` — empresa; `expenses` — gastos; `expenseCategories` — categorías de
+  gastos; `commissions` — comisiones y préstamos; `accounting` — contabilidad;
+  `receivables` — cuentas por cobrar; `cash` — caja y bancos; `users` —
+  usuarios; `roles` — roles; `settings` — configuración.
+
+Un endpoint con alcance de módulo al que le falte la clave en el rol del
+usuario falla con un trap `Unauthorized: no tiene acceso al módulo ...` (el
+mensaje nombra el módulo: por ejemplo `... al módulo de inventario`,
+`... al módulo de clientes`, `... al módulo de motos`, `... al módulo de
+taller`, `... al módulo de cotizaciones`, `... al módulo de servicios`,
+`... al módulo de categorías de servicios`, `... al módulo de técnicos`,
+`... al módulo de comisiones`, `... al módulo de empresa`, `... al módulo de
+citas`, `... al módulo de gastos`, `... al módulo de categorías de gastos`,
+`... al módulo de contabilidad`, `... al módulo de punto de venta`,
+`... al módulo de cuentas por cobrar`, `... al módulo de pedidos a proveedor`,
+`... al módulo de facturas de compra`, `... al panel de resumen`); los
+endpoints de compras y facturación que comparten guardia usan el mensaje
+genérico `Unauthorized: no tiene acceso al módulo solicitado`. Un llamador sin
+sesión válida y sin rol de administrador por Internet Identity recibe el mismo
+trap.
+
 ### Visibilidad del precio de costo
 
 `listParts`, `getPart` y `lowStockParts` devuelven `costPrice` **solo** si el
@@ -82,13 +155,20 @@ no cambia.
   — consulta. **Listado paginado de inventario, resuelto en el backend**:
   filtros, ordenamiento y paginación se aplican en el canister y la respuesta
   trae solo la página pedida, sin cargar el catálogo entero. `filter.search`
-  busca en nombre y SKU (sin distinguir mayúsculas); `filter.category` y
+  busca en nombre, SKU y código de barras (sin distinguir mayúsculas);
+  `filter.category` y
   `filter.brand` son igualdad exacta; `filter.lowStockOnly = ?true` limita a
   repuestos con stock total menor o igual al umbral. `sort` es
   `#name | #sku | #stock | #createdAt`. `PartPage` devuelve `items`, `total`
   (coincidencias antes de paginar), `offset` y `limit`. Es la vía recomendada
   para listados grandes.
 - `getPart(id : Id) : ?PartView` — consulta. `null` si no existe.
+- `findPartByCode(code : Text) : PartLookupResult` — consulta. Busca un
+  repuesto por **código de barras o SKU** (comparación sin distinguir
+  mayúsculas ni espacios externos); el código de barras tiene prioridad sobre
+  el SKU. Devuelve `#found(PartView)` o `#notFound` cuando el código está vacío
+  o no coincide con ningún repuesto. Es la vía que usa el lector de códigos de
+  barras del POS y de los demás formatos.
 - `listPartFacets() : PartFacets` — consulta. Devuelve únicamente los valores
   **distintos** de categoría y marca del catálogo (`categories` y `brands`,
   cada uno ordenado alfabéticamente sin distinguir mayúsculas), para poblar los
@@ -116,8 +196,8 @@ no cambia.
   actualización. Actualización masiva; las filas inexistentes o con SKU
   duplicado se omiten.
 - `exportInventoryCsv() : [InventoryCsvRow]` — consulta. Devuelve todas las
-  filas del inventario con las columnas de exportación (SKU, nombre,
-  categoría, marca, unidad, precio de venta, precio de costo, umbral de
+  filas del inventario con las columnas de exportación (SKU, código de barras,
+  nombre, categoría, marca, unidad, precio de venta, precio de costo, umbral de
   stock bajo y existencia actual) para que el frontend genere el archivo CSV
   real. `quantity` es la existencia total del repuesto (suma de sus lotes).
 - `importInventoryCsv(rows : [InventoryImportRow]) : InventoryImportResult`
@@ -468,7 +548,17 @@ Todos estos métodos exigen rol administrador; en caso contrario fallan con
 - `listPurchases(supplierId : ?Id) : [Purchase]` — consulta.
 - `createPurchase(input : PurchaseInput) : Purchase` — actualización. Crea
   un lote por cada línea y un movimiento de tipo `#purchase`, aumentando el
-  stock automáticamente. Falla con `Supplier not found`.
+  stock automáticamente. La compra nace con `accepted = false`. Falla con
+  `Supplier not found`.
+- `deletePurchase(id : Id) : Bool` — actualización. Elimina una compra **solo
+  mientras no haya sido aceptada/confirmada** (`accepted = false`) y no tenga
+  pagos. Falla con `Compra no encontrada` si no existe, con
+  `No se puede eliminar una compra ya aceptada` si `accepted = true` y con
+  `No se puede eliminar una compra con pagos registrados` si `paidAmount > 0`
+  o existe algún pago que la referencia. Al eliminarla se **revierten** sus
+  lotes y sus movimientos de inventario de tipo `#purchase`, de modo que el
+  stock vuelve a su estado anterior. Es **irreversible**: un reintento
+  devuelve `false` porque la compra ya no existe.
 - `listPayments(supplierId : ?Id) : [Payment]` — consulta.
 - `registerPayment(input : PaymentInput) : Payment` — actualización. Falla
   con `Supplier not found`, `Payment amount must be greater than zero` o
@@ -554,22 +644,78 @@ elimine.
   `card` y `transfer` se mapean a sus variantes; cualquier otro valor se trata
   como efectivo.
 
+### Caja y Bancos
+
+Módulo de tesorería con **turnos de caja**. Todos estos métodos exigen el
+módulo `cash`; un llamador sin ese módulo en su rol falla con
+`Unauthorized: no tiene acceso al módulo de caja y bancos`. Un turno declara
+saldos iniciales de **Caja** y **Bancos**; los movimientos de ingreso y egreso
+se clasifican por medio de pago y afectan una cuenta: el **efectivo** afecta
+Caja (`#cash`), y **transferencia** y **tarjeta** afectan Bancos (`#bank`).
+Los ingresos suman y los egresos restan. `#mixed` es ambiguo y respeta la
+cuenta indicada por el llamador en `input.account`.
+
+- `openShift(input : OpenShiftInput) : Shift` — actualización. Abre un turno
+  con los saldos iniciales declarados (`openingCash`, `openingBank`) y una nota
+  opcional. Falla con `Ya hay un turno de caja abierto` si ya existe un turno
+  `#open`. El turno nace `#open` con `computedClosingCash = openingCash` y
+  `computedClosingBank = openingBank`.
+- `closeShift(id : Id, input : CloseShiftInput) : Shift` — actualización.
+  Cierra el turno con los saldos finales declarados
+  (`declaredClosingCash`, `declaredClosingBank`). Calcula los saldos esperados
+  como saldo inicial + ingresos − egresos de cada cuenta
+  (`computedClosingCash`, `computedClosingBank`) y la diferencia
+  `declared − computed` (`differenceCash`, `differenceBank`, `Int`, puede ser
+  negativa). Falla con `Turno no encontrado` si no existe y con
+  `El turno ya está cerrado` si ya estaba cerrado. El turno pasa a `#closed`
+  con `closedAt` y `closedBy`.
+- `listShifts(filter : ShiftFilter, offset : Nat, limit : Nat) : ShiftPage` —
+  consulta. `filter.status` filtra por `#open | #closed`; `filter.from` /
+  `filter.to` acotan por `openedAt` (inclusive). Ordenado por id descendente.
+- `getShift(id : Id) : ?Shift` — consulta. `null` si no existe.
+- `getOpenShift() : ?Shift` — consulta. El turno abierto actual, o `null` si no
+  hay ninguno.
+- `registerCashMovement(input : CashMovementInput) : CashMovement` —
+  actualización. Registra un movimiento de ingreso o egreso en el **turno
+  abierto**. Falla con `No hay un turno de caja abierto` si no hay turno
+  abierto y con `El monto del movimiento debe ser mayor que cero` si
+  `amount = 0`. La cuenta afectada se deriva del medio de pago (ver arriba).
+  `source` indica el origen (`#manual | #invoice | #receivable | #purchase |
+  #expense | #commission | #pos | #other`) y `reference` es una referencia
+  externa opcional.
+- `listCashMovements(filter : CashMovementFilter, offset : Nat, limit : Nat) : CashMovementPage`
+  — consulta. `filter.shiftId` limita a un turno; `filter.kind`, `filter.account`
+  y `filter.paymentMethod` son igualdad exacta; `filter.from` / `filter.to`
+  acotan por `timestamp` (inclusive). Ordenado por id descendente.
+- `getDailyShiftReport(shiftId : Id) : DailyShiftReport` — consulta. Informe
+  diario del turno: **todos** sus movimientos (ordenados por id ascendente),
+  los totales por medio de pago (`byPaymentMethod`, con `income` y `expense`),
+  los totales generales (`totalIncome`, `totalExpense`), los totales por cuenta
+  (`cashIncome`, `cashExpense`, `bankIncome`, `bankExpense`) y el turno con sus
+  saldos finales declarados y calculados. Falla con `Turno no encontrado` si no
+  existe.
+
 ### Contabilidad
 
 Todos estos métodos exigen rol administrador; en caso contrario fallan con
 `Unauthorized: Only admins can perform this action`.
 
 - `getAccountingSummary(period : AccountingPeriod) : AccountingSummary` —
-  consulta. Ingresos (facturas `#paid`), gastos, beneficio (`Int`, puede ser
-  negativo), y conteos. `period.from` / `period.to` son opcionales e
-  inclusivos.
+  consulta. Ingresos (facturas `#paid`), gastos, comisiones de técnicos del
+  periodo (`totalCommissions`), beneficio bruto (`profit = totalIncome −
+  totalExpenses`, `Int`, puede ser negativo), **utilidad neta**
+  (`netProfit = profit − totalCommissions`, `Int`, puede ser negativa) y
+  conteos. `period.from` / `period.to` son opcionales e inclusivos.
 - `getAccountingReport(period : AccountingPeriod) : AccountingReport` —
   consulta. Resumen, desglose de gastos por categoría y por método de pago,
   el libro mayor ordenado por fecha descendente y el desglose de utilidad
   `profit` (ver más abajo).
 - `listLedgerEntries(period : AccountingPeriod) : [LedgerEntry]` — consulta.
-  Asientos de ingreso (`#income`, facturas pagadas) y de gasto (`#expense`),
-  ordenados por fecha descendente.
+  Asientos de ingreso (`#income`, facturas pagadas), de gasto (`#expense`) y de
+  **comisión de técnicos** (`#commission`), ordenados por fecha descendente.
+  Cada factura pagada del periodo cuya comisión de técnicos sea mayor que cero
+  aporta **un** asiento `#commission` con el importe agregado de sus líneas de
+  servicio, que **reduce la utilidad** del libro.
 - `getInventoryValuation() : InventoryValuation` — consulta. Informe del
   valor del inventario **actual**, sin periodo: una foto del estado en el
   momento de la llamada. Devuelve `rows` (una fila por repuesto existente),
@@ -643,7 +789,11 @@ Todos estos métodos exigen rol administrador; en caso contrario fallan con
   — actualización. **Solo se puede facturar una orden en estado `#delivered`**;
   una orden `#ready` ya no es facturable. En otro caso falla con
   `Solo se puede facturar una orden entregada` (o
-  `La orden está cancelada y no se puede facturar` si está cancelada). El
+  `La orden está cancelada y no se puede facturar` si está cancelada). **Una
+  orden solo puede facturarse una vez**: si ya existe una factura con origen
+  `#workshopOrder` que referencia esa orden, falla con
+  `La orden ya tiene una factura asociada` hasta que esa factura se elimine con
+  `deleteInvoice`. El
   número de factura es **consecutivo automático** (`F-<6 dígitos>`). Las
   líneas de repuesto se marcan `kind = #part` con su `unitCost` de referencia
   y las de mano de obra `kind = #service`. La factura nace con
@@ -657,8 +807,13 @@ Todos estos métodos exigen rol administrador; en caso contrario fallan con
   `createInvoiceFromOrder`.
 - `createInvoiceFromPosSale(posSaleId : Id, customerId : ?Id, customerName : ?Text, lines : [InvoiceLine], discount : Money, paymentMethod : PaymentMethod, paymentCondition : PaymentCondition, creditPlan : ?CreditPlanInput) : Invoice`
   — actualización. Emite una factura con origen `#pos`; si no hay nombre de
-  cliente usa `Cliente de mostrador`. Acepta condición de pago y plan de
-  cuotas igual que `createInvoiceFromOrder`.
+  cliente usa `Cliente de mostrador`. **Una venta de mostrador solo puede
+  facturarse una vez**: si la venta ya apunta a una factura
+  (`posSale.invoiceId` distinto de cero), falla con
+  `La venta de mostrador ya tiene una factura asociada` hasta que esa factura
+  se elimine con `deleteInvoice`. Falla con
+  `Venta de mostrador no encontrada` si la venta no existe. Acepta condición
+  de pago y plan de cuotas igual que `createInvoiceFromOrder`.
 - `listInvoices(filter : InvoiceFilter, offset : Nat, limit : Nat) : InvoicePage`
   — consulta. `filter.search` busca en número y nombre del cliente;
   `filter.from` / `filter.to` acotan por `issuedAt` (inclusive). Ordenado por
@@ -667,16 +822,32 @@ Todos estos métodos exigen rol administrador; en caso contrario fallan con
   (`installments`), de modo que la lista distingue contado, crédito y saldo
   pendiente.
 - `getInvoice(id : Id) : ?Invoice` — consulta.
+- `deleteInvoice(id : Id) : Bool` — actualización. Elimina una factura **solo
+  cuando está pendiente de pago y no tiene ningún cobro registrado**. Falla con
+  `Factura no encontrada` si no existe y con
+  `No se puede eliminar la factura porque ya tiene pagos o abonos registrados`
+  cuando la factura ya está `#paid`, cuando alguna cuota de su plan está pagada
+  o cuando existe al menos un abono de cuentas por cobrar sobre ella. Al
+  eliminarla, la venta POS de origen deja de apuntar a la factura
+  (`posSale.invoiceId = 0`) y la orden de taller vuelve a ser facturable, de
+  modo que el documento de origen se puede facturar de nuevo. La factura
+  desaparece de listados, cuentas por cobrar y contabilidad. Es
+  **irreversible**: un reintento devuelve `false` porque la factura ya no
+  existe.
 - `markInvoicePaid(id : Id, paymentMethod : PaymentMethod) : Invoice` —
-  actualización. Falla con `Invoice not found`.
+  actualización. Marca la factura como cobrada. **Rechaza un segundo cobro**:
+  si la factura ya está `#paid` falla con `La factura ya fue cobrada`. En una
+  factura a crédito da por pagadas todas sus cuotas. Falla con
+  `Factura no encontrada` si no existe.
 - `registerInstallmentPayment(id : Id, installmentNumber : Nat) : Invoice` —
   actualización. Registra el pago de **una cuota individual** de una factura a
   crédito: marca la cuota como pagada y guarda `paidAt`. La factura pasa a
   `#paid` **solo cuando todas las cuotas están pagadas**; mientras falte
-  alguna permanece `#pending`. Falla con `Factura no encontrada`, con
-  `La factura no tiene plan de cuotas` si la factura es de contado, con
-  `Cuota no encontrada` si el número no existe y con `La cuota ya fue pagada`
-  si esa cuota ya se había registrado.
+  alguna permanece `#pending`. **Rechaza un segundo cobro**: si la factura ya
+  está `#paid` falla con `La factura ya fue cobrada`. Falla con
+  `Factura no encontrada`, con `La factura no tiene plan de cuotas` si la
+  factura es de contado, con `Cuota no encontrada` si el número no existe y con
+  `La cuota ya fue pagada` si esa cuota ya se había registrado.
 
 ### Plan de cuotas
 
@@ -712,13 +883,60 @@ estos métodos exigen rol administrador; en caso contrario fallan con
   (facturas con saldo mayor que cero).
 - `registerReceivablePayment(input : ReceivablePaymentInput) : ReceivablePayment`
   — actualización. Registra un abono sobre una factura a crédito y recalcula
-  el saldo y el estado de la factura. Falla con `Factura no encontrada`,
+  el saldo y el estado de la factura. **Rechaza un segundo cobro**: si la
+  factura ya está `#paid` falla con `La factura ya fue cobrada`. Falla con
+  `Factura no encontrada`,
   `La factura no es una cuenta por cobrar a crédito`,
   `El monto del abono debe ser mayor que cero` o
   `El abono supera el saldo pendiente`. El abono marca como pagadas las cuotas
   cubiertas, en orden de vencimiento, y deja la factura en `#paid` cuando el
   saldo llega a cero. El abono queda registrado en la entidad OQL
   `receivablePayment` con el llamador (`performedBy`) y la fecha (`at`).
+
+### Recordatorios de pendientes
+
+- `getRemindersSummary(token : ?Text) : RemindersSummary` — consulta. Devuelve
+  en **una sola llamada** el resumen de pendientes que alimenta la ventana
+  emergente de recordatorios. Cada sección es `null` cuando el llamador no
+  tiene acceso al módulo correspondiente; el gating se evalúa por módulo, no
+  con un único guardia, de modo que un usuario con acceso parcial recibe solo
+  sus secciones. `generatedAt` es el instante de la consulta (`Time.now()`,
+  nanosegundos).
+
+  Secciones y su módulo:
+
+  - `appointments` (módulo `appointments`) — citas en estado `#scheduled` o
+    `#confirmed`, ordenadas por `scheduledAt` ascendente (la más próxima
+    primero). Cada ítem trae `id`, `customerId`, `customerName`, `scheduledAt`
+    y `status` como texto (`\"scheduled\"` / `\"confirmed\"`).
+  - `receivables` (módulo `receivables`) — cuentas por cobrar con saldo
+    pendiente o vencido (`#pending` o `#overdue`), ordenadas por `dueDate`
+    ascendente. Cada ítem trae `invoiceId`, `invoiceNumber`, `customerName`,
+    `balance`, `dueDate` y `status` (`\"pending\"` / `\"overdue\"`).
+  - `payables` (módulo `payables`) — cuentas por pagar por proveedor con saldo
+    pendiente o vencido (`#pending` o `#overdue`), ordenadas por `dueDate`
+    ascendente. Cada ítem trae `supplierId`, `supplierName`, `balance`,
+    `dueDate` y `status` (`\"pending\"` / `\"overdue\"`).
+  - `unapprovedOrders` (módulo `workshop`) — órdenes de taller en estado
+    `#received` (sin aprobar), ordenadas por id descendente. Cada ítem trae
+    `id`, `orderNumber`, `customerName` y `plate`.
+  - `pendingQuotes` (módulo `quotes`) — cotizaciones en estado `#draft` o
+    `#sent`, ordenadas por `createdAt` descendente. Cada ítem trae `id`,
+    `quoteNumber`, `customerName`, `createdAt` y `status` (`\"draft\"` /
+    `\"sent\"`).
+  - `finishedOrders` (módulo `workshop`) — órdenes en estado `#ready` (Lista)
+    cuya finalización supera los **tres días**, ordenadas por
+    `daysInWorkshop` descendente. Cada ítem trae `id`, `orderNumber`,
+    `customerName`, `plate` y `daysInWorkshop` (días completos transcurridos
+    desde que la orden quedó Lista). El momento de finalización es la última
+    transición a `#ready` del historial de la orden; si el historial no la
+    registra, se usa `updatedAt`.
+
+  Cada sección es un `ReminderSection<T>` con `count` (total de pendientes,
+  **sin recortar**) e `items` (los más relevantes, recortados a **10**). El
+  recorte no altera `count`: una sección con 25 pendientes devuelve
+  `count = 25` e `items` con 10. La consulta no muta estado y es segura de
+  repetir.
 
 ### Pedidos a proveedor
 
@@ -857,8 +1075,9 @@ alteran el stock ni el costo del repuesto.
 
 Todos estos métodos exigen rol administrador; en caso contrario fallan con
 `Unauthorized: Only admins can perform this action`. El respaldo es una
-operación **manual** del administrador: no hay respaldo programado ni
-restauración.
+operación **manual** del administrador: no hay respaldo programado. La
+restauración desde una copia local también es manual y se hace sección por
+sección (ver «Restauración desde una copia local»).
 
 - `getDriveConnectionStatus() : DriveConnectionStatus` — **actualización** (no
   consulta, porque lee las variables de entorno del canister). Devuelve
@@ -914,20 +1133,76 @@ restauración.
   carpeta aún no existe devuelve `#ok([])` (lista vacía), no un error. Si falta
   configuración OAuth, devuelve `#err(#driveFailed(\"Google Drive no está
   configurado: falta <VARIABLE>\"))` en lugar de fallar con un trap.
-- `downloadLocalBackup() : LocalBackup` — **consulta** (solo lectura, no
-  espera a ningún canister). Devuelve la **copia de seguridad local** para que
-  el frontend la descargue en el equipo del usuario, sin subir nada a la nube.
-  El campo `json` contiene **exactamente los mismos datos** que el respaldo a
-  Drive (`createBackup`): las mismas colecciones y el mismo formato JSON.
-  `fileName` es el nombre sugerido del archivo, con fecha y hora de generación
-  en UTC: `copia-local-hr-AAAA-MM-DD-HHmm.json`. `generatedAt` es el momento de
-  generación en nanosegundos. No muta estado y se puede reintentar sin efectos
-  secundarios; cada llamada refleja el estado del momento de la llamada.
+- `getLocalBackupManifest() : LocalBackupManifest` — **consulta** (solo
+  lectura, no espera a ningún canister). Devuelve el plan de la **copia de
+  seguridad local** sin serializar ningún dato: `fileName` (nombre sugerido,
+  con fecha y hora de generación en UTC:
+  `copia-local-hr-AAAA-MM-DD-HHmm.json`), `generatedAt` (nanosegundos),
+  `sections` (las 23 claves raíz del JSON, en el orden exacto del respaldo),
+  `totalSections` y `maxPageSize` (tamaño máximo de página que acepta
+  `getBackupSection`). No muta estado y se puede reintentar sin efectos
+  secundarios.
+- `getBackupSection(index : Nat, offset : Nat, limit : Nat) : BackupSectionChunk`
+  — **consulta** (solo lectura). Devuelve una página de la sección `index` del
+  manifiesto, serializando **solo esa página** para no acercarse al límite de
+  instrucciones por mensaje. Para las secciones de colección, `json` es un
+  arreglo JSON con los elementos `[offset, offset + limit)`; el frontend
+  concatena las páginas hasta que `done` sea `true`. Para las secciones de un
+  único registro (`businessSettings` y `company`), `json` es el objeto completo
+  y `done` es `true` en la primera llamada. `limit` se acota a
+  `maxPageSize` y el campo `limit` de la respuesta reporta el valor efectivo.
+  El frontend arma el JSON raíz como
+  `{ \"generatedAt\": <generatedAt>, \"<sections[0]>\": <valor>, ... }`. Un
+  `index` fuera de rango falla con un trap. No muta estado y se puede
+  reintentar sin efectos secundarios; cada llamada refleja el estado del
+  momento de la llamada.
 
 El respaldo **no** incluye los bytes de las fotos de evidencia (viven en el
 almacenamiento de archivos de la plataforma): solo se serializan sus metadatos
 (`filename`, `mimeType`, `uploadedBy`, `uploadedAt`). Tampoco incluye las
 credenciales de Drive ni los contadores internos de numeración.
+
+### Restauración desde una copia local
+
+Todos estos métodos exigen rol administrador; en caso contrario fallan con
+`Unauthorized: Only admins can perform this action`. La restauración recibe el
+JSON de una **copia local** (el mismo que produce `getLocalBackupManifest` +
+`getBackupSection`) y **sobrescribe únicamente las secciones seleccionadas**.
+Se procesa en dos pasos para respetar el límite de instrucciones por mensaje:
+primero se valida el archivo completo, luego se aplica **una sección por
+llamada**.
+
+- `validateRestoreFile(json : Text) : RestorePreviewOutcome` — actualización
+  (recibe el archivo como parámetro; **no modifica ningún dato**). Parsea el
+  JSON y devuelve `#ok(RestorePreview)` con `generatedAt` (nanosegundos),
+  `formatVersion`, `sections` (las secciones presentes, en el orden de
+  `SECTION_KEYS`, cada una con `key`, `index` y `count`) y `totalSections`; o
+  `#err(RestoreError)`. Es el paso previo a la confirmación: el frontend
+  muestra la fecha y las secciones antes de restaurar. Errores:
+  `#invalidFormat(<detalle>)` si el contenido no es un objeto JSON válido,
+  `#incompatibleVersion(<n>)` si `formatVersion` es mayor que la soportada
+  (`1`), y `#noKnownSections` si el archivo no contiene ninguna sección
+  conocida. Un archivo sin `formatVersion` se interpreta como versión `1`.
+- `restoreSection(json : Text, index : Nat) : RestoreSectionOutcome` —
+  actualización. Restaura **una** sección: `index` es la posición dentro de
+  `manifest.sections` (el mismo orden de `SECTION_KEYS`). Sobrescribe **solo**
+  esa colección con los registros del archivo y devuelve
+  `#ok(RestoreSectionResult)` con `key`, `index`, `status = #restored` y
+  `restored` (número de registros escritos); o `#err(RestoreError)` con
+  `#invalidFormat`, `#incompatibleVersion`, `#unknownSection(<clave>)` o
+  `#invalidSection(<clave>)` si algún registro de la sección no tiene el
+  formato esperado. **La sección se construye primero en memoria y solo se
+  vuelca al estado si todos sus registros son válidos**, de modo que un archivo
+  inválido no deja la colección a medias. El frontend llama una vez por cada
+  sección seleccionada. Las secciones de un único registro (`businessSettings`
+  y `company`) reemplazan el objeto completo y devuelven `restored = 1`.
+
+La restauración **no** restaura los bytes de las fotos de evidencia (no forman
+parte del archivo): las órdenes restauradas conservan sus metadatos de foto con
+la referencia vacía. Tampoco restaura credenciales de Drive ni contadores
+internos. Restaurar una sección es **destructivo** para esa sección: los
+registros que no estén en el archivo se pierden. No hay historial de
+restauraciones ni opción de deshacer.
 
 ### Notificación al cliente
 
@@ -949,6 +1224,12 @@ credenciales de Drive ni los contadores internos de numeración.
   controlado, para que el llamador distinga un fallo de envío de un error de
   entrada. **Requiere que el cliente tenga correo registrado**: sin él no hay
   forma de notificar. No envía mensajes por WhatsApp.
+
+  El cuerpo del correo incluye al final la **promesa de esperanza vigente**
+  (ver «Mensaje diario de esperanza bíblica») cuando está activada; el texto
+  del mensaje indicado por el llamador se conserva exactamente y la promesa se
+  añade después, separada por una línea en blanco. Si el mensaje está
+  desactivado o no hay promesa disponible, el cuerpo se envía sin cambios.
 
 ### Preparación de mensajes de WhatsApp
 
@@ -974,9 +1255,97 @@ credenciales de Drive ni los contadores internos de numeración.
   registro: nombre del contacto, folio/número, fecha, monto o estado según el
   caso, y va firmado con el nombre del negocio.
 
+  El `message` incluye al final la **promesa de esperanza vigente** (ver
+  «Mensaje diario de esperanza bíblica») cuando está activada; el texto de
+  estado se conserva exactamente y la promesa se añade después, separada por
+  una línea en blanco. Si el mensaje está desactivado o no hay promesa
+  disponible, el texto se devuelve sin cambios y sin espacios vacíos.
+
   Falla con `Contacto no encontrado: <id>` si el contacto no existe y con
   `Registro de referencia no encontrado: <id>` si el registro del contexto no
   existe o falta el `referenceId` requerido.
+
+### Mensaje diario de esperanza bíblica
+
+El sistema mantiene un **repertorio fijo** de promesas bíblicas de esperanza en
+español (Colombia), cada una con su cita. La promesa vigente se incluye al final
+de los mensajes prellenados de WhatsApp (`prepareWhatsAppMessage`) y del cuerpo
+de los correos de notificación al cliente (`notifyCustomer`), sin reemplazar el
+texto de estado existente.
+
+- `getDailyHopeMessage() : HopeMessage` — **consulta** (solo lectura, sin
+  autorización). Devuelve la promesa vigente para hoy: `enabled` (si debe
+  mostrarse), `mode` (`auto | manual`), `text`, `citation` y `referenceDate`
+  (el día calendario de Colombia en formato `DD/MM/AAAA`). Es la vía que usa el
+  frontend para mostrar la promesa y para incluirla en documentos y mensajes.
+- `getHopeSettings(token : ?Text) : HopeSettings` — consulta. Configuración
+  vigente (fila única). Exige el módulo `company`; un llamador sin ese módulo
+  falla con `Unauthorized: no tiene acceso al módulo de empresa`. Devuelve
+  `enabled`, `mode`, `manualText`, `manualCitation` y `updatedAt`
+  (nanosegundos).
+- `updateHopeSettings(token : ?Text, input : HopeSettingsRawInput) : HopeSettings`
+  — actualización. Exige el módulo `company`. La entrada es tolerante al borde
+  Candid: `mode` viaja como `Text` (`auto` o `manual`), de modo que una cadena
+  vacía o desconocida **no** produce un error de decodificación; el backend la
+  normaliza (un modo vacío o desconocido se guarda como `auto`). En modo
+  `manual` el texto es obligatorio: si queda vacío o solo espacios, falla con
+  `El texto de la promesa es obligatorio en modo manual`. Al guardar se
+  reemplaza la configuración y se actualiza `updatedAt`.
+
+**Modos.** En modo `auto` la promesa rota de forma **determinista por día
+calendario de Colombia** (America/Bogota, UTC-5): todos los documentos emitidos
+el mismo día muestran la misma promesa y la secuencia avanza un elemento por
+día, dando la vuelta al final del repertorio sin repetirse de inmediato. En modo
+`manual` se usa el texto y la cita fijados por el administrador.
+
+**Desactivado.** Con `enabled = false`, `getDailyHopeMessage` sigue devolviendo
+la promesa vigente (con `enabled = false`), pero los formatos y mensajes se
+generan exactamente como antes, sin la promesa y sin espacios vacíos.
+
+**Fecha de referencia.** `referenceDate` es el día calendario de Colombia en
+formato `DD/MM/AAAA`; la promesa cambia automáticamente al cambiar el día en
+Colombia, sin intervención del usuario.
+
+### Pie de página «Términos y condiciones del Servicio»
+
+El sistema mantiene un **texto único de pie de página** que el administrador
+edita desde la configuración del negocio. El texto guardado se aplica a los
+documentos generados **después** de guardarlo; los documentos ya emitidos
+conservan el texto con el que se generaron.
+
+- `getServiceTermsSettings(token : ?Text) : ServiceTermsSettings` — consulta.
+  Configuración vigente (fila única). Exige el módulo `company`; un llamador
+  sin ese módulo falla con `Unauthorized: no tiene acceso al módulo de
+  empresa`. Devuelve `text` y `updatedAt` (nanosegundos). Si el texto
+  almacenado está vacío, devuelve el **texto de recepción por defecto** para
+  que el pie de página nunca quede en blanco.
+- `updateServiceTermsSettings(token : ?Text, input : ServiceTermsSettingsRawInput) : ServiceTermsSettings`
+  — actualización. Exige el módulo `company`. Recorta el texto recibido,
+  reemplaza el pie de página y actualiza `updatedAt`. Un texto vacío o solo
+  espacios **no** deja el pie de página en blanco: cae al **texto de recepción
+  por defecto** (el mismo con el que nace la fila única).
+
+### Términos y Condiciones de Garantía
+
+El sistema mantiene un **texto único global** de Términos y Condiciones de
+Garantía que el administrador edita desde la configuración del negocio. El
+texto guardado reemplaza el contenido del documento de garantía en pantalla, en
+el imprimible y en el PDF de la orden de taller; el documento conserva el
+ejemplo de cláusulas que ya trae la aplicación cuando el texto guardado está
+vacío.
+
+- `getWarrantyTermsSettings(token : ?Text) : WarrantyTermsSettings` — consulta.
+  Configuración vigente (fila única). Exige el módulo `company`; un llamador
+  sin ese módulo falla con `Unauthorized: no tiene acceso al módulo de
+  empresa`. Devuelve `text` y `updatedAt` (nanosegundos). Si el texto
+  almacenado está vacío, devuelve el **texto por defecto** (las cláusulas de
+  garantía de ejemplo) para que el documento nunca quede en blanco.
+- `updateWarrantyTermsSettings(token : ?Text, input : WarrantyTermsSettingsRawInput) : WarrantyTermsSettings`
+  — actualización. Exige el módulo `company`. Recorta el texto recibido,
+  reemplaza los términos de garantía y actualiza `updatedAt`. Un texto vacío o
+  solo espacios **no** deja el documento en blanco: cae al **texto por defecto**
+  (el mismo con el que nace la fila única). El texto es **global para toda la
+  empresa**: una sola fila, no hay variantes por orden ni por cliente.
 
 ### IVA y régimen fiscal
 
@@ -1000,7 +1369,9 @@ calculados al leer; **no** recalcula ni migra documentos ya emitidos.
 ### Empresa y usuarios
 
 - `getCompanyProfile() : CompanyProfile` — consulta. Perfil fiscal de la
-  empresa (fila única), legible por cualquier llamador. Incluye los datos
+  empresa (fila única). Exige el módulo `company`; un llamador sin ese módulo
+  en su rol falla con `Unauthorized: no tiene acceso al módulo de empresa`.
+  Incluye los datos
   conforme a la norma colombiana y la resolución DIAN: `documentType`
   (`#nit | #cedulaCiudadania | #cedulaExtranjeria`), `taxId` (número de
   documento), `checkDigit` (dígito de verificación del NIT, `?Nat`),
@@ -1045,6 +1416,134 @@ calculados al leer; **no** recalcula ni migra documentos ya emitidos.
   administradores. Resumen de stock bajo, órdenes activas y cuentas por pagar
   pendientes.
 
+### Acceso con usuario y contraseña
+
+La aplicación se ingresa con **usuario y contraseña**, además de la vía
+alternativa de Internet Identity. Las contraseñas **nunca** se almacenan ni se
+devuelven en texto plano: el backend guarda únicamente un hash SHA-256
+encadenado (`iterations` rondas sobre `salt ++ contraseña`) con una sal
+aleatoria por usuario. El token de sesión es opaco para el cliente y se
+resuelve en el backend.
+
+- `login(username : Text, password : Text) : LoginResult` — actualización.
+  Verifica la credencial por nombre de usuario (comparación sin distinguir
+  mayúsculas ni espacios externos) y la contraseña. En caso de éxito crea una
+  sesión con token aleatorio y vencimiento a **7 días** y devuelve
+  `LoginResult` (`token`, `expiresAt`, `user`). `user` es un `SessionInfo` con
+  `userId`, `username`, `name`, `roleId`, `roleName` y `modules` (los módulos
+  permitidos por el rol). Falla con el trap
+  `Usuario o contraseña incorrectos` si el usuario no existe o la contraseña
+  no coincide, y con `La cuenta está desactivada` si la credencial tiene
+  `active = false`. El mensaje de credenciales inválidas es el mismo para
+  usuario inexistente y contraseña errónea, para no revelar qué usuarios
+  existen. **`login` no devuelve un `AuthError` tipado**: los fallos llegan
+  como un *reject* opaco con el mensaje del trap, así que el frontend debe
+  distinguir el caso por el texto del mensaje (o tratar cualquier reject como
+  credenciales inválidas) en lugar de por una variante. El tipo `AuthError`
+  existe en el esquema pero no es el canal de error de estos endpoints.
+- `logout(token : Text) : Bool` — actualización. Elimina la sesión; devuelve
+  `true` si existía y `false` si el token no era válido. Es idempotente: un
+  segundo `logout` con el mismo token devuelve `false` sin efectos.
+- `getSession(token : Text) : ?SessionInfo` — consulta. Devuelve la sesión
+  vigente del token, o `null` si el token no existe, ya venció o la cuenta fue
+  desactivada. Es la vía para restaurar la sesión al recargar la página.
+- `changeOwnPassword(token : Text, currentPassword : Text, newPassword : Text) : Bool`
+  — actualización. Cambia la contraseña del usuario de la sesión. Verifica
+  primero la contraseña actual; si no coincide falla con
+  `La contraseña actual no es correcta`. Falla con
+  `Sesión inválida o vencida` si el token no resuelve a un usuario activo, y
+  con `La nueva contraseña es obligatoria` si la nueva queda vacía. Al
+  cambiar la contraseña se rota la sal y se conserva la sesión actual.
+- `updateCallerName(token : Text, name : Text) : SessionInfo` — actualización.
+  Cambia el nombre visible de la credencial del usuario de la sesión (vía
+  usuario y contraseña) y devuelve la sesión actualizada. Falla con
+  `Sesión inválida o vencida` si el token no resuelve a un usuario activo y
+  con `El nombre es obligatorio` si el nombre queda vacío. La vía de Internet
+  Identity sigue usando `saveCallerUserProfile`.
+
+### Gestión de usuarios (administrador)
+
+Todos estos métodos exigen ser administrador: por Internet Identity
+(`AccessControl.isAdmin`) **o** por una sesión válida cuyo rol sea
+`Administrador`. Los métodos de escritura reciben el token de sesión en su
+primer parámetro `token : ?Text` (envíe `null` cuando la autorización sea por
+Internet Identity). En caso contrario fallan con
+`Unauthorized: Only admins can manage users and roles`. Las consultas
+`listUsersPage` y `listRoles` también exigen administrador y reciben el mismo
+`token : ?Text`.
+
+- `listUsersPage(token : ?Text, search : ?Text, offset : Nat, limit : Nat) : UserPage`
+  — consulta. **Requiere administrador** (por Internet Identity o por sesión con
+  rol `Administrador`); en caso contrario falla con
+  `Unauthorized: Only admins can manage users and roles`. **Listado paginado
+  resuelto en el backend**: `search` filtra por nombre o usuario de acceso (sin
+  distinguir mayúsculas); `UserPage` devuelve `items`, `total` (coincidencias
+  antes de paginar), `offset` y `limit`. Cada `UserListItem` trae `id`,
+  `username`, `name`, `roleId`, `roleName`, `active` y `createdAt`. Ordenado
+  por id ascendente.
+- `createUser(token : ?Text, username : Text, name : Text, roleId : Id, temporaryPassword : Text) : UserListItem`
+  — actualización. Crea una credencial activa con la contraseña temporal
+  indicada (se guarda solo su hash). Falla con
+  `Ya existe un usuario con ese nombre de acceso` si el usuario ya existe,
+  `El usuario de acceso es obligatorio` si queda vacío,
+  `La contraseña temporal es obligatoria` si queda vacía y
+  `Rol no encontrado` si el rol no existe. **El primer usuario creado es
+  siempre Administrador** (rol id `0`); los siguientes usan el rol indicado o,
+  si no se indica, el rol Mecánico (id `1`).
+- `updateUserRole(token : ?Text, userId : Id, roleId : Id) : UserListItem` —
+  actualización. Cambia el rol de un usuario. Falla con
+  `Usuario no encontrado` / `Rol no encontrado`.
+- `setUserActive(token : ?Text, userId : Id, active : Bool) : UserListItem` —
+  actualización. Activa o desactiva la cuenta. Al desactivarla se **cierran
+  todas sus sesiones abiertas**, de modo que un usuario desactivado no puede
+  seguir operando con un token ya emitido. Falla con `Usuario no encontrado`.
+- `resetUserPassword(token : ?Text, userId : Id) : ResetPasswordResult` —
+  actualización. Genera una contraseña temporal nueva, guarda solo su hash y la
+  devuelve **una sola vez** en `ResetPasswordResult` (`userId`,
+  `temporaryPassword`) para que el administrador la entregue. También invalida
+  las sesiones abiertas del usuario. Falla con `Usuario no encontrado`. La
+  contraseña temporal no se puede volver a consultar: si se pierde, hay que
+  restablecerla de nuevo.
+- `deleteUser(token : ?Text, userId : Id) : Bool` — actualización. Elimina la
+  credencial y todas sus sesiones. Falla con `Usuario no encontrado` si no
+  existe y con `No puede eliminar su propia cuenta de administrador` cuando el
+  token de sesión corresponde al mismo usuario que se intenta eliminar. La
+  operación es **irreversible**.
+- `listUsers() : [UserView]` — consulta. **Compatibilidad**: perfiles de
+  Internet Identity (principal, nombre, rol, fecha). No incluye las
+  credenciales de usuario y contraseña; para esas use `listUsersPage`.
+- `setUserRole(user : Principal, role : UserRole) : UserView` —
+  actualización. **Compatibilidad**: asigna el rol de Internet Identity a un
+  principal.
+
+### Roles editables (administrador)
+
+Los roles determinan qué módulos ve cada usuario. Los tres roles integrados
+—**Administrador** (id `0`), **Mecánico** (id `1`) e **Invitado** (id `2`)—
+tienen `kind = #builtin` y **no se pueden eliminar**; los roles personalizados
+tienen `kind = #custom` y llevan nombre y una selección de módulos.
+
+- `listRoles(token : ?Text) : [Role]` — consulta. **Requiere administrador**
+  (por Internet Identity o por sesión con rol `Administrador`); en caso
+  contrario falla con `Unauthorized: Only admins can manage users and roles`.
+  Todos los roles ordenados por id. Cada `Role` trae `id`, `name`, `kind`,
+  `modules` y `createdAt`.
+- `createRole(token : ?Text, input : RoleInput) : Role` — actualización. Crea
+  un rol personalizado (`kind = #custom`) con `name` y `modules`. Falla con
+  `El nombre del rol es obligatorio` si el nombre queda vacío y con
+  `Ya existe un rol con el nombre <nombre>` si ya hay uno con ese nombre
+  (comparación sin distinguir mayúsculas ni espacios externos).
+- `updateRole(token : ?Text, roleId : Id, input : RoleInput) : Role` —
+  actualización. Renombra y/o cambia los módulos de un rol. Falla con
+  `Rol no encontrado`, `El nombre del rol es obligatorio` y
+  `Ya existe un rol con el nombre <nombre>`. Los roles integrados pueden
+  renombrarse y cambiar sus módulos, pero no eliminarse.
+- `deleteRole(token : ?Text, roleId : Id) : Bool` — actualización. Elimina un
+  rol personalizado. Falla con `Rol no encontrado` si no existe, con
+  `Los roles integrados no se pueden eliminar` si es `#builtin` y con
+  `El rol está asignado a uno o más usuarios` si alguna credencial lo
+  referencia. La operación es **irreversible**.
+
 ### Autorización (mixin de plataforma)
 
 - `_initialize_access_control()` — actualización. Registra al llamador
@@ -1056,6 +1555,13 @@ calculados al leer; **no** recalcula ni migra documentos ya emitidos.
 - `assignCallerUserRole(user : Principal, role : UserRole)` — actualización.
   Solo administradores.
 - `isCallerAdmin() : Bool` — consulta.
+
+La autorización de los endpoints de negocio **no** se resuelve con
+`getCallerUserRole`/`isCallerAdmin` directamente, sino con las comprobaciones
+compartidas `UsersLib.isAdmin` (administrador) y `UsersLib.canAccessModule`
+(módulo), que aceptan tanto la vía de Internet Identity como el token de sesión
+de usuario y contraseña. `getCallerUserRole` e `isCallerAdmin` solo reflejan la
+vía de Internet Identity.
 
 ### Consultas OQL
 
@@ -1081,12 +1587,25 @@ Las entidades se exponen con autorización **por entidad**:
   `service`, `serviceCategory`, `technician`, `technicianLoan`,
   `commissionPayment`, `paidCommissionLine`, `appointment`, `expense`,
   `expenseCategory`, `posSale`, `receivablePayment`, `supplierOrder`,
-  `purchaseInvoice`, `companyProfile` y `driveCredential`.
+  `purchaseInvoice`, `shift`, `cashMovement`, `companyProfile`,
+  `driveCredential`, `credential`, `role`, `hopeSetting`,
+  `serviceTermsSetting` y `warrantyTermsSetting`.
 - `#scopedPerUser` — cada llamador firmado lee solo sus propias filas. Es el
   nivel de `userProfile`, con columna propietaria `principal`.
 
 Un llamador anónimo no puede leer ninguna entidad. Un llamador firmado no
 controlador solo puede leer `userProfile` (sus propias filas).
+
+La entidad `credential` expone las credenciales de acceso con usuario y
+contraseña como **solo controladores**: contiene el hash y la sal de cada
+contraseña, por lo que nunca debe ser legible por usuarios no
+administradores. Sus columnas son `id`, `username`, `name`, `roleId`,
+`active`, `createdAt` y `updatedAt`; **no** expone `salt`, `passwordHash` ni
+`iterations`. La entidad `role` expone los roles editables (`id`, `name`,
+`kind`, `modules`, `createdAt`) y también es `#controllerOnly`. La columna
+`modules` es una colección y **no** se expone como lista: se codifica con el
+centinela de cadena vacía (filtra con `eq \"\"`), así que para leer los módulos
+de un rol usa `listRoles`.
 
 La entidad `driveCredential` expone la conexión OAuth del administrador con
 Google Drive como **fila única** (o ninguna fila si no hay conexión). Por
@@ -1095,15 +1614,66 @@ cadena vacía), `connectedAt` (`Int`, nanosegundos) y `hasRefreshToken`
 (`Bool`). Es `#controllerOnly` porque las credenciales nunca deben ser
 legibles por usuarios no administradores.
 
+La entidad `hopeSetting` expone la configuración del mensaje de esperanza como
+**fila única** (`enabled` (`Bool`), `mode` (`auto | manual`), `manualText`,
+`manualCitation` (`Text`) y `updatedAt` (`Timestamp`, nanosegundos)). Es
+`#controllerOnly`. Su clave primaria es `mode` (la etiqueta del variante), de
+modo que la fila se identifica por `auto` o `manual`; la entidad siempre tiene
+exactamente una fila (la configuración vigente), incluso con
+`enabled = false`, porque la fila única se siembra con la configuración por
+defecto. La promesa vigente que se muestra en los formatos **no** se guarda en
+esta entidad: se deriva al leer con `getDailyHopeMessage` (rotada por día en
+modo `auto`, o el texto manual en modo `manual`).
+
+La entidad `serviceTermsSetting` expone el pie de página «Términos y condiciones
+del Servicio» como **fila única** (`text` (`Text`) y `updatedAt` (`Timestamp`,
+nanosegundos)). Es `#controllerOnly` y su clave primaria es `text`. La entidad
+siempre tiene exactamente una fila (la configuración vigente), porque la fila
+única se siembra con el texto de recepción por defecto. El texto que devuelve
+`getServiceTermsSettings` puede diferir del almacenado cuando este último está
+vacío: en ese caso la API devuelve el texto por defecto, mientras que la entidad
+OQL refleja el valor realmente persistido.
+
+La entidad `warrantyTermsSetting` expone los Términos y Condiciones de Garantía
+como **fila única** (`text` (`Text`) y `updatedAt` (`Timestamp`,
+nanosegundos)). Es `#controllerOnly` y su clave primaria es `text`. La entidad
+siempre tiene exactamente una fila (la configuración vigente), porque la fila
+única se siembra con el texto por defecto. El texto que devuelve
+`getWarrantyTermsSettings` puede diferir del almacenado cuando este último está
+vacío: en ese caso la API devuelve el texto por defecto, mientras que la entidad
+OQL refleja el valor realmente persistido.
+
+Las entidades `shift` y `cashMovement` exponen la tesorería de Caja y Bancos
+como **solo controladores**. `shift` publica `id` (`Nat`), `openedAt` y
+`closedAt` (`?Timestamp`, centinela `0`), `openingCash`, `openingBank`,
+`declaredClosingCash` y `declaredClosingBank` (`?Money`, centinela `0`),
+`computedClosingCash`, `computedClosingBank` (`Money`), `differenceCash` y
+`differenceBank` (`Int`, pueden ser negativos), `status` (`open | closed`),
+`openedBy` (`Principal`), `closedBy` (`?Principal`, centinela de cadena vacía)
+y `notes` (`?Text`, centinela de cadena vacía). `cashMovement` publica `id`,
+`shiftId` (`Nat`), `timestamp` (`Timestamp`), `kind` (`income | expense`),
+`paymentMethod` (`cash | card | transfer | mixed`), `amount` (`Money`),
+`account` (`cash | bank`), `description` (`Text`), `reference` (`?Text`,
+centinela de cadena vacía) y `source`
+(`manual | invoice | receivable | purchase | expense | commission | pos | other`).
+Los importes son centavos enteros y los timestamps nanosegundos, igual que el
+resto del backend.
+
 Las entidades `lot`, `movement`, `motorcycle`, `workshopOrder`, `purchase`,
 `payment`, `invoice`, `quote`, `technicianLoan`, `commissionPayment`,
-`appointment`, `expense`, `posSale`, `receivablePayment`, `supplierOrder` y
-`purchaseInvoice`
+`appointment`, `expense`, `posSale`, `receivablePayment`, `supplierOrder`,
+`purchaseInvoice` y `cashMovement`
 declaran claves foráneas (`part`, `customer`, `supplier`, `workshopOrder`,
-`motorcycle`, `technician`, `invoice`) que permiten rutas con punto, por
-ejemplo `part.name` o `customer.name`. En particular, `receivablePayment`
+`motorcycle`, `technician`, `invoice`, `shift`) que permiten rutas con punto,
+por ejemplo `part.name` o `customer.name`. En particular, `receivablePayment`
 apunta a `invoice` (`invoiceId`), `supplierOrder` apunta a `supplier`
-(`supplierId`) y `purchaseInvoice` apunta a `supplier` (`supplierId`).
+(`supplierId`), `purchaseInvoice` apunta a `supplier` (`supplierId`) y
+`cashMovement` apunta a `shift` (`shiftId`), de modo que una consulta puede
+recorrer `cashMovement.shiftId.status` para resolver el estado del turno de un
+movimiento sin una segunda consulta.
+La entidad `credential` apunta a `role` (`roleId`), de modo que una consulta
+puede recorrer `credential.roleId.name` para resolver el nombre del rol de una
+credencial sin una segunda consulta.
 
 ## Unidades, codificación y valores opcionales
 
@@ -1124,7 +1694,13 @@ apunta a `invoice` (`invoiceId`), `supplierOrder` apunta a `supplier`
   `ReceivableStatus` → `pending | overdue | paid`;
   `ExtractionStatus` → `pending | extracting | extracted | failed`;
   `PurchaseInvoiceStatus` → `pending | confirmed | withErrors`;
-  `InvoiceFileKind` → `pdf | image`.
+  `InvoiceFileKind` → `pdf | image`;
+  `ShiftStatus` → `open | closed`;
+  `CashMovementKind` → `income | expense`;
+  `CashAccount` → `cash | bank`;
+  `CashMovementSource` →
+  `manual | invoice | receivable | purchase | expense | commission | pos | other`;
+  `HopeMode` → `auto | manual`.
   La categoría de un gasto **ya no es un variante**: `expense.categoryId` es un
   `Nat` y `expense.categoryName` es texto libre; consulta la entidad
   `expenseCategory` para el catálogo administrable.
@@ -1182,9 +1758,17 @@ apunta a `invoice` (`invoiceId`), `supplierOrder` apunta a `supplier`
 - Una factura nace `#pending` y pasa a `#paid` con `markInvoicePaid`. Las
   facturas de POS **de contado** nacen directamente `#paid`; las de POS **a
   crédito** nacen `#pending` con su plan de cuotas y pasan a `#paid` cuando
-  todas las cuotas se registran con `registerInstallmentPayment`.
-- Una compra nace con `paidAmount = 0`; los pagos parciales la incrementan.
-  El estado de la cuenta por pagar es `#paid` cuando el saldo llega a `0`.
+  todas las cuotas se registran con `registerInstallmentPayment` o cuando un
+  abono deja el saldo en cero. Una factura `#pending` sin cobros se puede
+  eliminar con `deleteInvoice`; una factura ya cobrada no.
+- Una compra nace con `accepted = false` y `paidAmount = 0`; los pagos
+  parciales incrementan `paidAmount`. El estado de la cuenta por pagar es
+  `#paid` cuando el saldo llega a `0`. Una compra no aceptada y sin pagos se
+  puede eliminar con `deletePurchase`, que revierte sus lotes y movimientos.
+- Un turno de caja nace `#open` con sus saldos iniciales y pasa a `#closed`
+  con `closeShift`, que calcula los saldos esperados y la diferencia contra lo
+  declarado. Mientras está abierto se registran movimientos con
+  `registerCashMovement`; no puede haber dos turnos abiertos a la vez.
 - Una cuenta por cobrar se **deriva** de una factura a crédito
   (`paymentCondition = #credit`); no es una entidad propia. Su estado se
   calcula contra la hora actual en cada lectura: `#paid` si el saldo es `0`,
@@ -1273,8 +1857,24 @@ apunta a `invoice` (`invoiceId`), `supplierOrder` apunta a `supplier`
   avanzó.
 - `assignTechnician` es idempotente en efecto (si el técnico ya está
   asignado devuelve la orden sin cambios); `unassignTechnician` también.
-- `markInvoicePaid` es idempotente en efecto (vuelve a dejar la factura
-  `#paid`), pero actualiza el método de pago.
+- `markInvoicePaid` **rechaza un segundo cobro**: repetirla sobre una factura
+  ya `#paid` falla con `La factura ya fue cobrada` en lugar de duplicar el
+  efecto. `registerInstallmentPayment` y `registerReceivablePayment` aplican la
+  misma validación de cobro único.
+- `deleteInvoice` y `deletePurchase` son **irreversibles**: un reintento
+  devuelve `false` porque el registro ya no existe. `deleteInvoice` falla con
+  `No se puede eliminar la factura porque ya tiene pagos o abonos registrados`
+  si la factura ya tiene cobros; `deletePurchase` falla con
+  `No se puede eliminar una compra ya aceptada` o
+  `No se puede eliminar una compra con pagos registrados` según el caso.
+- `openShift` **no es idempotente**: cada llamada correcta abre un turno nuevo.
+  Un reintento tras un error de red falla con `Ya hay un turno de caja abierto`
+  si el primer intento sí se aplicó, así que vuelve a consultar `getOpenShift`
+  antes de repetir. `closeShift` es idempotente en efecto negativo: repetirla
+  falla con `El turno ya está cerrado`.
+- `registerCashMovement` **no es idempotente**: cada llamada correcta consume
+  un id y suma al turno. Un reintento duplica el movimiento; vuelve a consultar
+  `listCashMovements` antes de repetir.
 - `bulkCreateParts`, `bulkUpdateParts`, `bulkCreateCustomers`,
   `bulkUpdateCustomers`, `bulkCreateServices` y `bulkUpdateServices` omiten
   las filas que no se pueden aplicar (duplicados o inexistentes) en lugar de
@@ -1329,9 +1929,14 @@ apunta a `invoice` (`invoiceId`), `supplierOrder` apunta a `supplier`
   credenciales guardadas y hay que volver a autorizar para respaldar de nuevo.
 - `getDriveConnectionStatus` y `listBackups` se pueden reintentar sin efectos
   secundarios; `listBackups` solo lee el Drive del administrador.
-- `downloadLocalBackup` es una **consulta de solo lectura**: no muta estado y
-  se puede reintentar sin efectos secundarios. Su resultado puede variar entre
-  llamadas si los datos cambiaron en el intervalo.
+- `getLocalBackupManifest` y `getBackupSection` son **consultas de solo
+  lectura**: no mutan estado y se pueden reintentar sin efectos secundarios. Su
+  resultado puede variar entre llamadas si los datos cambiaron en el intervalo;
+  para una copia coherente, usa el `generatedAt` del manifiesto y no mezcles
+  páginas de manifiestos distintos.
+- `updateWarrantyTermsSettings` es **idempotente en efecto**: reemplaza el texto
+  completo de la fila única, de modo que repetir la misma llamada deja el mismo
+  texto (solo cambia `updatedAt`). No acumula ni duplica contenido.
 
 ## Errores y traps
 
@@ -1339,6 +1944,28 @@ Los errores de dominio se señalan con `Runtime.trap`, por lo que llegan al
 frontend como un *reject* opaco con el mensaje indicado. Los mensajes
 relevantes son: `User is not registered`,
 `Unauthorized: Only admins can perform this action`,
+`Unauthorized: Only admins can manage users and roles`,
+`Unauthorized: no tiene acceso al módulo solicitado`,
+`Unauthorized: no tiene acceso al módulo de inventario`,
+`Unauthorized: no tiene acceso al módulo de clientes`,
+`Unauthorized: no tiene acceso al módulo de motos`,
+`Unauthorized: no tiene acceso al módulo de taller`,
+`Unauthorized: no tiene acceso al módulo de cotizaciones`,
+`Unauthorized: no tiene acceso al módulo de servicios`,
+`Unauthorized: no tiene acceso al módulo de categorías de servicios`,
+`Unauthorized: no tiene acceso al módulo de técnicos`,
+`Unauthorized: no tiene acceso al módulo de comisiones`,
+`Unauthorized: no tiene acceso al módulo de empresa`,
+`Unauthorized: no tiene acceso al módulo de citas`,
+`Unauthorized: no tiene acceso al módulo de gastos`,
+`Unauthorized: no tiene acceso al módulo de categorías de gastos`,
+`Unauthorized: no tiene acceso al módulo de contabilidad`,
+`Unauthorized: no tiene acceso al módulo de punto de venta`,
+`Unauthorized: no tiene acceso al módulo de cuentas por cobrar`,
+`Unauthorized: no tiene acceso al módulo de caja y bancos`,
+`Unauthorized: no tiene acceso al módulo de pedidos a proveedor`,
+`Unauthorized: no tiene acceso al módulo de facturas de compra`,
+`Unauthorized: no tiene acceso al panel de resumen`,
 `Unauthorized: Only admins can manage suppliers and purchases`,
 `duplicateSku: <sku>`, `notFound: part <id>`, `notFound: lot <id>`,
 `invalidQuantity`, `insufficientStock: available <n>, requested <m>`,
@@ -1382,6 +2009,16 @@ relevantes son: `User is not registered`,
 `La factura no es una cuenta por cobrar a crédito`,
 `El monto del abono debe ser mayor que cero`,
 `El abono supera el saldo pendiente`,
+`La factura ya fue cobrada`,
+`No se puede eliminar la factura porque ya tiene pagos o abonos registrados`,
+`Compra no encontrada`,
+`No se puede eliminar una compra ya aceptada`,
+`No se puede eliminar una compra con pagos registrados`,
+`Ya hay un turno de caja abierto`,
+`Turno no encontrado`,
+`El turno ya está cerrado`,
+`No hay un turno de caja abierto`,
+`El monto del movimiento debe ser mayor que cero`,
 `La cantidad debe ser mayor que cero`, `Proveedor no encontrado`,
 `Unauthorized: Only admins can manage purchase invoices`,
 `invalidFile: el archivo de la factura es obligatorio`,
@@ -1405,6 +2042,14 @@ relevantes son: `User is not registered`,
 
 ## Notas de integración
 
+- **Autorización de dos vías.** Los endpoints administrativos y con alcance de
+  módulo reciben `token : ?Text` como primer parámetro. Envíe el token de
+  `login` para autorizar por usuario y contraseña, o `null` para autorizar por
+  Internet Identity. La comprobación de administrador (`UsersLib.isAdmin`) y la
+  de módulo (`UsersLib.canAccessModule`) aceptan cualquiera de las dos vías, de
+  modo que el rol asignado determina el acceso **también en el backend**, no
+  solo en la interfaz. Un token ausente, desconocido o vencido no autoriza
+  nada.
 - **Listados grandes: usa las consultas paginadas.** Para clientes,
   motocicletas e inventario, el backend resuelve paginación, filtros y
   ordenamiento en una sola llamada por página
@@ -1469,8 +2114,9 @@ relevantes son: `User is not registered`,
   precio al que se compró. La importación de CSV fija la existencia de cada
   repuesto importado, por lo que el informe refleja el inventario real
   completo, incluidos los repuestos sin existencia (`units = 0`).
-- `getCompanyProfile` es legible por cualquier llamador; solo
-  `updateCompanyProfile` exige administrador.
+- `getCompanyProfile` exige el módulo `company` (igual que
+  `updateCompanyProfile`); un llamador sin ese módulo en su rol falla con
+  `Unauthorized: no tiene acceso al módulo de empresa`.
 - El perfil de empresa es de **fila única**: `updateCompanyProfile` reemplaza
   el perfil completo, no hace actualización parcial. Envía siempre todos los
   campos fiscales y de contacto.
@@ -1485,11 +2131,12 @@ relevantes son: `User is not registered`,
   OAuth. La carpeta destino se busca por nombre y se crea si no existe. El
   respaldo es **manual**: no hay respaldo programado ni restauración desde un
   archivo de Drive.
-- `downloadLocalBackup` es la alternativa **local** al respaldo en la nube: no
-  requiere conexión con Google Drive ni configuración OAuth, y devuelve el
-  mismo JSON que `createBackup` para que el usuario lo guarde en su equipo. El
-  backend no conserva el archivo: la descarga la realiza el frontend con el
-  texto devuelto. No hay restauración desde el archivo descargado.
+- `getLocalBackupManifest` + `getBackupSection` son la alternativa **local** al
+  respaldo en la nube: no requieren conexión con Google Drive ni configuración
+  OAuth, y producen el mismo JSON que `createBackup` para que el usuario lo
+  guarde en su equipo. El backend no conserva el archivo: la descarga la
+  realiza el frontend ensamblando el manifiesto y las páginas de cada sección.
+  No hay restauración desde el archivo descargado.
 - `createBackup` y `listBackups` devuelven `#err(#notConnected)` cuando no hay
   conexión o la autorización expiró, y `#err(#driveFailed(<detalle>)` cuando
   Google Drive falla; el frontend debe distinguir «volver a conectar» de
@@ -1498,6 +2145,5 @@ relevantes son: `User is not registered`,
   **no** se exponen por la API ni por OQL: la entidad `driveCredential` solo
   publica el correo, la fecha de conexión y si hay `refreshToken`.
 ";
-    doc
   };
 };

@@ -107,6 +107,8 @@ function accountingReport(): AccountingReport {
       totalIncome: 0n,
       totalExpenses: 0n,
       profit: 0n,
+      totalCommissions: 0n,
+      netProfit: 0n,
     },
     entries: [
       {
@@ -142,6 +144,8 @@ function accountingReport(): AccountingReport {
         margin: 0n,
         marginBps: 0n,
       },
+      totalCommission: 0n,
+      netProfit: 0n,
       serviceLines: [],
     },
   };

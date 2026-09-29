@@ -8,9 +8,12 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { useDailyHopeMessage } from "@/hooks/use-hope";
 import { useContactDocumentPdf } from "@/hooks/use-whatsapp";
 import { formatNit } from "@/lib/format";
+import { hopeMessageContent } from "@/lib/pdf";
 import type {
   CompanyProfile,
   ContactDocument,
@@ -59,6 +62,8 @@ export function ContactDocumentPreview({
   const [isDownloading, setIsDownloading] = useState(false);
 
   const { download } = useContactDocumentPdf();
+  const dailyHopeQuery = useDailyHopeMessage();
+  const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
 
   function handleOpenChange(next: boolean) {
     if (next) setFormat("a4");
@@ -68,7 +73,7 @@ export function ContactDocumentPreview({
   async function handleDownloadPdf(nextFormat: DocumentFormat) {
     setIsDownloading(true);
     try {
-      await download(document, nextFormat);
+      await download(document, nextFormat, hopeMessage);
     } finally {
       setIsDownloading(false);
     }
@@ -108,6 +113,7 @@ export function ContactDocumentPreview({
               format={format}
               ocid={ocid}
               isDownloading={isDownloading}
+              hopeMessage={hopeMessage}
               onFormatChange={setFormat}
               onDownloadPdf={handleDownloadPdf}
             />
@@ -123,6 +129,7 @@ interface ContactDocumentPreviewBodyProps {
   format: DocumentFormat;
   ocid: string;
   isDownloading: boolean;
+  hopeMessage: { text: string; citation: string } | null;
   onFormatChange: (format: DocumentFormat) => void;
   onDownloadPdf: (format: DocumentFormat) => void | Promise<void>;
 }
@@ -137,16 +144,18 @@ function ContactDocumentPreviewBody({
   format,
   ocid,
   isDownloading,
+  hopeMessage,
   onFormatChange,
   onDownloadPdf,
 }: ContactDocumentPreviewBodyProps) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   const companyQuery = useQuery({
     queryKey: ["company-profile"],
     queryFn: async (): Promise<CompanyProfile | null> => {
       if (!actor) return null;
-      return actor.getCompanyProfile();
+      return actor.getCompanyProfile(token);
     },
     enabled: !!actor && !isFetching,
     staleTime: Number.POSITIVE_INFINITY,
@@ -159,6 +168,7 @@ function ContactDocumentPreviewBody({
     profile?.city,
     profile?.phone,
     profile?.email,
+    profile?.website,
   ]
     .filter((part): part is string => !!part && part.trim() !== "")
     .join(" · ");
@@ -208,6 +218,7 @@ function ContactDocumentPreviewBody({
       lines={lines}
       totals={[]}
       footer={document.footer}
+      hopeMessage={hopeMessage}
       format={format}
       ocid={`${ocid}.preview`}
       onFormatChange={onFormatChange}

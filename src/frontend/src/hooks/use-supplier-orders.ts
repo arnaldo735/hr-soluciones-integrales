@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Id,
@@ -15,6 +16,7 @@ export interface SupplierOrderListParams {
 /** Pedidos a proveedor, opcionalmente acotados a un proveedor. */
 export function useSupplierOrders(params: SupplierOrderListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const search = params.search.trim();
 
   return useQuery({
@@ -29,7 +31,7 @@ export function useSupplierOrders(params: SupplierOrderListParams) {
         supplierId: params.supplierId ?? undefined,
         search: search.length > 0 ? search : undefined,
       };
-      return actor.listSupplierOrders(filter);
+      return actor.listSupplierOrders(token, filter);
     },
     enabled: !!actor && !isFetching,
   });
@@ -38,12 +40,13 @@ export function useSupplierOrders(params: SupplierOrderListParams) {
 /** Guarda un pedido a proveedor con cantidad, SKU y descripción. */
 export function useCreateSupplierOrder() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: SupplierOrderInput): Promise<SupplierOrder> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createSupplierOrder(input);
+      return actor.createSupplierOrder(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["supplier-orders"] });

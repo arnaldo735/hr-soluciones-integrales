@@ -10,6 +10,7 @@ import Time "mo:core/Time";
 import Types "../types/customers";
 import CommonTypes "../types/common";
 import WorkshopTypes "../types/workshop";
+import Search "../lib/search";
 
 module {
   public type State = {
@@ -70,18 +71,18 @@ module {
     let plates = Map.empty<Types.Id, List.List<Text>>();
     for (moto in state.motorcycles.values()) {
       let current = plates.get(moto.customerId) ?? List.empty<Text>();
-      current.add(moto.plate.toLower());
+      current.add(Search.normalize(moto.plate));
       plates.add(moto.customerId, current);
     };
     plates
   };
 
   func matchesSearch(customer : Types.Customer, needle : Text, plates : List.List<Text>) : Bool {
-    if (customer.name.toLower().contains(#text needle)) { return true };
-    if (customer.phone.toLower().contains(#text needle)) { return true };
+    if (Search.contains(customer.name, needle)) { return true };
+    if (Search.contains(customer.phone, needle)) { return true };
     switch (customer.document) {
       case (?doc) {
-        if (doc.toLower().contains(#text needle)) { return true };
+        if (Search.contains(doc, needle)) { return true };
       };
       case null {};
     };
@@ -105,7 +106,7 @@ module {
     let out = List.empty<Types.Customer>();
     let needle = switch (search) {
       case null { "" };
-      case (?term) { term.toLower() };
+      case (?term) { Search.normalize(term) };
     };
     let plates = if (needle == "") { Map.empty<Types.Id, List.List<Text>>() } else { platesByCustomer(state) };
     for (customer in state.customers.values()) {
@@ -113,7 +114,7 @@ module {
         out.add(customer);
       };
     };
-    out.toArray().sort(func (a, b) = Text.compare(a.name.toLower(), b.name.toLower()));
+    out.toArray().sort(func (a, b) = Text.compare(Search.sortKey(a.name), Search.sortKey(b.name)));
   };
 
   public func getCustomer(state : State, id : Types.Id) : ?Types.Customer {
@@ -208,7 +209,7 @@ module {
 
   func compareCustomerItems(a : Types.CustomerListItem, b : Types.CustomerListItem, sort : Types.CustomerSort) : Order.Order {
     switch (sort) {
-      case (#name) { Text.compare(a.name.toLower(), b.name.toLower()) };
+      case (#name) { Text.compare(Search.sortKey(a.name), Search.sortKey(b.name)) };
       case (#createdAt) { Int.compare(a.createdAt, b.createdAt) };
       case (#motorcycleCount) { Nat.compare(b.motorcycleCount, a.motorcycleCount) };
     }
@@ -219,12 +220,10 @@ module {
       case null { true };
       case (?n) {
         if (n == "") { true } else {
-          var matched = moto.plate.toLower().contains(#text n)
-            or moto.brand.toLower().contains(#text n)
-            or moto.model.toLower().contains(#text n);
+          var matched = Search.containsAny([moto.plate, moto.brand, moto.model], n);
           switch (owner) {
             case (?customer) {
-              if (customer.name.toLower().contains(#text n)) { matched := true };
+              if (Search.contains(customer.name, n)) { matched := true };
             };
             case null {};
           };
@@ -241,10 +240,10 @@ module {
 
   func compareMotorcycleItems(a : Types.MotorcycleListItem, b : Types.MotorcycleListItem, sort : Types.MotorcycleSort) : Order.Order {
     switch (sort) {
-      case (#plate) { Text.compare(a.plate.toLower(), b.plate.toLower()) };
-      case (#brand) { Text.compare(a.brand.toLower(), b.brand.toLower()) };
+      case (#plate) { Text.compare(Search.sortKey(a.plate), Search.sortKey(b.plate)) };
+      case (#brand) { Text.compare(Search.sortKey(a.brand), Search.sortKey(b.brand)) };
       case (#year) { Nat.compare(a.year, b.year) };
-      case (#customerName) { Text.compare(a.customerName.toLower(), b.customerName.toLower()) };
+      case (#customerName) { Text.compare(Search.sortKey(a.customerName), Search.sortKey(b.customerName)) };
     }
   };
 
@@ -290,7 +289,7 @@ module {
     let counts = motorcycleCountByCustomer(state);
     let needle = switch (filter.search) {
       case null { null };
-      case (?term) { ?term.toLower() };
+      case (?term) { ?Search.normalize(term) };
     };
     let needsPlates = switch (needle) {
       case null { false };
@@ -341,7 +340,7 @@ module {
     let owners = customersById(state);
     let needle = switch (filter.search) {
       case null { null };
-      case (?term) { ?term.toLower() };
+      case (?term) { ?Search.normalize(term) };
     };
     let matched = List.empty<Types.MotorcycleListItem>();
     for (moto in state.motorcycles.values()) {
@@ -391,7 +390,7 @@ module {
         motorcycles = motos.toArray().sort(func (a, b) = Nat.compare(a.id, b.id));
       });
     };
-    out.toArray().sort(func (a, b) = Text.compare(a.customer.name.toLower(), b.customer.name.toLower()));
+    out.toArray().sort(func (a, b) = Text.compare(Search.sortKey(a.customer.name), Search.sortKey(b.customer.name)));
   };
 
   public func createMotorcycle(state : State, input : Types.MotorcycleInput) : Types.Motorcycle {

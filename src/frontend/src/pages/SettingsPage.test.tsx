@@ -1,19 +1,31 @@
-import type { BusinessSettings, UserView } from "@/lib/types";
+import type { BusinessSettings } from "@/lib/types";
 import { UserRole } from "@/lib/types";
 import { SettingsPage } from "@/pages/SettingsPage";
 import { renderWithProviders } from "@/test/helpers";
-import { Principal } from "@icp-sdk/core/principal";
-import { screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+
+/**
+ * Coverage for the Configuración page after the user-management rework.
+ *
+ * The accepted change moves user and role management to their own screens
+ * (`/configuracion/usuarios` and `/configuracion/roles`). Configuración now
+ * keeps the business settings, the backup cards, the caller profile and the
+ * change-password card, and links out to the two management screens. These
+ * tests protect that composition and the profile/password contracts.
+ */
 
 const getBusinessSettingsMock = vi.fn();
 const updateBusinessSettingsMock = vi.fn();
 const getCallerUserProfileMock = vi.fn();
-const listUsersMock = vi.fn();
+const saveCallerUserProfileMock = vi.fn();
+const changeOwnPasswordMock = vi.fn();
 const getDriveConnectionStatusMock = vi.fn();
 const listBackupsMock = vi.fn();
-const downloadLocalBackupMock = vi.fn();
+const getLocalBackupManifestMock = vi.fn();
+const getBackupSectionMock = vi.fn();
+const useAuthMock = vi.fn();
 
 vi.mock("@/hooks/use-backend", () => ({
   useBackend: () => ({
@@ -21,16 +33,44 @@ vi.mock("@/hooks/use-backend", () => ({
       getBusinessSettings: getBusinessSettingsMock,
       updateBusinessSettings: updateBusinessSettingsMock,
       getCallerUserProfile: getCallerUserProfileMock,
-      listUsers: listUsersMock,
+      saveCallerUserProfile: saveCallerUserProfileMock,
+      changeOwnPassword: changeOwnPasswordMock,
       getDriveConnectionStatus: getDriveConnectionStatusMock,
       listBackups: listBackupsMock,
-      downloadLocalBackup: downloadLocalBackupMock,
+      getLocalBackupManifest: getLocalBackupManifestMock,
+      getBackupSection: getBackupSectionMock,
     },
     isFetching: false,
   }),
 }));
 
+// The profile and password cards read the session from the auth context. Only
+// `useAuth` is stubbed; the real `AuthProvider` that `renderWithProviders`
+// mounts is preserved.
+vi.mock("@/hooks/use-auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/use-auth")>();
+  return { ...actual, useAuth: () => useAuthMock() };
+});
+
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
+
+// The page links to the users and roles screens with TanStack Router's `Link`,
+// which needs a router context. Rendering it as a plain anchor keeps the
+// navigation contract observable without mounting a router.
+vi.mock("@tanstack/react-router", () => ({
+  Link: ({
+    children,
+    to,
+    ...props
+  }: {
+    children: React.ReactNode;
+    to: string;
+  }) => (
+    <a href={to} {...props}>
+      {children}
+    </a>
+  ),
+}));
 
 function settings(overrides: Partial<BusinessSettings> = {}): BusinessSettings {
   return {
@@ -43,31 +83,36 @@ function settings(overrides: Partial<BusinessSettings> = {}): BusinessSettings {
   };
 }
 
-function user(overrides: Partial<UserView> = {}): UserView {
-  return {
-    principal: Principal.fromText("aaaaa-aa"),
-    name: "Dueño",
-    role: UserRole.admin,
-    createdAt: 1_700_000_000_000_000_000n,
-    ...overrides,
-  };
-}
-
 describe("SettingsPage", () => {
   beforeEach(() => {
     getBusinessSettingsMock.mockReset();
     updateBusinessSettingsMock.mockReset();
     getCallerUserProfileMock.mockReset();
-    listUsersMock.mockReset();
+    saveCallerUserProfileMock.mockReset();
+    changeOwnPasswordMock.mockReset();
     getDriveConnectionStatusMock.mockReset();
     listBackupsMock.mockReset();
-    downloadLocalBackupMock.mockReset();
+    getLocalBackupManifestMock.mockReset();
+    getBackupSectionMock.mockReset();
+    useAuthMock.mockReset();
+    useAuthMock.mockReturnValue({
+      token: null,
+      user: null,
+      isAdmin: false,
+      modules: null,
+      roleName: "Invitado",
+      isAuthenticated: false,
+      isLoading: false,
+      isRestoring: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetch: vi.fn(),
+    });
     getCallerUserProfileMock.mockResolvedValue({
       name: "Dueño",
       role: UserRole.admin,
       createdAt: 0n,
     });
-    listUsersMock.mockResolvedValue([]);
     getDriveConnectionStatusMock.mockResolvedValue({ connected: false });
     listBackupsMock.mockResolvedValue({ __kind__: "ok", ok: [] });
   });
@@ -141,48 +186,31 @@ describe("SettingsPage", () => {
     ).toBeInTheDocument();
   });
 
-  it("lists users with their role labels", async () => {
-    getBusinessSettingsMock.mockResolvedValue(settings());
-    listUsersMock.mockResolvedValue([
-      user(),
-      user({
-        principal: Principal.fromText("2vxsx-fae"),
-        name: "Mecánico",
-        role: UserRole.user,
-      }),
-    ]);
-    renderWithProviders(<SettingsPage />);
+  // --- Accepted behavior: user and role management moved to their own screens
 
-    expect(await screen.findByText("Dueño")).toBeInTheDocument();
-    const table = screen.getByTestId("settings.users.table");
-    // The mechanic's name, role badge and role select all read "Mecánico".
-    expect(
-      within(table).getAllByText("Mecánico").length,
-    ).toBeGreaterThanOrEqual(1);
-    expect(
-      within(table).getAllByText("Administrador").length,
-    ).toBeGreaterThanOrEqual(1);
-  });
-
-  it("renders an empty state when no users are registered", async () => {
+  it("links to the users and roles management screens", async () => {
     getBusinessSettingsMock.mockResolvedValue(settings());
-    listUsersMock.mockResolvedValue([]);
     renderWithProviders(<SettingsPage />);
 
     expect(
-      await screen.findByTestId("settings.users.empty_state"),
+      await screen.findByTestId("settings.user_management.card"),
     ).toBeInTheDocument();
-    expect(
-      screen.getByText("Aún no hay usuarios registrados"),
-    ).toBeInTheDocument();
+    expect(screen.getByTestId("settings.users.link")).toHaveAttribute(
+      "href",
+      "/configuracion/usuarios",
+    );
+    expect(screen.getByTestId("settings.roles.link")).toHaveAttribute(
+      "href",
+      "/configuracion/roles",
+    );
   });
 
   // --- Characterization: the existing settings sections keep rendering ------
   //
-  // The accepted change adds a Google Drive backup card to this page. These
-  // tests protect the sections that were already there: the page heading, the
-  // business settings form, the caller profile card and the users card all
-  // render together, and the profile read still seeds the name field.
+  // The accepted change reworks the user-management seam. These tests protect
+  // the sections that were already there: the page heading, the business
+  // settings form, the caller profile card and the backup cards all render
+  // together, and the profile read still seeds the name field.
 
   it("renders the heading and all existing sections together", async () => {
     getBusinessSettingsMock.mockResolvedValue(settings());
@@ -197,14 +225,12 @@ describe("SettingsPage", () => {
       await screen.findByTestId("settings.business.form"),
     ).toBeInTheDocument();
     expect(screen.getByTestId("settings.profile.card")).toBeInTheDocument();
-    expect(screen.getByTestId("settings.users.card")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("settings.user_management.card"),
+    ).toBeInTheDocument();
   });
 
   // --- Accepted behavior: the Google Drive backup card ----------------------
-  //
-  // The accepted change adds the backup card to Configuración. It renders
-  // alongside the existing sections and offers to connect when the
-  // administrator has not authorized their Drive account yet.
 
   it("renders the Google Drive backup card with the connect action", async () => {
     getBusinessSettingsMock.mockResolvedValue(settings());
@@ -236,12 +262,6 @@ describe("SettingsPage", () => {
 
   // --- Characterization: the Drive backup card sits among the existing
   // sections ----------------------------------------------------------------
-  //
-  // The accepted change adds a "Descargar copia local" action to the backup
-  // area. These tests protect the surrounding page composition that must
-  // survive it: the Drive backup card renders together with the business
-  // settings, profile and users sections, and the page still loads its
-  // business settings read.
 
   it("renders the Drive backup card alongside every existing section", async () => {
     getBusinessSettingsMock.mockResolvedValue(settings());
@@ -253,7 +273,9 @@ describe("SettingsPage", () => {
     // The pre-existing sections are still present on the same page.
     expect(screen.getByTestId("settings.business.card")).toBeInTheDocument();
     expect(screen.getByTestId("settings.profile.card")).toBeInTheDocument();
-    expect(screen.getByTestId("settings.users.card")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("settings.user_management.card"),
+    ).toBeInTheDocument();
     // The Drive card keeps its own heading and setup panel.
     expect(screen.getByText("Respaldo en Google Drive")).toBeInTheDocument();
     expect(
@@ -279,11 +301,6 @@ describe("SettingsPage", () => {
   });
 
   // --- Accepted behavior: the local backup download sits next to Drive ------
-  //
-  // The accepted change adds a "Descargar copia local" action to Configuración,
-  // beside the Google Drive backup. These tests protect the page composition:
-  // both backup cards render together with the existing sections, and the local
-  // download action is available to the administrator.
 
   it("renders the local backup card next to the Drive backup card", async () => {
     getBusinessSettingsMock.mockResolvedValue(settings());
@@ -301,6 +318,207 @@ describe("SettingsPage", () => {
     // The pre-existing sections are still present on the same page.
     expect(screen.getByTestId("settings.business.card")).toBeInTheDocument();
     expect(screen.getByTestId("settings.profile.card")).toBeInTheDocument();
-    expect(screen.getByTestId("settings.users.card")).toBeInTheDocument();
+    expect(
+      screen.getByTestId("settings.user_management.card"),
+    ).toBeInTheDocument();
+  });
+
+  // --- Accepted behavior: the caller's own profile and password -------------
+  //
+  // The accepted change lets each user see their name, username and role in
+  // Configuración and change their own password by entering the current one.
+
+  it("shows the caller's name, username and role from the session", async () => {
+    getBusinessSettingsMock.mockResolvedValue(settings());
+    useAuthMock.mockReturnValue({
+      token: "session-token",
+      user: {
+        userId: 1n,
+        username: "dueno.taller",
+        name: "Dueño",
+        roleId: 1n,
+        roleName: "Administrador",
+        modules: [],
+      },
+      isAdmin: true,
+      modules: [],
+      roleName: "Administrador",
+      isAuthenticated: true,
+      isLoading: false,
+      isRestoring: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetch: vi.fn(),
+    });
+    renderWithProviders(<SettingsPage />);
+
+    expect(
+      await screen.findByTestId("settings.profile.name_value"),
+    ).toHaveTextContent("Dueño");
+    expect(
+      screen.getByTestId("settings.profile.username_value"),
+    ).toHaveTextContent("dueno.taller");
+    expect(screen.getByTestId("settings.profile.role_value")).toHaveTextContent(
+      "Administrador",
+    );
+  });
+
+  it("changes the caller's password with the current one", async () => {
+    getBusinessSettingsMock.mockResolvedValue(settings());
+    changeOwnPasswordMock.mockResolvedValue(true);
+    useAuthMock.mockReturnValue({
+      token: "session-token",
+      user: {
+        userId: 1n,
+        username: "dueno.taller",
+        name: "Dueño",
+        roleId: 1n,
+        roleName: "Administrador",
+        modules: [],
+      },
+      isAdmin: true,
+      modules: [],
+      roleName: "Administrador",
+      isAuthenticated: true,
+      isLoading: false,
+      isRestoring: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetch: vi.fn(),
+    });
+    renderWithProviders(<SettingsPage />);
+
+    await screen.findByTestId("settings.password.form");
+    await userEvent.type(
+      screen.getByTestId("settings.password.current_input"),
+      "actual-123",
+    );
+    await userEvent.type(
+      screen.getByTestId("settings.password.new_input"),
+      "nueva-456",
+    );
+    await userEvent.type(
+      screen.getByTestId("settings.password.confirm_input"),
+      "nueva-456",
+    );
+    await userEvent.click(
+      screen.getByTestId("settings.password.submit_button"),
+    );
+
+    await waitFor(() => expect(changeOwnPasswordMock).toHaveBeenCalledTimes(1));
+    expect(changeOwnPasswordMock).toHaveBeenCalledWith(
+      "session-token",
+      "actual-123",
+      "nueva-456",
+    );
+    expect(
+      await screen.findByTestId("settings.password.success_state"),
+    ).toBeInTheDocument();
+  });
+
+  it("reports a wrong current password without clearing the form", async () => {
+    getBusinessSettingsMock.mockResolvedValue(settings());
+    changeOwnPasswordMock.mockResolvedValue(false);
+    useAuthMock.mockReturnValue({
+      token: "session-token",
+      user: {
+        userId: 1n,
+        username: "dueno.taller",
+        name: "Dueño",
+        roleId: 1n,
+        roleName: "Administrador",
+        modules: [],
+      },
+      isAdmin: true,
+      modules: [],
+      roleName: "Administrador",
+      isAuthenticated: true,
+      isLoading: false,
+      isRestoring: false,
+      login: vi.fn(),
+      logout: vi.fn(),
+      refetch: vi.fn(),
+    });
+    renderWithProviders(<SettingsPage />);
+
+    await screen.findByTestId("settings.password.form");
+    await userEvent.type(
+      screen.getByTestId("settings.password.current_input"),
+      "mala",
+    );
+    await userEvent.type(
+      screen.getByTestId("settings.password.new_input"),
+      "nueva-456",
+    );
+    await userEvent.type(
+      screen.getByTestId("settings.password.confirm_input"),
+      "nueva-456",
+    );
+    await userEvent.click(
+      screen.getByTestId("settings.password.submit_button"),
+    );
+
+    expect(
+      await screen.findByTestId("settings.password.error_state"),
+    ).toHaveTextContent("La contraseña actual no es correcta");
+  });
+
+  it("refuses to change the password without a password session", async () => {
+    // The Internet Identity admin path has no session token, so the card must
+    // explain that a username/password session is required instead of calling
+    // the backend with an empty token.
+    getBusinessSettingsMock.mockResolvedValue(settings());
+    renderWithProviders(<SettingsPage />);
+
+    await screen.findByTestId("settings.password.form");
+    await userEvent.type(
+      screen.getByTestId("settings.password.current_input"),
+      "actual-123",
+    );
+    await userEvent.type(
+      screen.getByTestId("settings.password.new_input"),
+      "nueva-456",
+    );
+    await userEvent.type(
+      screen.getByTestId("settings.password.confirm_input"),
+      "nueva-456",
+    );
+    await userEvent.click(
+      screen.getByTestId("settings.password.submit_button"),
+    );
+
+    expect(
+      await screen.findByTestId("settings.password.error_state"),
+    ).toHaveTextContent(
+      "Debes iniciar sesión con usuario y contraseña para cambiarla.",
+    );
+    expect(changeOwnPasswordMock).not.toHaveBeenCalled();
+  });
+
+  it("blocks the password change when the new passwords do not match", async () => {
+    getBusinessSettingsMock.mockResolvedValue(settings());
+    renderWithProviders(<SettingsPage />);
+
+    await screen.findByTestId("settings.password.form");
+    await userEvent.type(
+      screen.getByTestId("settings.password.current_input"),
+      "actual-123",
+    );
+    await userEvent.type(
+      screen.getByTestId("settings.password.new_input"),
+      "nueva-456",
+    );
+    await userEvent.type(
+      screen.getByTestId("settings.password.confirm_input"),
+      "otra-789",
+    );
+
+    expect(
+      screen.getByTestId("settings.password.confirm_error"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("settings.password.submit_button"),
+    ).toBeDisabled();
+    expect(changeOwnPasswordMock).not.toHaveBeenCalled();
   });
 });

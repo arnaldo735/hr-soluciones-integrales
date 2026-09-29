@@ -1,4 +1,5 @@
 import { InvoiceSort as InvoiceSortEnum } from "@/backend";
+import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { PageHeader } from "@/components/PageHeader";
 import { PurchaseInvoiceList } from "@/components/purchase-invoices-history/PurchaseInvoiceList";
 import { InvoiceResultSummary } from "@/components/purchase-invoices/invoice-result-summary";
@@ -22,6 +23,14 @@ import {
   prepareInvoiceFile,
 } from "@/components/purchase-invoices/upload-zone";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import {
   useConfirmPurchaseInvoice,
@@ -35,6 +44,7 @@ import type {
   Id,
   InvoiceApplyResult,
   InvoiceSort,
+  PartView,
   PurchaseInvoice,
   PurchaseInvoiceStatus,
   Supplier,
@@ -47,7 +57,13 @@ import {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useQuery } from "@tanstack/react-query";
-import { AlertTriangle, FileText, History, RotateCcw } from "lucide-react";
+import {
+  AlertTriangle,
+  FileText,
+  History,
+  RotateCcw,
+  ScanLine,
+} from "lucide-react";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
@@ -187,6 +203,7 @@ const TABS: Array<{ value: PageTab; label: string; icon: typeof FileText }> = [
 
 export function PurchaseInvoicesPage() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const createDraft = useCreatePurchaseInvoiceDraft();
   const runExtraction = useRunPurchaseInvoiceExtraction();
   const updateReview = useUpdatePurchaseInvoiceReview();
@@ -202,6 +219,9 @@ export function PurchaseInvoicesPage() {
   const [wasAlreadyConfirmed, setWasAlreadyConfirmed] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
   const [batchError, setBatchError] = useState<string | null>(null);
+  // Scan-to-line flow: the dialog is open and the line it will fill.
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanLineKey, setScanLineKey] = useState<string | null>(null);
 
   // History tab state, kept on the page so switching tabs preserves filters.
   const [historyPage, setHistoryPage] = useState(1);
@@ -267,7 +287,7 @@ export function PurchaseInvoicesPage() {
     queryKey: ["suppliers", "invoice-review"],
     queryFn: async (): Promise<Supplier[]> => {
       if (!actor) return [];
-      return actor.listSuppliers(null);
+      return actor.listSuppliers(token, null);
     },
     enabled: !!actor && !isFetching,
   });
@@ -520,7 +540,7 @@ export function PurchaseInvoicesPage() {
       }
       if (!actor) return;
       void actor
-        .getPurchaseInvoice(item.invoiceId)
+        .getPurchaseInvoice(token, item.invoiceId)
         .then((invoice) => {
           if (!invoice) return;
           setHeader(toReviewHeader(invoice));
@@ -530,7 +550,7 @@ export function PurchaseInvoicesPage() {
           toast.error("No se pudo cargar la factura para revisión.");
         });
     },
-    [actor, forceActiveKey],
+    [actor, token, forceActiveKey],
   );
 
   const handleHeaderChange = useCallback((patch: Partial<ReviewHeader>) => {
@@ -568,6 +588,47 @@ export function PurchaseInvoicesPage() {
   const handleRemoveLine = useCallback((key: string) => {
     setLines((current) => current.filter((line) => line.key !== key));
   }, []);
+
+  /** Opens the scanner for a specific review line. */
+  const handleOpenScan = useCallback((key: string) => {
+    setScanLineKey(key);
+    setScanOpen(true);
+  }, []);
+
+  const handleScanOpenChange = useCallback((open: boolean) => {
+    setScanOpen(open);
+    if (!open) setScanLineKey(null);
+  }, []);
+
+  /**
+   * Assigns a scanned or manually typed code to the line the scanner was opened
+   * for. The scanner already resolved the code through the backend
+   * `findPartByCode` (barcode or SKU), so the resolved part is applied directly
+   * without a second backend lookup; an unknown code shows the "producto no
+   * encontrado" notice and adds nothing.
+   */
+  const handleScanCode = useCallback(
+    (part: PartView): void => {
+      const key = scanLineKey;
+      if (key === null) return;
+      setLines((current) =>
+        current.map((line) =>
+          line.key === key
+            ? {
+                ...line,
+                code: part.sku,
+                description: part.name,
+                unitCost: centsToPesosInput(part.costPrice),
+                matchStatus: LineMatchStatus.existing,
+              }
+            : line,
+        ),
+      );
+      toast.success(`${part.name} asignado a la línea`);
+      setScanOpen(false);
+    },
+    [scanLineKey],
+  );
 
   /**
    * Resolves the supplier for the review. When the user typed a new supplier
@@ -939,6 +1000,7 @@ export function PurchaseInvoicesPage() {
               onLineChange={handleLineChange}
               onAddLine={handleAddLine}
               onRemoveLine={handleRemoveLine}
+              onScanLine={handleOpenScan}
               suppliers={suppliersQuery.data ?? []}
               suppliersLoading={suppliersQuery.isLoading}
               isSaving={updateReview.isPending}
@@ -977,6 +1039,36 @@ export function PurchaseInvoicesPage() {
               </div>
             </section>
           ) : null}
+
+          <Dialog open={scanOpen} onOpenChange={handleScanOpenChange}>
+            <DialogContent
+              data-ocid="purchase_invoices.scan_dialog"
+              className="max-h-[90vh] overflow-y-auto sm:max-w-lg"
+            >
+              <DialogHeader>
+                <DialogTitle className="flex items-center gap-2 font-display">
+                  <ScanLine
+                    className="size-4 text-primary"
+                    aria-hidden="true"
+                  />
+                  Escanear repuesto
+                </DialogTitle>
+                <DialogDescription>
+                  Lee el código de barras del repuesto o ingrésalo manualmente
+                  para asignarlo a la línea seleccionada.
+                </DialogDescription>
+              </DialogHeader>
+              <BarcodeScanner
+                ocid="purchase_invoices.scan"
+                title="Lector de códigos"
+                hint="Apunta la cámara al código del repuesto o ingrésalo manualmente."
+                onDetected={(part) => handleScanCode(part)}
+                onNotFound={(code) => {
+                  toast.error(`Producto no encontrado para el código ${code}`);
+                }}
+              />
+            </DialogContent>
+          </Dialog>
         </>
       )}
 

@@ -1,6 +1,7 @@
 import Map "mo:core/Map";
 import Result "mo:core/Result";
 import Text "mo:core/Text";
+import Time "mo:core/Time";
 
 import EmailClient "mo:caffeineai-email/emailClient";
 
@@ -14,6 +15,8 @@ import BillingTypes "../types/billing";
 import AppointmentTypes "../types/appointments";
 import ServiceTypes "../types/services";
 import CompanyTypes "../types/company";
+import HopeTypes "../types/hope";
+import HopeLib "./hope";
 
 module {
   public type State = {
@@ -25,6 +28,7 @@ module {
     appointments : Map.Map<Common.Id, AppointmentTypes.Appointment>;
     services : Map.Map<Common.Id, ServiceTypes.Service>;
     company : { var profile : CompanyTypes.CompanyProfile };
+    hope : { var settings : HopeTypes.HopeSettings };
   };
 
   // Envía un correo de notificación al cliente con el asunto y el mensaje
@@ -57,12 +61,14 @@ module {
     // inesperado del propio cliente (por ejemplo, una variable de entorno
     // ausente) sí podría propagarse como trap. Se captura aquí para que todo
     // fallo de envío llegue al llamador como `#sendFailed` tipado.
+    let body = HopeLib.appendHope({ hope = state.hope }, input.message, Time.now());
+
     let sendResult = try {
       await EmailClient.sendServiceEmail(
         "no-reply",
         [email],
         input.subject,
-        input.message,
+        body,
       );
     } catch (error) {
       return #err(#sendFailed(error.message()));
@@ -361,6 +367,7 @@ module {
       case (#ok(text)) { text };
       case (#err(error)) { return #err(error) };
     };
+    let messageWithHope = HopeLib.appendHope({ hope = state.hope }, message, Time.now());
 
     #ok({
       contactKind = input.contactKind;
@@ -368,7 +375,7 @@ module {
       contactName;
       hasPhone = phone != null;
       phone;
-      message;
+      message = messageWithHope;
     });
   };
 };

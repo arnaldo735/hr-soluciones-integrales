@@ -1,48 +1,8 @@
-import type { backendInterface } from "@/backend";
-import { UserRole } from "@/lib/types";
+import { AuthProvider } from "@/hooks/use-auth";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render } from "@testing-library/react";
 import ExcelJS from "exceljs";
 import type { ReactElement, ReactNode } from "react";
-import { vi } from "vitest";
-
-/**
- * A typed partial of the generated backend interface. Tests provide only the
- * methods they exercise; every other method is absent, so an unexpected call
- * fails loudly instead of silently returning `undefined`.
- */
-export type ActorMock = Partial<backendInterface>;
-
-export interface RenderOptions {
-  actor?: ActorMock;
-  role?: UserRole;
-  isFetching?: boolean;
-}
-
-/**
- * Installs a module mock for `@caffeineai/core-infrastructure` so components
- * resolve a local typed actor instead of a real Internet Identity session.
- * Must be called before importing the component under test.
- */
-export function mockCoreInfrastructure(options: RenderOptions = {}) {
-  const actor = options.actor ?? {};
-  const role = options.role ?? UserRole.admin;
-  const isFetching = options.isFetching ?? false;
-
-  vi.mock("@caffeineai/core-infrastructure", () => ({
-    useActor: () => ({ actor, isFetching }),
-    useInternetIdentity: () => ({
-      isAuthenticated: true,
-      isInitializing: false,
-      isLoggingIn: false,
-      login: vi.fn(),
-      logout: vi.fn(),
-      identity: undefined,
-    }),
-  }));
-
-  return { actor, role };
-}
 
 /** A fresh QueryClient per render so tests never share cached data. */
 export function createTestQueryClient(): QueryClient {
@@ -60,7 +20,9 @@ export function renderWithProviders(
 ) {
   function Wrapper({ children }: { children: ReactNode }) {
     return (
-      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+      <QueryClientProvider client={queryClient}>
+        <AuthProvider>{children}</AuthProvider>
+      </QueryClientProvider>
     );
   }
   return { queryClient, ...render(ui, { wrapper: Wrapper }) };

@@ -1,3 +1,4 @@
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { StatusBadge } from "@/components/StatusBadge";
 import { InvoiceStatusBadge } from "@/components/purchase-invoices-history/InvoiceStatusBadge";
 import {
@@ -18,16 +19,41 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useCompanyProfile } from "@/hooks/use-company";
+import { useDailyHopeMessage } from "@/hooks/use-hope";
 import { usePurchaseInvoice } from "@/hooks/use-purchase-invoices";
+import {
+  companyContactLine,
+  companyFiscalLines,
+  companyHeaderFromProfile,
+} from "@/lib/company-header";
+import { downloadFile } from "@/lib/download";
 import {
   formatDate,
   formatDateTime,
   formatMoney,
   formatNumber,
 } from "@/lib/format";
-import type { Id, PurchaseInvoice, PurchaseInvoiceLine } from "@/lib/types";
+import {
+  drawHopeMessage,
+  hopeMessageContent,
+  loadPdfLibs,
+  measureHopeMessage,
+  pdfCompanyFromProfile,
+} from "@/lib/pdf";
+import type { HopeMessageContent } from "@/lib/pdf";
+import type {
+  DocumentFormat,
+  DocumentLine,
+  DocumentMeta,
+  DocumentTotals,
+  Id,
+  PurchaseInvoice,
+  PurchaseInvoiceLine,
+} from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Link } from "@tanstack/react-router";
+import type { jsPDF } from "jspdf";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -36,8 +62,10 @@ import {
   CheckCircle2,
   FileText,
   PackagePlus,
+  Printer,
   RefreshCw,
 } from "lucide-react";
+import { useState } from "react";
 
 /** Total cost of the extracted lines, in cents. */
 function linesTotal(invoice: PurchaseInvoice): bigint {
@@ -192,6 +220,320 @@ function DetailError() {
         </Link>
       </Button>
     </div>
+  );
+}
+
+/**
+ * Builds the purchase-invoice PDF in the selected format (A4 sheet or 80 mm
+ * tirilla) with the same content the shared `DocumentPreview` shows on screen.
+ * The blob is handed to the shared mobile-safe `downloadFile` helper so the
+ * file lands on the device on phone and tablet, not only on desktop.
+ */
+async function buildPurchaseInvoicePdf(
+  format: DocumentFormat,
+  number: string,
+  company: ReturnType<typeof pdfCompanyFromProfile>,
+  meta: DocumentMeta[],
+  lines: DocumentLine[],
+  totals: DocumentTotals[],
+  footer: string,
+  hope: HopeMessageContent | null,
+): Promise<Blob> {
+  const { jsPDF, autoTable } = await loadPdfLibs();
+  const narrow = format === "receipt80";
+  const margin = narrow ? 3 : 14;
+  const right = narrow ? 77 : 196;
+  const doc = new jsPDF({ unit: "mm", format: narrow ? [80, 297] : "a4" });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(narrow ? 10 : 15);
+  doc.setTextColor(30, 41, 59);
+  doc.text(company.name, margin, 14);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(narrow ? 6.5 : 8.5);
+  doc.setTextColor(100, 116, 139);
+  const contact = [company.taxId, company.address, company.phone]
+    .filter((value): value is string => !!value && value.trim() !== "")
+    .join(narrow ? " · " : "  ·  ");
+  let cursor = 18.5;
+  if (contact !== "") {
+    const contactLines = doc.splitTextToSize(contact, right - margin);
+    doc.text(contactLines, margin, cursor);
+    cursor += contactLines.length * (narrow ? 3 : 4);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(narrow ? 8.5 : 11);
+  doc.setTextColor(30, 41, 59);
+  doc.text("FACTURA DE COMPRA", right, 14, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(narrow ? 6.5 : 9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(number, right, 18.5, { align: "right" });
+
+  doc.setDrawColor(30, 41, 59);
+  doc.setLineWidth(0.4);
+  doc.line(margin, cursor + 1, right, cursor + 1);
+  cursor += 5;
+
+  if (narrow) {
+    for (const entry of meta) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(entry.label, margin, cursor);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      const value = doc.splitTextToSize(entry.value, right - margin);
+      doc.text(value, margin, cursor + 3);
+      cursor += 3 + value.length * 3 + 1.5;
+    }
+  } else {
+    autoTable(doc, {
+      startY: cursor,
+      body: meta.map((entry) => [entry.label, entry.value]),
+      theme: "plain",
+      styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.5 },
+      columnStyles: {
+        0: { cellWidth: 40, textColor: [100, 116, 139] },
+        1: { fontStyle: "bold", textColor: [30, 41, 59] },
+      },
+      margin: { left: margin, right: margin },
+    });
+    cursor =
+      ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
+        ?.finalY ?? cursor) + 4;
+  }
+
+  autoTable(doc, {
+    startY: cursor,
+    head: [["Concepto", "Cant.", "P. unit.", "Importe"]],
+    body: lines.map((line) => [
+      line.description,
+      formatNumber(line.quantity),
+      formatMoney(BigInt(Math.round(line.unitPrice * 100))),
+      formatMoney(BigInt(Math.round(line.amount * 100))),
+    ]),
+    theme: "striped",
+    styles: {
+      font: "helvetica",
+      fontSize: narrow ? 6.5 : 8.5,
+      cellPadding: narrow ? 1.2 : 2,
+      overflow: "linebreak",
+    },
+    headStyles: { fillColor: [71, 85, 105], textColor: 255 },
+    columnStyles: {
+      1: { halign: "right" },
+      2: { halign: "right" },
+      3: { halign: "right" },
+    },
+    margin: { left: margin, right: margin },
+  });
+
+  cursor =
+    ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
+      ?.finalY ?? cursor) + 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(narrow ? 7 : 9);
+  for (const entry of totals) {
+    doc.setTextColor(100, 116, 139);
+    doc.text(entry.label, right - 40, cursor, { align: "right" });
+    doc.setFont("helvetica", entry.emphasis ? "bold" : "normal");
+    doc.setTextColor(30, 41, 59);
+    doc.text(entry.value, right, cursor, { align: "right" });
+    doc.setFont("helvetica", "normal");
+    cursor += narrow ? 4 : 5;
+  }
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(narrow ? 6 : 7.5);
+  doc.setTextColor(100, 116, 139);
+  const footerLines = doc.splitTextToSize(footer, right - margin);
+  const noteLineHeight = narrow ? 2.6 : 3.4;
+  const noteHeight = footerLines.length * noteLineHeight;
+  const pageHeight = doc.internal.pageSize.getHeight();
+  const bottomLimit = pageHeight - (narrow ? 4 : 8);
+  // Reserve the space the hope card needs above the footer so the card never
+  // runs past the bottom margin: the footer is anchored to the page bottom and
+  // the card is stacked just above it.
+  const hopeHeight = hope
+    ? measureHopeMessage(doc, hope, { x: margin, right, narrow })
+    : 0;
+  const gap = hope ? 2 : 0;
+  const footerY = Math.min(
+    narrow ? 290 : 288,
+    bottomLimit - noteHeight - gap - hopeHeight,
+  );
+
+  if (hope) {
+    drawHopeMessage(doc, hope, {
+      x: margin,
+      right,
+      y: footerY - gap - hopeHeight,
+      narrow,
+    });
+  }
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(narrow ? 6 : 7.5);
+  doc.setTextColor(100, 116, 139);
+  doc.text(footerLines, margin, footerY);
+
+  return doc.output("blob");
+}
+
+/**
+ * Printable purchase invoice: the extracted header, the supplier data, the line
+ * items and the totals, offered in A4 and 80 mm tirilla through the shared
+ * `DocumentPreview`. The PDF download mirrors exactly what the preview shows.
+ */
+function PurchaseInvoicePrint({ invoice }: { invoice: PurchaseInvoice }) {
+  const companyQuery = useCompanyProfile();
+  const dailyHopeQuery = useDailyHopeMessage();
+  const [format, setFormat] = useState<DocumentFormat>("a4");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  const profile = companyQuery.data ?? null;
+  const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
+  // Complete company identity for the printed purchase invoice: logo, razón
+  // social, NIT con dígito de verificación, régimen, responsabilidad, dirección,
+  // ciudad, teléfono, correo y web. Unconfigured fields are omitted cleanly so
+  // the header never shows an orphan label or an empty gap.
+  const companyHeader = companyHeaderFromProfile(profile);
+  const companyName = companyHeader?.legalName ?? "Taller de motos";
+  const companyContact = companyContactLine(companyHeader);
+  const companyFiscal = companyFiscalLines(companyHeader);
+
+  const number = invoice.invoiceNumber?.trim() || `#${invoice.id.toString()}`;
+  const total = linesTotal(invoice);
+
+  const meta: DocumentMeta[] = [
+    {
+      label: "Proveedor",
+      value: invoice.supplierName?.trim() || "Sin identificar",
+    },
+    {
+      label: "NIT / ID fiscal",
+      value: invoice.supplierTaxId || "—",
+      rail: true,
+    },
+    { label: "Número", value: number, rail: true },
+    { label: "Fecha de factura", value: formatDate(invoice.invoiceDate) },
+    { label: "Cargada el", value: formatDateTime(invoice.createdAt) },
+    { label: "Método de pago", value: invoice.paymentMethod || "—" },
+    { label: "Medio de pago", value: invoice.paymentMeans || "—" },
+  ];
+
+  const lines: DocumentLine[] = invoice.lines.map((line) => ({
+    description: line.code
+      ? `${line.code} · ${line.description}`
+      : line.description,
+    quantity: Number(line.quantity),
+    unitPrice: Number(line.unitCost) / 100,
+    amount: Number(line.total) / 100,
+  }));
+
+  const totals: DocumentTotals[] = [
+    { label: "Total de líneas", value: formatNumber(invoice.lines.length) },
+    { label: "Total", value: formatMoney(total), emphasis: true },
+  ];
+
+  const footer =
+    "Documento de compra generado por el sistema de taller. Conserva este comprobante como soporte de la entrada de inventario.";
+
+  async function handleDownloadPdf(nextFormat: DocumentFormat) {
+    setDownloadError(null);
+    setIsDownloading(true);
+    try {
+      const blob = await buildPurchaseInvoicePdf(
+        nextFormat,
+        number,
+        pdfCompanyFromProfile(profile),
+        meta,
+        lines,
+        totals,
+        footer,
+        hopeMessage,
+      );
+      await downloadFile({
+        filename: `Factura-compra-${number.replace(/[^\w-]+/g, "_")}.pdf`,
+        mimeType: "application/pdf",
+        data: blob,
+      });
+    } catch {
+      setDownloadError(
+        "No se pudo guardar el PDF en este dispositivo. Intenta de nuevo.",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  return (
+    <section
+      data-ocid="purchase_invoice_detail.print_panel"
+      className="space-y-3"
+    >
+      <header className="flex items-center gap-2 print:hidden">
+        <Printer className="size-4 text-muted-foreground" aria-hidden="true" />
+        <h2 className="font-display text-sm font-semibold">
+          Imprimir factura de compra
+        </h2>
+      </header>
+      <p className="text-xs text-muted-foreground print:hidden">
+        Elige <span className="font-medium text-foreground">A4</span> o{" "}
+        <span className="font-medium text-foreground">Tirilla 80 mm</span> y usa{" "}
+        <span className="font-medium text-foreground">Imprimir</span> o{" "}
+        <span className="font-medium text-foreground">Descargar PDF</span> para
+        guardar el archivo en el dispositivo.
+      </p>
+
+      {downloadError ? (
+        <div
+          data-ocid="purchase_invoice_detail.print_error"
+          className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 print:hidden"
+        >
+          <p className="flex items-start gap-2 text-xs text-destructive">
+            <AlertTriangle
+              className="mt-0.5 size-3.5 shrink-0"
+              aria-hidden="true"
+            />
+            {downloadError}
+          </p>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void handleDownloadPdf(format)}
+            data-ocid="purchase_invoice_detail.print_retry_button"
+          >
+            Reintentar
+          </Button>
+        </div>
+      ) : null}
+
+      <DocumentPreview
+        title="Factura de compra"
+        number={number}
+        companyName={companyName}
+        companyLogoUrl={companyHeader?.logoUrl}
+        companyContact={companyContact}
+        companyFiscal={companyFiscal}
+        meta={meta}
+        lines={lines}
+        totals={totals}
+        footer={footer}
+        hopeMessage={hopeMessage}
+        format={format}
+        ocid="purchase_invoice_detail.document"
+        onFormatChange={setFormat}
+        onDownloadPdf={handleDownloadPdf}
+        isDownloading={isDownloading}
+      />
+    </section>
   );
 }
 
@@ -467,6 +809,8 @@ export function PurchaseInvoiceDetail({
           </ul>
         </section>
       ) : null}
+
+      <PurchaseInvoicePrint invoice={invoice} />
     </div>
   );
 }

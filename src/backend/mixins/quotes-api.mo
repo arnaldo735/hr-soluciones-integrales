@@ -1,5 +1,6 @@
 import Map "mo:core/Map";
 import Principal "mo:core/Principal";
+import Runtime "mo:core/Runtime";
 import AccessControl "mo:caffeineai-authorization/access-control";
 
 import Common "../types/common";
@@ -10,7 +11,9 @@ import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
 import ServiceTypes "../types/services";
 import InventoryTypes "../types/inventory";
+import UserTypes "../types/users";
 import QuotesLib "../lib/quotes";
+import UsersLib "../lib/users";
 
 mixin (
   accessControlState : AccessControl.AccessControlState,
@@ -24,46 +27,55 @@ mixin (
   businessSettings : { var settings : BillingTypes.BusinessSettings },
   company : { var profile : CompanyTypes.CompanyProfile },
   counters : QuotesLib.Counters,
+  credentials : Map.Map<Common.Id, UserTypes.Credential>,
+  sessions : Map.Map<Text, UserTypes.Session>,
+  roles : Map.Map<Common.Id, UserTypes.Role>,
 ) {
   func quotesState() : QuotesLib.State = { quotes; customers; motorcycles; parts; services; orders; invoices; businessSettings; company; counters };
 
-  public query func listQuotes(filter : Types.QuoteFilter, sort : Types.QuoteSort, offset : Nat, limit : Nat) : async Types.QuotePage {
-    ignore (filter, sort, offset, limit);
+  func requireQuotesModule(caller : Principal, token : ?Text) {
+    if (not UsersLib.canAccessModule({ credentials; sessions; roles }, accessControlState, caller, token, "quotes")) {
+      Runtime.trap("Unauthorized: no tiene acceso al módulo de cotizaciones");
+    };
+  };
+
+  public query ({ caller }) func listQuotes(token : ?Text, filter : Types.QuoteFilter, sort : Types.QuoteSort, offset : Nat, limit : Nat) : async Types.QuotePage {
+    requireQuotesModule(caller, token);
     QuotesLib.listQuotes(quotesState(), filter, sort, offset, limit);
   };
 
-  public query func getQuote(id : Types.Id) : async ?Types.QuoteView {
-    ignore id;
+  public query ({ caller }) func getQuote(token : ?Text, id : Types.Id) : async ?Types.QuoteView {
+    requireQuotesModule(caller, token);
     QuotesLib.getQuote(quotesState(), id);
   };
 
-  public shared ({ caller }) func createQuote(input : Types.QuoteInput) : async Types.QuoteView {
-    ignore input;
+  public shared ({ caller }) func createQuote(token : ?Text, input : Types.QuoteInput) : async Types.QuoteView {
+    requireQuotesModule(caller, token);
     QuotesLib.createQuote(quotesState(), input, caller);
   };
 
-  public shared ({ caller }) func updateQuote(id : Types.Id, input : Types.QuoteInput) : async Types.QuoteView {
-    ignore (id, input);
+  public shared ({ caller }) func updateQuote(token : ?Text, id : Types.Id, input : Types.QuoteInput) : async Types.QuoteView {
+    requireQuotesModule(caller, token);
     QuotesLib.updateQuote(quotesState(), id, input, caller);
   };
 
-  public shared ({ caller }) func deleteQuote(id : Types.Id) : async Bool {
-    ignore id;
+  public shared ({ caller }) func deleteQuote(token : ?Text, id : Types.Id) : async Bool {
+    requireQuotesModule(caller, token);
     QuotesLib.deleteQuote(quotesState(), id, caller);
   };
 
-  public shared ({ caller }) func updateQuoteStatus(id : Types.Id, status : Types.QuoteStatus) : async Types.QuoteView {
-    ignore (id, status);
+  public shared ({ caller }) func updateQuoteStatus(token : ?Text, id : Types.Id, status : Types.QuoteStatus) : async Types.QuoteView {
+    requireQuotesModule(caller, token);
     QuotesLib.updateQuoteStatus(quotesState(), id, status, caller);
   };
 
-  public shared ({ caller }) func convertQuoteToOrder(id : Types.Id) : async WorkshopTypes.OrderView {
-    ignore id;
+  public shared ({ caller }) func convertQuoteToOrder(token : ?Text, id : Types.Id) : async WorkshopTypes.OrderView {
+    requireQuotesModule(caller, token);
     QuotesLib.convertQuoteToOrder(quotesState(), id, caller);
   };
 
-  public shared ({ caller }) func convertQuoteToInvoice(id : Types.Id, paymentMethod : BillingTypes.PaymentMethod) : async BillingTypes.Invoice {
-    ignore (id, paymentMethod);
+  public shared ({ caller }) func convertQuoteToInvoice(token : ?Text, id : Types.Id, paymentMethod : BillingTypes.PaymentMethod) : async BillingTypes.Invoice {
+    requireQuotesModule(caller, token);
     QuotesLib.convertQuoteToInvoice(quotesState(), id, paymentMethod, caller);
   };
 };

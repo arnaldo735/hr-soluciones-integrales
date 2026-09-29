@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import {
   QUOTE_STATUS_LABELS,
@@ -86,6 +87,7 @@ interface QuoteSearch {
  */
 function useQuoteCustomerEmails(customerIds: Id[]) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const key = customerIds
     .map((id) => id.toString())
     .sort()
@@ -101,7 +103,7 @@ function useQuoteCustomerEmails(customerIds: Id[]) {
       );
       const results = await Promise.all(
         unique.map(async (id) => {
-          const customer = await actor.getCustomer(BigInt(id));
+          const customer = await actor.getCustomer(token, BigInt(id));
           return { id, email: customer?.email?.trim() ?? "" };
         }),
       );

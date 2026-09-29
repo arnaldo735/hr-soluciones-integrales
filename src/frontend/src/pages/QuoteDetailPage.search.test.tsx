@@ -20,15 +20,15 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Characterization coverage for the new-quote pickers' search seam, adjacent to
- * the accepted change that makes the customer, part and service pickers return
- * filtered results while typing.
+ * Coverage for the new-quote pickers' search seam.
  *
- * These tests protect the consumer contract the pickers already rely on: the
- * term typed into each search box is debounced and forwarded to the matching
- * backend method, and the picker still lists and selects the options the
- * backend returns for that term. They never assert the filtering itself, which
- * is exactly what is changing.
+ * The accepted change makes the pickers stop truncating: the part and service
+ * pickers request a page large enough to cover the whole catalog (1000 rows)
+ * instead of the old 50/100 caps, and the actor call carries the session token
+ * as its leading argument. These tests pin the consumer contract the pickers
+ * rely on: the term typed into each search box is debounced and forwarded to
+ * the matching backend method with the resolved call shape, and the picker
+ * still lists and selects the options the backend returns for that term.
  */
 
 const listCustomersMock = vi.fn();
@@ -109,6 +109,7 @@ function part(overrides: Partial<PartView> = {}): PartView {
     createdAt: 1_700_000_000_000_000_000n,
     unit: "pza",
     totalStock: 8n,
+    barcode: "",
     category: "Frenos",
     salePrice: 25000n,
     brand: "Genérico",
@@ -194,7 +195,9 @@ describe("QuoteDetailPage new-quote picker search", () => {
     await screen.findByText("Nueva cotización");
 
     await waitFor(() => expect(listCustomersMock).toHaveBeenCalled());
-    expect(listCustomersMock).toHaveBeenLastCalledWith(null);
+    // The session token is the leading argument; with no term the search is
+    // absent, so the backend returns the whole directory.
+    expect(listCustomersMock).toHaveBeenLastCalledWith(null, null);
 
     await userEvent.type(
       screen.getByTestId("quote_detail.customer_search_input"),
@@ -202,7 +205,7 @@ describe("QuoteDetailPage new-quote picker search", () => {
     );
 
     await waitFor(() =>
-      expect(listCustomersMock).toHaveBeenLastCalledWith("Ada"),
+      expect(listCustomersMock).toHaveBeenLastCalledWith(null, "Ada"),
     );
   });
 
@@ -217,12 +220,13 @@ describe("QuoteDetailPage new-quote picker search", () => {
 
     await waitFor(() =>
       expect(listPartsMock).toHaveBeenLastCalledWith(
+        null,
         { search: "balata" },
         PartSort.name,
         0n,
-        // The picker cap intentionally dropped from 5000 to 50: the picker is a
-        // type-to-narrow control, so a small page keeps each keystroke cheap.
-        50n,
+        // The picker no longer truncates: it asks for a page large enough to
+        // cover the whole catalog.
+        1000n,
       ),
     );
   });
@@ -238,10 +242,12 @@ describe("QuoteDetailPage new-quote picker search", () => {
 
     await waitFor(() =>
       expect(listServicesMock).toHaveBeenLastCalledWith(
+        null,
         expect.objectContaining({ search: "aceite", activeOnly: true }),
         ServiceSort.name,
         0n,
-        100n,
+        // The picker no longer truncates: it asks for a whole-catalog page.
+        1000n,
       ),
     );
   });
@@ -256,11 +262,11 @@ describe("QuoteDetailPage new-quote picker search", () => {
     );
     await waitFor(() =>
       expect(listPartsMock).toHaveBeenLastCalledWith(
+        null,
         { search: "balata" },
         PartSort.name,
         0n,
-        // The picker cap intentionally dropped from 5000 to 50.
-        50n,
+        1000n,
       ),
     );
 
@@ -288,10 +294,11 @@ describe("QuoteDetailPage new-quote picker search", () => {
     );
     await waitFor(() =>
       expect(listServicesMock).toHaveBeenLastCalledWith(
+        null,
         expect.objectContaining({ search: "aceite" }),
         ServiceSort.name,
         0n,
-        100n,
+        1000n,
       ),
     );
 

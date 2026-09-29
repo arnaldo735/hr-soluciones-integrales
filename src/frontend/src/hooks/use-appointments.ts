@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Appointment,
@@ -36,6 +37,7 @@ export interface AppointmentListParams {
 
 export function useAppointments(params: AppointmentListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: [
@@ -53,7 +55,7 @@ export function useAppointments(params: AppointmentListParams) {
         from: params.from ?? undefined,
         to: params.to ?? undefined,
       };
-      return actor.listAppointments(filter);
+      return actor.listAppointments(token, filter);
     },
     enabled: !!actor && !isFetching,
   });
@@ -61,12 +63,13 @@ export function useAppointments(params: AppointmentListParams) {
 
 export function useAppointment(id: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["appointment", id?.toString() ?? "none"],
     queryFn: async (): Promise<Appointment | null> => {
       if (!actor || id === null) return null;
-      return actor.getAppointment(id);
+      return actor.getAppointment(token, id);
     },
     enabled: !!actor && !isFetching && id !== null,
   });
@@ -74,12 +77,13 @@ export function useAppointment(id: Id | null) {
 
 export function useCreateAppointment() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: AppointmentInput): Promise<Appointment> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createAppointment(input);
+      return actor.createAppointment(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["appointments"] });
@@ -89,6 +93,7 @@ export function useCreateAppointment() {
 
 export function useUpdateAppointment() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -100,7 +105,7 @@ export function useUpdateAppointment() {
       input: AppointmentInput;
     }): Promise<Appointment> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateAppointment(id, input);
+      return actor.updateAppointment(token, id, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["appointments"] });
@@ -110,6 +115,7 @@ export function useUpdateAppointment() {
 
 export function useUpdateAppointmentStatus() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -121,7 +127,7 @@ export function useUpdateAppointmentStatus() {
       status: AppointmentStatus;
     }): Promise<Appointment> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateAppointmentStatus(id, status);
+      return actor.updateAppointmentStatus(token, id, status);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["appointments"] });
@@ -131,12 +137,13 @@ export function useUpdateAppointmentStatus() {
 
 export function useDeleteAppointment() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: Id): Promise<boolean> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.deleteAppointment(id);
+      return actor.deleteAppointment(token, id);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["appointments"] });
@@ -146,12 +153,13 @@ export function useDeleteAppointment() {
 
 export function useConvertAppointmentToOrder() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: Id) => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.convertAppointmentToOrder(id);
+      return actor.convertAppointmentToOrder(token, id);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["appointments"] });

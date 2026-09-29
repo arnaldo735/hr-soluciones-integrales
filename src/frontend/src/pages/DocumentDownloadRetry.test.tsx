@@ -260,6 +260,7 @@ describe("document download failure and retry", () => {
           costPrice: 12000n,
           lowStockThreshold: 5n,
           totalStock: 12n,
+          barcode: "",
           lowStock: false,
           createdAt: 1_700_000_000_000_000_000n,
         },

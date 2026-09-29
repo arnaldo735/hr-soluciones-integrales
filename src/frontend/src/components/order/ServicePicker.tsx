@@ -10,6 +10,13 @@ import { ServiceSort } from "@/lib/types";
 import { Search, Tag, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+/**
+ * The picker shows every match in a scrollable panel instead of a small fixed
+ * page, so a valid service is never cut off. The page is large enough to cover
+ * the whole active catalog.
+ */
+const SERVICE_PICKER_PAGE_SIZE = 1000;
+
 interface ServicePickerProps {
   /** Currently linked catalog service, or `null` for a free-text line. */
   value: Service | null;
@@ -44,17 +51,18 @@ export function ServicePicker({
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  const term = debounced.trim();
   const servicesQuery = useServices({
     search: debounced,
     category: null,
     activeOnly: true,
     sort: ServiceSort.name,
     page: 1,
-    pageSize: 8,
+    pageSize: SERVICE_PICKER_PAGE_SIZE,
+    enabled: term.length > 0,
   });
 
-  const services = servicesQuery.data?.items ?? [];
-  const term = debounced.trim();
+  const services = term.length > 0 ? (servicesQuery.data?.items ?? []) : [];
 
   if (value) {
     return (
@@ -126,7 +134,14 @@ export function ServicePicker({
         />
       </div>
 
-      {servicesQuery.isLoading ? (
+      {term.length === 0 ? (
+        <p
+          data-ocid={`${ocid}.prompt_state`}
+          className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground"
+        >
+          Escribe el código o el nombre del servicio para ver coincidencias.
+        </p>
+      ) : servicesQuery.isLoading ? (
         <div data-ocid={`${ocid}.loading_state`} className="space-y-1.5">
           {Array.from(
             { length: 3 },
@@ -147,9 +162,7 @@ export function ServicePicker({
           data-ocid={`${ocid}.empty_state`}
           className="rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground"
         >
-          {term.length > 0
-            ? `Sin servicios activos que coincidan con “${term}”. Puedes escribir la descripción libremente.`
-            : "No hay servicios activos en el catálogo. Puedes escribir la descripción libremente."}
+          {`Sin servicios activos que coincidan con “${term}”. Puedes escribir la descripción libremente.`}
         </p>
       ) : (
         <ul

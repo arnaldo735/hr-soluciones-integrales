@@ -1,6 +1,8 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { formatDate, formatMoney, formatNit } from "@/lib/format";
 import { downloadContactDocumentPdf, pdfCompanyFromProfile } from "@/lib/pdf";
+import type { HopeMessageContent } from "@/lib/pdf";
 import type {
   ContactDocument,
   ContactDocumentSection,
@@ -124,27 +126,29 @@ export function motorcycleRow(motorcycle: {
  */
 export function useContactDocumentPdf() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   const download = useCallback(
     async (
       document: ContactDocument,
       format: DocumentFormat,
+      hope?: HopeMessageContent | null,
     ): Promise<string> => {
       const profile = await queryClient.fetchQuery({
         queryKey: ["company-profile"],
         queryFn: async () => {
           if (!actor) return null;
-          return actor.getCompanyProfile();
+          return actor.getCompanyProfile(token);
         },
         staleTime: Number.POSITIVE_INFINITY,
       });
       const company = pdfCompanyFromProfile(profile);
-      await downloadContactDocumentPdf(document, company, format);
+      await downloadContactDocumentPdf(document, company, format, hope ?? null);
       const slug = document.kind === "customer" ? "cliente" : "proveedor";
       return `ficha-${slug}-${document.number}.pdf`;
     },
-    [actor, queryClient],
+    [actor, token, queryClient],
   );
 
   return { download, isCompanyLoading: isFetching };

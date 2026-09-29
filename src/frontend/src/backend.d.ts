@@ -22,12 +22,14 @@ export interface AccountingReport {
 }
 export interface AccountingSummary {
     to?: Timestamp;
+    totalCommissions: Money;
     expenseCount: bigint;
     invoiceCount: bigint;
     from?: Timestamp;
     totalIncome: Money;
     totalExpenses: Money;
     profit: bigint;
+    netProfit: bigint;
 }
 export interface AdjustmentInput {
     direction: AdjustmentDirection;
@@ -100,6 +102,15 @@ export interface BackupResult {
     fileId: string;
     webViewLink: string;
 }
+export interface BackupSectionChunk {
+    key: string;
+    total: bigint;
+    done: boolean;
+    json: string;
+    offset: bigint;
+    limit: bigint;
+    index: bigint;
+}
 export type BasisPoints = bigint;
 export interface BulkResult {
     created: bigint;
@@ -121,6 +132,41 @@ export interface BusinessSettings {
     phone: string;
     taxRate: TaxRate;
 }
+export interface CashMovement {
+    id: Id;
+    paymentMethod: PaymentMethod;
+    source: CashMovementSource;
+    kind: CashMovementKind;
+    reference?: string;
+    description: string;
+    account: CashAccount;
+    timestamp: Timestamp;
+    amount: Money;
+    shiftId: Id;
+}
+export interface CashMovementFilter {
+    to?: Timestamp;
+    paymentMethod?: PaymentMethod;
+    from?: Timestamp;
+    kind?: CashMovementKind;
+    account?: CashAccount;
+    shiftId?: Id;
+}
+export interface CashMovementInput {
+    paymentMethod: PaymentMethod;
+    source: CashMovementSource;
+    kind: CashMovementKind;
+    reference?: string;
+    description: string;
+    account: CashAccount;
+    amount: Money;
+}
+export interface CashMovementPage {
+    total: bigint;
+    offset: bigint;
+    limit: bigint;
+    items: Array<CashMovement>;
+}
 export interface CategoryBreakdown {
     total: Money;
     category: string;
@@ -128,6 +174,11 @@ export interface CategoryBreakdown {
 export interface Cell {
     value: Value;
     name: string;
+}
+export interface CloseShiftInput {
+    notes?: string;
+    declaredClosingBank: Money;
+    declaredClosingCash: Money;
 }
 export interface CommissionLine {
     at: Timestamp;
@@ -302,6 +353,17 @@ export interface CustomerPage {
     limit: bigint;
     items: Array<CustomerListItem>;
 }
+export interface DailyShiftReport {
+    movements: Array<CashMovement>;
+    bankIncome: Money;
+    totalIncome: Money;
+    byPaymentMethod: Array<PaymentMethodTotal>;
+    shift: Shift;
+    cashExpense: Money;
+    cashIncome: Money;
+    bankExpense: Money;
+    totalExpense: Money;
+}
 export interface DashboardSummary {
     pendingPayablesTotal: Money;
     pendingPayablesCount: bigint;
@@ -435,6 +497,26 @@ export interface ExpenseSummary {
     count: bigint;
     byCategory: Array<ExpenseCategoryTotal>;
 }
+export interface HopeMessage {
+    mode: HopeMode;
+    text: string;
+    enabled: boolean;
+    referenceDate: string;
+    citation: string;
+}
+export interface HopeSettings {
+    mode: HopeMode;
+    enabled: boolean;
+    updatedAt: Timestamp;
+    manualText: string;
+    manualCitation: string;
+}
+export interface HopeSettingsRawInput {
+    mode: string;
+    enabled: boolean;
+    manualText: string;
+    manualCitation: string;
+}
 export interface HttpHeader {
     value: string;
     name: string;
@@ -462,6 +544,7 @@ export interface InventoryCsvRow {
     lowStockThreshold: bigint;
     name: string;
     unit: string;
+    barcode: string;
     quantity: bigint;
     category: string;
     salePrice: Money;
@@ -479,6 +562,7 @@ export interface InventoryImportRow {
     lowStockThreshold: bigint;
     name: string;
     unit: string;
+    barcode: string;
     quantity: bigint;
     category: string;
     salePrice: Money;
@@ -652,10 +736,17 @@ export interface LedgerEntry {
     category: string;
     amount: Money;
 }
-export interface LocalBackup {
+export interface LocalBackupManifest {
     generatedAt: bigint;
-    json: string;
     fileName: string;
+    sections: Array<string>;
+    maxPageSize: bigint;
+    totalSections: bigint;
+}
+export interface LoginResult {
+    token: string;
+    expiresAt: Timestamp;
+    user: SessionInfo;
 }
 export interface Lot {
     id: Id;
@@ -674,6 +765,7 @@ export interface LowStockItem {
     totalStock: bigint;
     partId: Id;
 }
+export type ModuleKey = string;
 export type Money = bigint;
 export interface Motorcycle {
     id: Id;
@@ -726,6 +818,11 @@ export interface Movement {
     partId: Id;
     unitCost?: Money;
     reason?: string;
+}
+export interface OpenShiftInput {
+    openingBank: Money;
+    openingCash: Money;
+    notes?: string;
 }
 export interface OrderFilter {
     status?: OrderStatus;
@@ -802,11 +899,19 @@ export interface PartInput {
     lowStockThreshold: bigint;
     name: string;
     unit: string;
+    barcode: string;
     category: string;
     salePrice: Money;
     brand: string;
     costPrice: Money;
 }
+export type PartLookupResult = {
+    __kind__: "found";
+    found: PartView;
+} | {
+    __kind__: "notFound";
+    notFound: null;
+};
 export interface PartPage {
     total: bigint;
     offset: bigint;
@@ -821,6 +926,7 @@ export interface PartView {
     createdAt: Timestamp;
     unit: string;
     totalStock: bigint;
+    barcode: string;
     category: string;
     salePrice: Money;
     brand: string;
@@ -856,6 +962,11 @@ export interface PaymentInput {
 export interface PaymentMethodBreakdown {
     method: string;
     total: Money;
+}
+export interface PaymentMethodTotal {
+    method: PaymentMethod;
+    expense: Money;
+    income: Money;
 }
 export interface PosSale {
     id: Id;
@@ -908,7 +1019,6 @@ export interface PosSalePage {
     limit: bigint;
     items: Array<PosSale>;
 }
-export type Principal = Principal;
 export interface ProfitBlock {
     cost: Money;
     commission: Money;
@@ -918,15 +1028,18 @@ export interface ProfitBlock {
 }
 export interface ProfitBreakdown {
     total: ProfitBlock;
+    totalCommission: Money;
     serviceLines: Array<ServiceProfitLine>;
     parts: ProfitBlock;
     services: ProfitBlock;
+    netProfit: bigint;
 }
 export interface Purchase {
     id: Id;
     total: Money;
     createdAt: Timestamp;
     items: Array<PurchaseItem>;
+    accepted: boolean;
     paidAmount: Money;
     supplierId: Id;
 }
@@ -1090,6 +1203,145 @@ export interface ReceivableSummary {
     totalOutstanding: Money;
     openCount: bigint;
 }
+export interface ReminderAppointment {
+    id: Id;
+    customerName: string;
+    status: string;
+    customerId: Id;
+    scheduledAt: Timestamp;
+}
+export interface ReminderFinishedOrder {
+    id: Id;
+    customerName: string;
+    plate: string;
+    orderNumber: string;
+    daysInWorkshop: bigint;
+}
+export interface ReminderOrder {
+    id: Id;
+    customerName: string;
+    plate: string;
+    orderNumber: string;
+}
+export interface ReminderPayable {
+    status: string;
+    balance: Money;
+    supplierName: string;
+    dueDate: Timestamp;
+    supplierId: Id;
+}
+export interface ReminderQuote {
+    id: Id;
+    customerName: string;
+    status: string;
+    createdAt: Timestamp;
+    quoteNumber: string;
+}
+export interface ReminderReceivable {
+    customerName: string;
+    status: string;
+    balance: Money;
+    dueDate: Timestamp;
+    invoiceId: Id;
+    invoiceNumber: string;
+}
+export interface ReminderSection {
+    count: bigint;
+    items: Array<ReminderAppointment>;
+}
+export interface ReminderSection_1 {
+    count: bigint;
+    items: Array<ReminderFinishedOrder>;
+}
+export interface ReminderSection_2 {
+    count: bigint;
+    items: Array<ReminderPayable>;
+}
+export interface ReminderSection_3 {
+    count: bigint;
+    items: Array<ReminderQuote>;
+}
+export interface ReminderSection_4 {
+    count: bigint;
+    items: Array<ReminderReceivable>;
+}
+export interface ReminderSection_5 {
+    count: bigint;
+    items: Array<ReminderOrder>;
+}
+export interface RemindersSummary {
+    payables?: ReminderSection_2;
+    generatedAt: Timestamp;
+    unapprovedOrders?: ReminderSection_5;
+    appointments?: ReminderSection;
+    finishedOrders?: ReminderSection_1;
+    receivables?: ReminderSection_4;
+    pendingQuotes?: ReminderSection_3;
+}
+export interface ResetPasswordResult {
+    userId: Id;
+    temporaryPassword: string;
+}
+export type RestoreError = {
+    __kind__: "invalidFormat";
+    invalidFormat: string;
+} | {
+    __kind__: "invalidSection";
+    invalidSection: string;
+} | {
+    __kind__: "incompatibleVersion";
+    incompatibleVersion: bigint;
+} | {
+    __kind__: "notAuthorized";
+    notAuthorized: null;
+} | {
+    __kind__: "noKnownSections";
+    noKnownSections: null;
+} | {
+    __kind__: "unknownSection";
+    unknownSection: string;
+};
+export interface RestorePreview {
+    generatedAt: bigint;
+    formatVersion: bigint;
+    sections: Array<RestoreSectionInfo>;
+    totalSections: bigint;
+}
+export type RestorePreviewOutcome = {
+    __kind__: "ok";
+    ok: RestorePreview;
+} | {
+    __kind__: "err";
+    err: RestoreError;
+};
+export interface RestoreSectionInfo {
+    key: string;
+    count: bigint;
+    index: bigint;
+}
+export type RestoreSectionOutcome = {
+    __kind__: "ok";
+    ok: RestoreSectionResult;
+} | {
+    __kind__: "err";
+    err: RestoreError;
+};
+export interface RestoreSectionResult {
+    key: string;
+    status: RestoreSectionStatus;
+    index: bigint;
+    restored: bigint;
+}
+export type RestoreSectionStatus = {
+    __kind__: "skipped";
+    skipped: null;
+} | {
+    __kind__: "error";
+    error: string;
+} | {
+    __kind__: "restored";
+    restored: null;
+};
 export interface Result {
     hasMore: boolean;
     rows: Array<Array<Cell>>;
@@ -1101,6 +1353,17 @@ export type Result__1 = {
     __kind__: "err";
     err: Error_;
 };
+export interface Role {
+    id: Id;
+    kind: RoleKind;
+    name: string;
+    createdAt: Timestamp;
+    modules: Array<ModuleKey>;
+}
+export interface RoleInput {
+    name: string;
+    modules: Array<ModuleKey>;
+}
 export interface Service {
     id: Id;
     active: boolean;
@@ -1161,6 +1424,49 @@ export interface ServiceProfitLine {
     profit: bigint;
     serviceId?: Id;
     charged: Money;
+}
+export interface ServiceTermsSettings {
+    text: string;
+    updatedAt: Timestamp;
+}
+export interface ServiceTermsSettingsRawInput {
+    text: string;
+}
+export interface SessionInfo {
+    roleName: string;
+    username: string;
+    userId: Id;
+    name: string;
+    roleId: Id;
+    modules: Array<ModuleKey>;
+}
+export interface Shift {
+    id: Id;
+    status: ShiftStatus;
+    openingBank: Money;
+    openingCash: Money;
+    differenceBank: bigint;
+    differenceCash: bigint;
+    closedAt?: Timestamp;
+    closedBy?: Principal;
+    notes?: string;
+    declaredClosingBank?: Money;
+    declaredClosingCash?: Money;
+    computedClosingBank: Money;
+    computedClosingCash: Money;
+    openedAt: Timestamp;
+    openedBy: Principal;
+}
+export interface ShiftFilter {
+    to?: Timestamp;
+    status?: ShiftStatus;
+    from?: Timestamp;
+}
+export interface ShiftPage {
+    total: bigint;
+    offset: bigint;
+    limit: bigint;
+    items: Array<Shift>;
 }
 export interface StatusChange {
     at: Timestamp;
@@ -1281,13 +1587,22 @@ export interface TransformationOutput {
     body: Uint8Array;
     headers: Array<HttpHeader>;
 }
-export interface UserProfile {
+export interface UserListItem {
+    id: Id;
+    roleName: string;
+    active: boolean;
+    username: string;
     name: string;
     createdAt: Timestamp;
-    role: UserRole;
+    roleId: Id;
 }
-export interface UserView {
-    principal: Principal;
+export interface UserPage {
+    total: bigint;
+    offset: bigint;
+    limit: bigint;
+    items: Array<UserListItem>;
+}
+export interface UserProfile {
     name: string;
     createdAt: Timestamp;
     role: UserRole;
@@ -1311,6 +1626,13 @@ export type Value = {
     __kind__: "text";
     text: string;
 };
+export interface WarrantyTermsSettings {
+    text: string;
+    updatedAt: Timestamp;
+}
+export interface WarrantyTermsSettingsRawInput {
+    text: string;
+}
 export interface WhatsAppMessageInput {
     contactKind: WhatsAppContactKind;
     context: WhatsAppContext;
@@ -1360,6 +1682,24 @@ export enum AppointmentStatus {
     attended = "attended",
     confirmed = "confirmed"
 }
+export enum CashAccount {
+    bank = "bank",
+    cash = "cash"
+}
+export enum CashMovementKind {
+    expense = "expense",
+    income = "income"
+}
+export enum CashMovementSource {
+    pos = "pos",
+    expense = "expense",
+    other = "other",
+    invoice = "invoice",
+    commission = "commission",
+    receivable = "receivable",
+    manual = "manual",
+    purchase = "purchase"
+}
 export enum CustomerSort {
     name = "name",
     createdAt = "createdAt",
@@ -1379,6 +1719,10 @@ export enum ExtractionStatus {
 export enum FiscalRegime {
     noResponsableIva = "noResponsableIva",
     responsableIva = "responsableIva"
+}
+export enum HopeMode {
+    auto = "auto",
+    manual = "manual"
 }
 export enum ImportRowStatus {
     created = "created",
@@ -1405,6 +1749,7 @@ export enum InvoiceSort {
 }
 export enum LedgerEntryKind {
     expense = "expense",
+    commission = "commission",
     income = "income"
 }
 export enum LineApplyStatus {
@@ -1490,11 +1835,19 @@ export enum ReceivableStatus {
     paid = "paid",
     overdue = "overdue"
 }
+export enum RoleKind {
+    custom = "custom",
+    builtin = "builtin"
+}
 export enum ServiceSort {
     code = "code",
     name = "name",
     category = "category",
     laborRate = "laborRate"
+}
+export enum ShiftStatus {
+    closed = "closed",
+    open = "open"
 }
 export enum TaxResponsibility {
     agenteRetencionIva = "agenteRetencionIva",
@@ -1521,88 +1874,111 @@ export enum WhatsAppContext {
     receivable = "receivable"
 }
 export interface backendInterface {
-    addLabor(id: Id, input: LaborInput): Promise<OrderView>;
-    addOrderPart(id: Id, input: OrderPartInput): Promise<OrderView>;
-    addOrderPhoto(id: Id, input: OrderPhotoInput): Promise<OrderView>;
-    adjustStock(input: AdjustmentInput): Promise<Movement>;
+    addLabor(token: string | null, id: Id, input: LaborInput): Promise<OrderView>;
+    addOrderPart(token: string | null, id: Id, input: OrderPartInput): Promise<OrderView>;
+    addOrderPhoto(token: string | null, id: Id, input: OrderPhotoInput): Promise<OrderView>;
+    adjustStock(token: string | null, input: AdjustmentInput): Promise<Movement>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
-    assignTechnician(id: Id, technicianId: Id): Promise<OrderView>;
-    bulkCreateCustomers(inputs: Array<CustomerInput>): Promise<BulkResult>;
-    bulkCreateParts(inputs: Array<PartInput>): Promise<BulkResult>;
-    bulkCreateServices(inputs: Array<ServiceInput>): Promise<Array<Service>>;
-    bulkUpdateCustomers(updates: Array<[Id, CustomerInput]>): Promise<BulkResult>;
-    bulkUpdateParts(updates: Array<[Id, PartInput]>): Promise<BulkResult>;
-    bulkUpdateServices(updates: Array<[Id, ServiceInput]>): Promise<Array<Service>>;
-    cancelOrder(id: Id, reason: string): Promise<OrderView>;
+    assignTechnician(token: string | null, id: Id, technicianId: Id): Promise<OrderView>;
+    bulkCreateCustomers(token: string | null, inputs: Array<CustomerInput>): Promise<BulkResult>;
+    bulkCreateParts(token: string | null, inputs: Array<PartInput>): Promise<BulkResult>;
+    bulkCreateServices(token: string | null, inputs: Array<ServiceInput>): Promise<Array<Service>>;
+    bulkUpdateCustomers(token: string | null, updates: Array<[Id, CustomerInput]>): Promise<BulkResult>;
+    bulkUpdateParts(token: string | null, updates: Array<[Id, PartInput]>): Promise<BulkResult>;
+    bulkUpdateServices(token: string | null, updates: Array<[Id, ServiceInput]>): Promise<Array<Service>>;
+    cancelOrder(token: string | null, id: Id, reason: string): Promise<OrderView>;
+    changeOwnPassword(token: string, currentPassword: string, newPassword: string): Promise<boolean>;
+    closeShift(token: string | null, id: Id, input: CloseShiftInput): Promise<Shift>;
     /**
      * / Completa la autorización OAuth con el código devuelto por Google.
      */
-    completeDriveAuthorization(code: string, state: string): Promise<DriveAuthResult>;
-    confirmPurchaseInvoice(invoiceId: Id): Promise<InvoiceApplyResult>;
-    convertAppointmentToOrder(id: Id): Promise<OrderView>;
-    convertQuoteToInvoice(id: Id, paymentMethod: PaymentMethod): Promise<Invoice>;
-    convertQuoteToOrder(id: Id): Promise<OrderView>;
-    createAppointment(input: AppointmentInput): Promise<Appointment>;
+    completeDriveAuthorization(token: string | null, code: string, state: string): Promise<DriveAuthResult>;
+    confirmPurchaseInvoice(token: string | null, invoiceId: Id): Promise<InvoiceApplyResult>;
+    convertAppointmentToOrder(token: string | null, id: Id): Promise<OrderView>;
+    convertQuoteToInvoice(token: string | null, id: Id, paymentMethod: PaymentMethod): Promise<Invoice>;
+    convertQuoteToOrder(token: string | null, id: Id): Promise<OrderView>;
+    createAppointment(token: string | null, input: AppointmentInput): Promise<Appointment>;
     /**
      * / Genera el respaldo y lo sube al Drive del administrador.
      */
-    createBackup(): Promise<BackupOutcome>;
-    createCustomer(input: CustomerInput): Promise<Customer>;
-    createExpense(input: ExpenseInput): Promise<Expense>;
-    createExpenseCategory(input: ExpenseCategoryInput): Promise<ExpenseCategory>;
-    createInvoiceFromOrder(orderId: Id, paymentMethod: PaymentMethod, paymentCondition: PaymentCondition, creditPlan: CreditPlanInput | null): Promise<Invoice>;
-    createInvoiceFromPosSale(posSaleId: Id, customerId: Id | null, customerName: string | null, lines: Array<InvoiceLine>, discount: Money, paymentMethod: PaymentMethod, paymentCondition: PaymentCondition, creditPlan: CreditPlanInput | null): Promise<Invoice>;
-    createInvoiceFromQuote(quoteId: Id, customerId: Id, lines: Array<InvoiceLine>, discount: Money, paymentMethod: PaymentMethod, paymentCondition: PaymentCondition, creditPlan: CreditPlanInput | null): Promise<Invoice>;
-    createMotorcycle(input: MotorcycleInput): Promise<Motorcycle>;
-    createOrder(input: OrderInput): Promise<OrderView>;
-    createPart(input: PartInput): Promise<PartView>;
-    createPosSale(input: PosSaleInput): Promise<PosSale>;
-    createPurchase(input: PurchaseInput): Promise<Purchase>;
-    createPurchaseInvoiceDraft(input: CreateInvoiceInput): Promise<PurchaseInvoice>;
-    createQuote(input: QuoteInput): Promise<QuoteView>;
-    createService(input: ServiceInput): Promise<Service>;
-    createServiceCategory(input: ServiceCategoryInput): Promise<ServiceCategory>;
-    createSupplier(input: SupplierInput): Promise<Supplier>;
-    createSupplierOrder(input: SupplierOrderInput): Promise<SupplierOrder>;
-    createTechnician(input: TechnicianInput): Promise<Technician>;
-    createTechnicianLoan(input: TechnicianLoanInput): Promise<TechnicianLoan>;
-    deleteAppointment(id: Id): Promise<boolean>;
-    deleteExpense(id: Id): Promise<boolean>;
-    deleteExpenseCategory(id: Id): Promise<boolean>;
-    deleteOrder(id: Id): Promise<boolean>;
-    deleteQuote(id: Id): Promise<boolean>;
-    deleteService(id: Id): Promise<boolean>;
-    deleteServiceCategory(id: Id): Promise<boolean>;
-    deleteTechnician(id: Id): Promise<boolean>;
-    deleteTechnicianLoan(id: Id): Promise<boolean>;
+    createBackup(token: string | null): Promise<BackupOutcome>;
+    createCustomer(token: string | null, input: CustomerInput): Promise<Customer>;
+    createExpense(token: string | null, input: ExpenseInput): Promise<Expense>;
+    createExpenseCategory(token: string | null, input: ExpenseCategoryInput): Promise<ExpenseCategory>;
+    createInvoiceFromOrder(token: string | null, orderId: Id, paymentMethod: PaymentMethod, paymentCondition: PaymentCondition, creditPlan: CreditPlanInput | null): Promise<Invoice>;
+    createInvoiceFromPosSale(token: string | null, posSaleId: Id, customerId: Id | null, customerName: string | null, lines: Array<InvoiceLine>, discount: Money, paymentMethod: PaymentMethod, paymentCondition: PaymentCondition, creditPlan: CreditPlanInput | null): Promise<Invoice>;
+    createInvoiceFromQuote(token: string | null, quoteId: Id, customerId: Id, lines: Array<InvoiceLine>, discount: Money, paymentMethod: PaymentMethod, paymentCondition: PaymentCondition, creditPlan: CreditPlanInput | null): Promise<Invoice>;
+    createMotorcycle(token: string | null, input: MotorcycleInput): Promise<Motorcycle>;
+    createOrder(token: string | null, input: OrderInput): Promise<OrderView>;
+    createPart(token: string | null, input: PartInput): Promise<PartView>;
+    createPosSale(token: string | null, input: PosSaleInput): Promise<PosSale>;
+    createPurchase(token: string | null, input: PurchaseInput): Promise<Purchase>;
+    createPurchaseInvoiceDraft(token: string | null, input: CreateInvoiceInput): Promise<PurchaseInvoice>;
+    createQuote(token: string | null, input: QuoteInput): Promise<QuoteView>;
+    createRole(token: string | null, input: RoleInput): Promise<Role>;
+    createService(token: string | null, input: ServiceInput): Promise<Service>;
+    createServiceCategory(token: string | null, input: ServiceCategoryInput): Promise<ServiceCategory>;
+    createSupplier(token: string | null, input: SupplierInput): Promise<Supplier>;
+    createSupplierOrder(token: string | null, input: SupplierOrderInput): Promise<SupplierOrder>;
+    createTechnician(token: string | null, input: TechnicianInput): Promise<Technician>;
+    createTechnicianLoan(token: string | null, input: TechnicianLoanInput): Promise<TechnicianLoan>;
+    createUser(token: string | null, username: string, name: string, roleId: Id, temporaryPassword: string): Promise<UserListItem>;
+    deleteAppointment(token: string | null, id: Id): Promise<boolean>;
+    deleteExpense(token: string | null, id: Id): Promise<boolean>;
+    deleteExpenseCategory(token: string | null, id: Id): Promise<boolean>;
+    deleteInvoice(token: string | null, id: Id): Promise<boolean>;
+    deleteOrder(token: string | null, id: Id): Promise<boolean>;
+    deletePurchase(token: string | null, id: Id): Promise<boolean>;
+    deleteQuote(token: string | null, id: Id): Promise<boolean>;
+    deleteRole(token: string | null, roleId: Id): Promise<boolean>;
+    deleteService(token: string | null, id: Id): Promise<boolean>;
+    deleteServiceCategory(token: string | null, id: Id): Promise<boolean>;
+    deleteTechnician(token: string | null, id: Id): Promise<boolean>;
+    deleteTechnicianLoan(token: string | null, id: Id): Promise<boolean>;
+    deleteUser(token: string | null, userId: Id): Promise<boolean>;
     /**
      * / Revoca la conexión con Google Drive del administrador.
      */
-    disconnectDrive(): Promise<void>;
-    /**
-     * / Genera la copia de seguridad local: devuelve el mismo JSON que el
-     * / respaldo a Drive y el nombre del archivo con fecha y hora, para que el
-     * / frontend lo descargue en el equipo del usuario. Es una **consulta** de
-     * / solo lectura: no espera a ningún canister ni muta estado.
-     */
-    downloadLocalBackup(): Promise<LocalBackup>;
+    disconnectDrive(token: string | null): Promise<void>;
     execute(qJson: string): Promise<Result>;
-    exportCustomersAggregated(): Promise<Array<CustomerExportRow>>;
-    exportInventoryCsv(): Promise<Array<InventoryCsvRow>>;
-    findTechnicianByCode(code: string): Promise<Technician | null>;
-    getAccountingReport(period: AccountingPeriod): Promise<AccountingReport>;
-    getAccountingSummary(period: AccountingPeriod): Promise<AccountingSummary>;
+    exportCustomersAggregated(token: string | null): Promise<Array<CustomerExportRow>>;
+    exportInventoryCsv(token: string | null): Promise<Array<InventoryCsvRow>>;
+    /**
+     * / Busca un repuesto por **código de barras o SKU**. La comparación ignora
+     * / mayúsculas y espacios externos; el código de barras tiene prioridad sobre
+     * / el SKU. Devuelve `#found` con la vista del repuesto o `#notFound` cuando
+     * / el código está vacío o no coincide con ningún repuesto. Es la vía que usa
+     * / el lector de códigos de barras del POS y de los demás formatos.
+     */
+    findPartByCode(token: string | null, code: string): Promise<PartLookupResult>;
+    findTechnicianByCode(token: string | null, code: string): Promise<Technician | null>;
+    getAccountingReport(token: string | null, period: AccountingPeriod): Promise<AccountingReport>;
+    getAccountingSummary(token: string | null, period: AccountingPeriod): Promise<AccountingSummary>;
     getApiDoc(): Promise<string>;
-    getAppointment(id: Id): Promise<Appointment | null>;
-    getBusinessSettings(): Promise<BusinessSettings>;
+    getAppointment(token: string | null, id: Id): Promise<Appointment | null>;
+    /**
+     * / Devuelve una página de una sección del respaldo. `index` es la posición
+     * / dentro de `manifest.sections`; `offset` y `limit` paginan las secciones de
+     * / colección (las de un único registro los ignoran). `limit` se acota a
+     * / `manifest.maxPageSize`. El frontend concatena las páginas de cada sección
+     * / hasta que `done` sea `true`.
+     * /
+     * / Es una **consulta** de solo lectura: serializa únicamente la página
+     * / pedida, de modo que ninguna llamada se acerca al límite de instrucciones
+     * / por mensaje.
+     */
+    getBackupSection(token: string | null, index: bigint, offset: bigint, limit: bigint): Promise<BackupSectionChunk>;
+    getBusinessSettings(token: string | null): Promise<BusinessSettings>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
-    getCommissionPayment(id: Id): Promise<CommissionPayment | null>;
-    getCommissionReport(period: CommissionPeriod): Promise<CommissionReport>;
-    getCompanyProfile(): Promise<CompanyProfile>;
-    getCustomer(id: Id): Promise<Customer | null>;
-    getCustomerDetail(id: Id): Promise<CustomerDetail | null>;
-    getDashboardSummary(): Promise<DashboardSummary>;
+    getCommissionPayment(token: string | null, id: Id): Promise<CommissionPayment | null>;
+    getCommissionReport(token: string | null, period: CommissionPeriod): Promise<CommissionReport>;
+    getCompanyProfile(token: string | null): Promise<CompanyProfile>;
+    getCustomer(token: string | null, id: Id): Promise<Customer | null>;
+    getCustomerDetail(token: string | null, id: Id): Promise<CustomerDetail | null>;
+    getDailyHopeMessage(): Promise<HopeMessage>;
+    getDailyShiftReport(token: string | null, shiftId: Id): Promise<DailyShiftReport>;
+    getDashboardSummary(token: string | null): Promise<DashboardSummary>;
     /**
      * / Estado de la conexión con Google Drive del administrador. Es tolerante a
      * / credenciales ausentes: nunca lanza un trap por configuración faltante y
@@ -1610,107 +1986,158 @@ export interface backendInterface {
      * / actualización (no consulta) porque lee las variables de entorno del
      * / canister, que requieren la capacidad `<system>`.
      */
-    getDriveConnectionStatus(): Promise<DriveConnectionStatus>;
-    getExpense(id: Id): Promise<Expense | null>;
-    getExpenseCategory(id: Id): Promise<ExpenseCategory | null>;
-    getExpenseSummary(filter: ExpenseFilter): Promise<ExpenseSummary>;
-    getInventoryValuation(): Promise<InventoryValuation>;
-    getInvoice(id: Id): Promise<Invoice | null>;
-    getOrder(id: Id): Promise<OrderView | null>;
-    getPart(id: Id): Promise<PartView | null>;
-    getPayable(supplierId: Id): Promise<Payable | null>;
-    getPosSale(id: Id): Promise<PosSale | null>;
-    getPurchaseInvoice(invoiceId: Id): Promise<PurchaseInvoice | null>;
-    getQuote(id: Id): Promise<QuoteView | null>;
-    getReceivableSummary(): Promise<ReceivableSummary>;
-    getService(id: Id): Promise<Service | null>;
-    getServiceCategory(id: Id): Promise<ServiceCategory | null>;
-    getSupplier(id: Id): Promise<Supplier | null>;
-    getTechnician(id: Id): Promise<Technician | null>;
-    getTechnicianCommissionSummary(technicianId: Id, period: CommissionPeriod): Promise<TechnicianCommissionSummary | null>;
-    getTechnicianLoan(id: Id): Promise<TechnicianLoan | null>;
-    getTechnicianWorkload(technicianId: Id): Promise<TechnicianWorkload | null>;
-    importInventoryCsv(rows: Array<InventoryImportRow>): Promise<InventoryImportResult>;
+    getDriveConnectionStatus(token: string | null): Promise<DriveConnectionStatus>;
+    getExpense(token: string | null, id: Id): Promise<Expense | null>;
+    getExpenseCategory(token: string | null, id: Id): Promise<ExpenseCategory | null>;
+    getExpenseSummary(token: string | null, filter: ExpenseFilter): Promise<ExpenseSummary>;
+    getHopeSettings(token: string | null): Promise<HopeSettings>;
+    getInventoryValuation(token: string | null): Promise<InventoryValuation>;
+    getInvoice(token: string | null, id: Id): Promise<Invoice | null>;
+    /**
+     * / Manifiesto de la copia de seguridad local: devuelve el nombre del archivo,
+     * / el momento de generación y el plan ordenado de secciones, **sin**
+     * / serializar ningún dato. Es una **consulta** de solo lectura.
+     * /
+     * / El frontend arma el JSON raíz así:
+     * / `{ "generatedAt": <generatedAt>, "<sections[0]>": <valor>, ... }`, donde
+     * / cada valor se obtiene con `getBackupSection(index, offset, limit)`.
+     */
+    getLocalBackupManifest(token: string | null): Promise<LocalBackupManifest>;
+    getOpenShift(token: string | null): Promise<Shift | null>;
+    getOrder(token: string | null, id: Id): Promise<OrderView | null>;
+    getPart(token: string | null, id: Id): Promise<PartView | null>;
+    getPayable(token: string | null, supplierId: Id): Promise<Payable | null>;
+    getPosSale(token: string | null, id: Id): Promise<PosSale | null>;
+    getPurchaseInvoice(token: string | null, invoiceId: Id): Promise<PurchaseInvoice | null>;
+    getQuote(token: string | null, id: Id): Promise<QuoteView | null>;
+    getReceivableSummary(token: string | null): Promise<ReceivableSummary>;
+    getRemindersSummary(token: string | null): Promise<RemindersSummary>;
+    getService(token: string | null, id: Id): Promise<Service | null>;
+    getServiceCategory(token: string | null, id: Id): Promise<ServiceCategory | null>;
+    getServiceTermsSettings(token: string | null): Promise<ServiceTermsSettings>;
+    getSession(token: string): Promise<SessionInfo | null>;
+    getShift(token: string | null, id: Id): Promise<Shift | null>;
+    getSupplier(token: string | null, id: Id): Promise<Supplier | null>;
+    getTechnician(token: string | null, id: Id): Promise<Technician | null>;
+    getTechnicianCommissionSummary(token: string | null, technicianId: Id, period: CommissionPeriod): Promise<TechnicianCommissionSummary | null>;
+    getTechnicianLoan(token: string | null, id: Id): Promise<TechnicianLoan | null>;
+    getTechnicianWorkload(token: string | null, technicianId: Id): Promise<TechnicianWorkload | null>;
+    getWarrantyTermsSettings(token: string | null): Promise<WarrantyTermsSettings>;
+    importInventoryCsv(token: string | null, rows: Array<InventoryImportRow>): Promise<InventoryImportResult>;
     isCallerAdmin(): Promise<boolean>;
-    listAppointments(filter: AppointmentFilter): Promise<Array<Appointment>>;
+    listAppointments(token: string | null, filter: AppointmentFilter): Promise<Array<Appointment>>;
     /**
      * / Lista los respaldos recientes desde el Drive del administrador.
      */
-    listBackups(): Promise<BackupListOutcome>;
-    listCommissionLines(technicianId: Id | null, period: CommissionPeriod): Promise<Array<CommissionLine>>;
-    listCommissionPayments(filter: CommissionPaymentFilter): Promise<Array<CommissionPayment>>;
-    listCustomers(search: string | null): Promise<Array<Customer>>;
-    listCustomersPage(filter: CustomerFilter, sort: CustomerSort, offset: bigint, limit: bigint): Promise<CustomerPage>;
-    listCustomersPageDir(filter: CustomerFilter, sort: CustomerSort, descending: boolean, offset: bigint, limit: bigint): Promise<CustomerPage>;
-    listExpenseCategories(filter: ExpenseCategoryFilter): Promise<Array<ExpenseCategoryUsage>>;
-    listExpenses(filter: ExpenseFilter, offset: bigint, limit: bigint): Promise<ExpensePage>;
-    listInvoices(filter: InvoiceFilter__1, offset: bigint, limit: bigint): Promise<InvoicePage__1>;
-    listLedgerEntries(period: AccountingPeriod): Promise<Array<LedgerEntry>>;
-    listLots(partId: Id): Promise<Array<Lot>>;
-    listMotorcycleCountsByCustomers(ids: Array<Id>): Promise<Array<[Id, bigint]>>;
-    listMotorcycles(customerId: Id): Promise<Array<Motorcycle>>;
-    listMotorcyclesPage(filter: MotorcycleFilter, sort: MotorcycleSort, offset: bigint, limit: bigint): Promise<MotorcyclePage>;
-    listMotorcyclesPageDir(filter: MotorcycleFilter, sort: MotorcycleSort, descending: boolean, offset: bigint, limit: bigint): Promise<MotorcyclePage>;
-    listMovements(partId: Id): Promise<Array<Movement>>;
-    listOrders(filter: OrderFilter, offset: bigint, limit: bigint): Promise<OrderPage>;
-    listPartFacets(): Promise<PartFacets>;
-    listParts(filter: PartFilter, sort: PartSort, offset: bigint, limit: bigint): Promise<PartPage>;
-    listPartsDir(filter: PartFilter, sort: PartSort, descending: boolean, offset: bigint, limit: bigint): Promise<PartPage>;
-    listPayables(): Promise<Array<Payable>>;
-    listPayments(supplierId: Id | null): Promise<Array<Payment>>;
-    listPosSales(filter: PosSaleFilter, offset: bigint, limit: bigint): Promise<PosSalePage>;
-    listPurchaseInvoices(filter: InvoiceFilter, sort: InvoiceSort, offset: bigint, limit: bigint): Promise<InvoicePage>;
-    listPurchases(supplierId: Id | null): Promise<Array<Purchase>>;
-    listQuotes(filter: QuoteFilter, sort: QuoteSort, offset: bigint, limit: bigint): Promise<QuotePage>;
-    listReceivables(filter: ReceivableFilter): Promise<Array<Receivable>>;
-    listServiceCategories(filter: ServiceCategoryFilter): Promise<Array<ServiceCategoryUsage>>;
-    listServices(filter: ServiceFilter, sort: ServiceSort, offset: bigint, limit: bigint): Promise<ServicePage>;
-    listSupplierOrders(filter: SupplierOrderFilter): Promise<Array<SupplierOrder>>;
-    listSuppliers(search: string | null): Promise<Array<Supplier>>;
-    listTechnicianLoans(filter: TechnicianLoanFilter): Promise<Array<TechnicianLoan>>;
-    listTechnicianWorkload(): Promise<Array<TechnicianWorkload>>;
-    listTechnicians(filter: TechnicianFilter): Promise<Array<Technician>>;
-    listUsers(): Promise<Array<UserView>>;
-    lowStockParts(): Promise<Array<PartView>>;
-    markInvoicePaid(id: Id, paymentMethod: PaymentMethod): Promise<Invoice>;
+    listBackups(token: string | null): Promise<BackupListOutcome>;
+    listCashMovements(token: string | null, filter: CashMovementFilter, offset: bigint, limit: bigint): Promise<CashMovementPage>;
+    listCommissionLines(token: string | null, technicianId: Id | null, period: CommissionPeriod): Promise<Array<CommissionLine>>;
+    listCommissionPayments(token: string | null, filter: CommissionPaymentFilter): Promise<Array<CommissionPayment>>;
+    listCustomers(token: string | null, search: string | null): Promise<Array<Customer>>;
+    listCustomersPage(token: string | null, filter: CustomerFilter, sort: CustomerSort, offset: bigint, limit: bigint): Promise<CustomerPage>;
+    listCustomersPageDir(token: string | null, filter: CustomerFilter, sort: CustomerSort, descending: boolean, offset: bigint, limit: bigint): Promise<CustomerPage>;
+    listExpenseCategories(token: string | null, filter: ExpenseCategoryFilter): Promise<Array<ExpenseCategoryUsage>>;
+    listExpenses(token: string | null, filter: ExpenseFilter, offset: bigint, limit: bigint): Promise<ExpensePage>;
+    listInvoices(token: string | null, filter: InvoiceFilter__1, offset: bigint, limit: bigint): Promise<InvoicePage__1>;
+    listLedgerEntries(token: string | null, period: AccountingPeriod): Promise<Array<LedgerEntry>>;
+    listLots(token: string | null, partId: Id): Promise<Array<Lot>>;
+    listMotorcycleCountsByCustomers(token: string | null, ids: Array<Id>): Promise<Array<[Id, bigint]>>;
+    listMotorcycles(token: string | null, customerId: Id): Promise<Array<Motorcycle>>;
+    listMotorcyclesPage(token: string | null, filter: MotorcycleFilter, sort: MotorcycleSort, offset: bigint, limit: bigint): Promise<MotorcyclePage>;
+    listMotorcyclesPageDir(token: string | null, filter: MotorcycleFilter, sort: MotorcycleSort, descending: boolean, offset: bigint, limit: bigint): Promise<MotorcyclePage>;
+    listMovements(token: string | null, partId: Id): Promise<Array<Movement>>;
+    listOrders(token: string | null, filter: OrderFilter, offset: bigint, limit: bigint): Promise<OrderPage>;
+    listPartFacets(token: string | null): Promise<PartFacets>;
+    listParts(token: string | null, filter: PartFilter, sort: PartSort, offset: bigint, limit: bigint): Promise<PartPage>;
+    listPartsDir(token: string | null, filter: PartFilter, sort: PartSort, descending: boolean, offset: bigint, limit: bigint): Promise<PartPage>;
+    listPayables(token: string | null): Promise<Array<Payable>>;
+    listPayments(token: string | null, supplierId: Id | null): Promise<Array<Payment>>;
+    listPosSales(token: string | null, filter: PosSaleFilter, offset: bigint, limit: bigint): Promise<PosSalePage>;
+    listPurchaseInvoices(token: string | null, filter: InvoiceFilter, sort: InvoiceSort, offset: bigint, limit: bigint): Promise<InvoicePage>;
+    listPurchases(token: string | null, supplierId: Id | null): Promise<Array<Purchase>>;
+    listQuotes(token: string | null, filter: QuoteFilter, sort: QuoteSort, offset: bigint, limit: bigint): Promise<QuotePage>;
+    listReceivables(token: string | null, filter: ReceivableFilter): Promise<Array<Receivable>>;
+    listRoles(token: string | null): Promise<Array<Role>>;
+    listServiceCategories(token: string | null, filter: ServiceCategoryFilter): Promise<Array<ServiceCategoryUsage>>;
+    listServices(token: string | null, filter: ServiceFilter, sort: ServiceSort, offset: bigint, limit: bigint): Promise<ServicePage>;
+    listShifts(token: string | null, filter: ShiftFilter, offset: bigint, limit: bigint): Promise<ShiftPage>;
+    listSupplierOrders(token: string | null, filter: SupplierOrderFilter): Promise<Array<SupplierOrder>>;
+    listSuppliers(token: string | null, search: string | null): Promise<Array<Supplier>>;
+    listTechnicianLoans(token: string | null, filter: TechnicianLoanFilter): Promise<Array<TechnicianLoan>>;
+    listTechnicianWorkload(token: string | null): Promise<Array<TechnicianWorkload>>;
+    listTechnicians(token: string | null, filter: TechnicianFilter): Promise<Array<Technician>>;
+    listUsersPage(token: string | null, search: string | null, offset: bigint, limit: bigint): Promise<UserPage>;
+    login(username: string, password: string): Promise<LoginResult>;
+    logout(token: string): Promise<boolean>;
+    lowStockParts(token: string | null): Promise<Array<PartView>>;
+    markInvoicePaid(token: string | null, id: Id, paymentMethod: PaymentMethod): Promise<Invoice>;
     notifyCustomer(input: CustomerNotificationInput): Promise<CustomerNotificationResult>;
-    payTechnicianCommission(input: CommissionPaymentInput): Promise<CommissionPayment>;
+    openShift(token: string | null, input: OpenShiftInput): Promise<Shift>;
+    payTechnicianCommission(token: string | null, input: CommissionPaymentInput): Promise<CommissionPayment>;
     prepareWhatsAppMessage(input: WhatsAppMessageInput): Promise<WhatsAppMessageResult>;
-    registerInstallmentPayment(id: Id, installmentNumber: bigint): Promise<Invoice>;
-    registerPayment(input: PaymentInput): Promise<Payment>;
-    registerReceivablePayment(input: ReceivablePaymentInput): Promise<ReceivablePayment>;
-    removeLabor(id: Id, laborId: Id): Promise<OrderView>;
-    removeOrderPart(id: Id, orderPartId: Id): Promise<OrderView>;
-    removeOrderPhoto(id: Id, photoId: Id): Promise<OrderView>;
-    runPurchaseInvoiceExtraction(invoiceId: Id): Promise<PurchaseInvoice>;
+    registerCashMovement(token: string | null, input: CashMovementInput): Promise<CashMovement>;
+    registerInstallmentPayment(token: string | null, id: Id, installmentNumber: bigint): Promise<Invoice>;
+    registerPayment(token: string | null, input: PaymentInput): Promise<Payment>;
+    registerReceivablePayment(token: string | null, input: ReceivablePaymentInput): Promise<ReceivablePayment>;
+    removeLabor(token: string | null, id: Id, laborId: Id): Promise<OrderView>;
+    removeOrderPart(token: string | null, id: Id, orderPartId: Id): Promise<OrderView>;
+    removeOrderPhoto(token: string | null, id: Id, photoId: Id): Promise<OrderView>;
+    resetUserPassword(token: string | null, userId: Id): Promise<ResetPasswordResult>;
+    /**
+     * / Restaura **una** sección del archivo de copia local, sobrescribiendo solo
+     * / esa colección. `index` es la posición dentro de `manifest.sections`
+     * / (el mismo orden de `SECTION_KEYS`). El frontend llama una vez por sección
+     * / seleccionada, de modo que ninguna llamada procesa el archivo completo y
+     * / se respeta el límite de instrucciones por mensaje.
+     * /
+     * / Un archivo inválido, una versión incompatible o una sección con formato
+     * / incorrecto se rechazan con un error tipado **sin alterar los datos**.
+     */
+    restoreSection(token: string | null, json: string, index: bigint): Promise<RestoreSectionOutcome>;
+    runPurchaseInvoiceExtraction(token: string | null, invoiceId: Id): Promise<PurchaseInvoice>;
     saveCallerUserProfile(name: string): Promise<UserProfile>;
     schema(): Promise<string>;
-    setUserRole(user: Principal, role: UserRole): Promise<UserView>;
+    setUserActive(token: string | null, userId: Id, active: boolean): Promise<UserListItem>;
     /**
      * / Inicia la autorización OAuth (PKCE) de la cuenta propia del
      * / administrador.
      */
-    startDriveAuthorization(): Promise<DriveAuthStart>;
+    startDriveAuthorization(token: string | null): Promise<DriveAuthStart>;
     transform(input: TransformationInput): Promise<TransformationOutput>;
-    unassignTechnician(id: Id, technicianId: Id): Promise<OrderView>;
-    updateAppointment(id: Id, input: AppointmentInput): Promise<Appointment>;
-    updateAppointmentStatus(id: Id, status: AppointmentStatus): Promise<Appointment>;
-    updateBusinessSettings(settings: BusinessSettings): Promise<BusinessSettings>;
-    updateCompanyProfile(input: CompanyProfileRawInput): Promise<CompanyProfile>;
-    updateCustomer(id: Id, input: CustomerInput): Promise<Customer>;
-    updateExpense(id: Id, input: ExpenseInput): Promise<Expense>;
-    updateExpenseCategory(id: Id, input: ExpenseCategoryInput): Promise<ExpenseCategory>;
-    updateLaborTechnician(id: Id, laborId: Id, technicianId: Id | null): Promise<OrderView>;
-    updateMotorcycle(id: Id, input: MotorcycleInput): Promise<Motorcycle>;
-    updateOrderStatus(id: Id, status: OrderStatus): Promise<OrderView>;
-    updatePart(id: Id, input: PartInput): Promise<PartView>;
-    updatePurchaseInvoiceReview(invoiceId: Id, input: InvoiceReviewInput): Promise<PurchaseInvoice>;
-    updateQuote(id: Id, input: QuoteInput): Promise<QuoteView>;
-    updateQuoteStatus(id: Id, status: QuoteStatus): Promise<QuoteView>;
-    updateService(id: Id, input: ServiceInput): Promise<Service>;
-    updateServiceCategory(id: Id, input: ServiceCategoryInput): Promise<ServiceCategory>;
-    updateSupplier(id: Id, input: SupplierInput): Promise<Supplier>;
-    updateTechnician(id: Id, input: TechnicianInput): Promise<Technician>;
-    zeroInventory(): Promise<ZeroInventoryResult>;
-    zeroServices(): Promise<ZeroServicesResult>;
+    unassignTechnician(token: string | null, id: Id, technicianId: Id): Promise<OrderView>;
+    updateAppointment(token: string | null, id: Id, input: AppointmentInput): Promise<Appointment>;
+    updateAppointmentStatus(token: string | null, id: Id, status: AppointmentStatus): Promise<Appointment>;
+    updateBusinessSettings(token: string | null, settings: BusinessSettings): Promise<BusinessSettings>;
+    updateCallerName(token: string, name: string): Promise<SessionInfo>;
+    updateCompanyProfile(token: string | null, input: CompanyProfileRawInput): Promise<CompanyProfile>;
+    updateCustomer(token: string | null, id: Id, input: CustomerInput): Promise<Customer>;
+    updateExpense(token: string | null, id: Id, input: ExpenseInput): Promise<Expense>;
+    updateExpenseCategory(token: string | null, id: Id, input: ExpenseCategoryInput): Promise<ExpenseCategory>;
+    updateHopeSettings(token: string | null, input: HopeSettingsRawInput): Promise<HopeSettings>;
+    updateLaborTechnician(token: string | null, id: Id, laborId: Id, technicianId: Id | null): Promise<OrderView>;
+    updateMotorcycle(token: string | null, id: Id, input: MotorcycleInput): Promise<Motorcycle>;
+    updateOrderStatus(token: string | null, id: Id, status: OrderStatus): Promise<OrderView>;
+    updatePart(token: string | null, id: Id, input: PartInput): Promise<PartView>;
+    updatePurchaseInvoiceReview(token: string | null, invoiceId: Id, input: InvoiceReviewInput): Promise<PurchaseInvoice>;
+    updateQuote(token: string | null, id: Id, input: QuoteInput): Promise<QuoteView>;
+    updateQuoteStatus(token: string | null, id: Id, status: QuoteStatus): Promise<QuoteView>;
+    updateRole(token: string | null, roleId: Id, input: RoleInput): Promise<Role>;
+    updateService(token: string | null, id: Id, input: ServiceInput): Promise<Service>;
+    updateServiceCategory(token: string | null, id: Id, input: ServiceCategoryInput): Promise<ServiceCategory>;
+    updateServiceTermsSettings(token: string | null, input: ServiceTermsSettingsRawInput): Promise<ServiceTermsSettings>;
+    updateSupplier(token: string | null, id: Id, input: SupplierInput): Promise<Supplier>;
+    updateTechnician(token: string | null, id: Id, input: TechnicianInput): Promise<Technician>;
+    updateUserRole(token: string | null, userId: Id, roleId: Id): Promise<UserListItem>;
+    updateWarrantyTermsSettings(token: string | null, input: WarrantyTermsSettingsRawInput): Promise<WarrantyTermsSettings>;
+    /**
+     * / Valida un archivo de copia local y devuelve su vista previa (fecha de
+     * / generación y secciones presentes) **sin alterar ningún dato**. El
+     * / frontend la usa para mostrar la confirmación antes de restaurar.
+     * /
+     * / Es una **actualización** (no consulta) porque recibe el contenido del
+     * / archivo como parámetro; no modifica el estado.
+     */
+    validateRestoreFile(token: string | null, json: string): Promise<RestorePreviewOutcome>;
+    zeroInventory(token: string | null): Promise<ZeroInventoryResult>;
+    zeroServices(token: string | null): Promise<ZeroServicesResult>;
 }

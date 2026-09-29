@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Customer,
@@ -32,13 +33,14 @@ export type CustomerSortDir = "asc" | "desc";
  */
 export function useCustomers(search: string) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const trimmed = search.trim();
 
   return useQuery({
     queryKey: ["customers", trimmed],
     queryFn: async (): Promise<Array<Customer>> => {
       if (!actor) return [];
-      return actor.listCustomers(trimmed === "" ? null : trimmed);
+      return actor.listCustomers(token, trimmed === "" ? null : trimmed);
     },
     enabled: !!actor && !isFetching,
   });
@@ -80,6 +82,7 @@ export function useCustomersPage(
   page: number,
 ) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const trimmed = search.trim();
   const key = customersPageKey(trimmed, sort, dir, page);
 
@@ -92,6 +95,7 @@ export function useCustomersPage(
       };
       const offset = BigInt((page - 1) * CUSTOMERS_PAGE_SIZE);
       return actor.listCustomersPageDir(
+        token,
         filter,
         sort,
         dir === "desc",
@@ -112,11 +116,12 @@ export function useCustomersPage(
  */
 export function useExportCustomersAggregated() {
   const { actor } = useBackend();
+  const { token } = useAuth();
 
   return useMutation({
     mutationFn: async (): Promise<Array<CustomerExportRow>> => {
       if (!actor) throw new Error("El backend no está disponible");
-      return actor.exportCustomersAggregated();
+      return actor.exportCustomersAggregated(token);
     },
   });
 }
@@ -124,12 +129,13 @@ export function useExportCustomersAggregated() {
 /** Full customer record with motorcycles and workshop order history. */
 export function useCustomerDetail(id: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["customer-detail", id?.toString() ?? "none"],
     queryFn: async (): Promise<CustomerDetail | null> => {
       if (!actor || id === null) return null;
-      return actor.getCustomerDetail(id);
+      return actor.getCustomerDetail(token, id);
     },
     enabled: !!actor && !isFetching && id !== null,
   });
@@ -137,12 +143,13 @@ export function useCustomerDetail(id: Id | null) {
 
 export function useCreateCustomer() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: CustomerInput): Promise<Customer> => {
       if (!actor) throw new Error("El backend no está disponible");
-      return actor.createCustomer(input);
+      return actor.createCustomer(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -153,6 +160,7 @@ export function useCreateCustomer() {
 
 export function useUpdateCustomer() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -164,7 +172,7 @@ export function useUpdateCustomer() {
       input: CustomerInput;
     }): Promise<Customer> => {
       if (!actor) throw new Error("El backend no está disponible");
-      return actor.updateCustomer(id, input);
+      return actor.updateCustomer(token, id, input);
     },
     onSuccess: (_customer, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -178,12 +186,13 @@ export function useUpdateCustomer() {
 
 export function useCreateMotorcycle() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: MotorcycleInput): Promise<Motorcycle> => {
       if (!actor) throw new Error("El backend no está disponible");
-      return actor.createMotorcycle(input);
+      return actor.createMotorcycle(token, input);
     },
     onSuccess: (_motorcycle, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -197,6 +206,7 @@ export function useCreateMotorcycle() {
 
 export function useUpdateMotorcycle() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -208,7 +218,7 @@ export function useUpdateMotorcycle() {
       input: MotorcycleInput;
     }): Promise<Motorcycle> => {
       if (!actor) throw new Error("El backend no está disponible");
-      return actor.updateMotorcycle(id, input);
+      return actor.updateMotorcycle(token, id, input);
     },
     onSuccess: (_motorcycle, variables) => {
       void queryClient.invalidateQueries({ queryKey: ["customers"] });
@@ -239,6 +249,7 @@ export type MotorcycleSortDir = "asc" | "desc";
 /** The actor surface the paginated motorcycles helpers depend on. */
 interface MotorcyclesPageActor {
   listMotorcyclesPageDir: (
+    token: string | null,
     filter: MotorcycleFilter,
     sort: MotorcycleSort,
     descending: boolean,
@@ -279,6 +290,7 @@ export function motorcyclesPageKey(
  */
 export async function fetchMotorcyclesPage(
   actor: MotorcyclesPageActor,
+  token: string | null,
   filter: MotorcycleFilter,
   sort: MotorcycleSort,
   dir: MotorcycleSortDir,
@@ -286,6 +298,7 @@ export async function fetchMotorcyclesPage(
   limit: number,
 ): Promise<MotorcyclePage> {
   return actor.listMotorcyclesPageDir(
+    token,
     filter,
     sort,
     dir === "desc",
@@ -312,6 +325,7 @@ export function useMotorcyclesPage(
   limit: number,
 ) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const key = motorcyclesPageKey(filter, sort, dir, offset, limit);
 
   return useQuery({
@@ -325,7 +339,15 @@ export function useMotorcyclesPage(
           items: [],
         };
       }
-      return fetchMotorcyclesPage(actor, filter, sort, dir, offset, limit);
+      return fetchMotorcyclesPage(
+        actor,
+        token,
+        filter,
+        sort,
+        dir,
+        offset,
+        limit,
+      );
     },
     enabled: !!actor && !isFetching,
   });

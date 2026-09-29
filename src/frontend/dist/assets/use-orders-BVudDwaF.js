@@ -1,0 +1,367 @@
+import { O as OrderStatus, k as useBackend, l as useAuth, m as useQuery, ao as useQueryClient, ap as useMutation, p as PartSort } from "./index-EqGEeyjs.js";
+const ORDER_STATUS_LABELS = {
+  [OrderStatus.received]: "Recibida",
+  [OrderStatus.inRepair]: "En reparación",
+  [OrderStatus.ready]: "Lista",
+  [OrderStatus.delivered]: "Entregada",
+  [OrderStatus.cancelled]: "Cancelada"
+};
+const ORDER_STATUS_FLOW = [
+  OrderStatus.received,
+  OrderStatus.inRepair,
+  OrderStatus.ready,
+  OrderStatus.delivered
+];
+function nextStatus(status) {
+  const index = ORDER_STATUS_FLOW.indexOf(status);
+  if (index < 0 || index >= ORDER_STATUS_FLOW.length - 1) return null;
+  return ORDER_STATUS_FLOW[index + 1];
+}
+const ORDER_STATUS_BADGE = {
+  [OrderStatus.received]: "border-info/40 bg-info/10 text-info",
+  [OrderStatus.inRepair]: "border-warning/40 bg-warning/10 text-warning",
+  [OrderStatus.ready]: "border-primary/40 bg-primary/10 text-primary",
+  [OrderStatus.delivered]: "border-success/40 bg-success/10 text-success",
+  [OrderStatus.cancelled]: "border-status-cancelled/40 bg-status-cancelled/10 text-status-cancelled"
+};
+function errorMessage(error) {
+  if (error instanceof Error && error.message.trim().length > 0) {
+    return error.message;
+  }
+  if (typeof error === "string" && error.trim().length > 0) return error;
+  return "Ocurrió un error inesperado. Inténtalo de nuevo.";
+}
+const PICKER_PAGE_SIZE = 1000n;
+function useOrders(params) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  const offset = BigInt((params.page - 1) * params.pageSize);
+  const limit = BigInt(params.pageSize);
+  const search = params.search.trim();
+  return useQuery({
+    queryKey: [
+      "orders",
+      params.status ?? "all",
+      search,
+      params.page,
+      params.pageSize
+    ],
+    queryFn: async () => {
+      if (!actor) throw new Error("Backend no disponible");
+      const filter = {
+        status: params.status ?? void 0,
+        search: search.length > 0 ? search : void 0
+      };
+      return actor.listOrders(token, filter, offset, limit);
+    },
+    enabled: !!actor && !isFetching
+  });
+}
+function useOrder(id) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ["order", (id == null ? void 0 : id.toString()) ?? "none"],
+    queryFn: async () => {
+      if (!actor || id === null) return null;
+      return actor.getOrder(token, id);
+    },
+    enabled: !!actor && !isFetching && id !== null
+  });
+}
+function useCustomers(search) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  const term = search.trim();
+  return useQuery({
+    queryKey: ["customers", term],
+    queryFn: async () => {
+      if (!actor) return [];
+      return actor.listCustomers(token, term.length > 0 ? term : null);
+    },
+    enabled: !!actor && !isFetching
+  });
+}
+function useOrderLookups(customerIds, motorcycleIds) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  const customerKey = customerIds.map((id) => id.toString()).sort().join(",");
+  const motorcycleKey = motorcycleIds.map((id) => id.toString()).sort().join(",");
+  return useQuery({
+    queryKey: ["order-lookups", customerKey, motorcycleKey],
+    queryFn: async () => {
+      const customers = /* @__PURE__ */ new Map();
+      const motorcycles = /* @__PURE__ */ new Map();
+      if (!actor) return { customers, motorcycles };
+      const uniqueCustomers = Array.from(
+        new Set(customerIds.map((id) => id.toString()))
+      );
+      const results = await Promise.all(
+        uniqueCustomers.map(async (id) => {
+          const [customer, motos] = await Promise.all([
+            actor.getCustomer(token, BigInt(id)),
+            actor.listMotorcycles(token, BigInt(id))
+          ]);
+          return { id, name: (customer == null ? void 0 : customer.name) ?? null, motos };
+        })
+      );
+      for (const entry of results) {
+        if (entry.name) customers.set(entry.id, entry.name);
+        for (const moto of entry.motos) {
+          motorcycles.set(moto.id.toString(), moto.plate);
+        }
+      }
+      return { customers, motorcycles };
+    },
+    enabled: !!actor && !isFetching
+  });
+}
+function useMotorcycles(customerId) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ["motorcycles", (customerId == null ? void 0 : customerId.toString()) ?? "none"],
+    queryFn: async () => {
+      if (!actor || customerId === null) return [];
+      return actor.listMotorcycles(token, customerId);
+    },
+    enabled: !!actor && !isFetching && customerId !== null
+  });
+}
+function useParts(search) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  const term = search.trim();
+  return useQuery({
+    queryKey: ["parts", "picker", term],
+    queryFn: async () => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.listParts(
+        token,
+        { search: term.length > 0 ? term : void 0 },
+        PartSort.name,
+        0n,
+        PICKER_PAGE_SIZE
+      );
+    },
+    enabled: !!actor && !isFetching && term.length > 0
+  });
+}
+function useFindPartByCode() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  return useMutation({
+    mutationFn: async (code) => {
+      const value = code.trim();
+      if (value === "" || !actor) return null;
+      const result = await actor.findPartByCode(token, value);
+      return result.__kind__ === "found" ? result.found : null;
+    }
+  });
+}
+function useLots(partId) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  return useQuery({
+    queryKey: ["lots", (partId == null ? void 0 : partId.toString()) ?? "none"],
+    queryFn: async () => {
+      if (!actor || partId === null) return [];
+      return actor.listLots(token, partId);
+    },
+    enabled: !!actor && !isFetching && partId !== null
+  });
+}
+function useCreateOrder() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.createOrder(token, input);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+    }
+  });
+}
+function useUpdateOrderStatus() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.updateOrderStatus(token, input.id, input.status);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()]
+      });
+    }
+  });
+}
+function useAddOrderPart() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.addOrderPart(token, input.id, input.part);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()]
+      });
+    }
+  });
+}
+function useRemoveOrderPart() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.removeOrderPart(token, input.id, input.orderPartId);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()]
+      });
+    }
+  });
+}
+function useAddLabor() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.addLabor(token, input.id, input.labor);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()]
+      });
+    }
+  });
+}
+function useRemoveLabor() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.removeLabor(token, input.id, input.laborId);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()]
+      });
+    }
+  });
+}
+function useCancelOrder() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.cancelOrder(token, input.id, input.reason);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()]
+      });
+    }
+  });
+}
+function useDeleteOrder() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.deleteOrder(token, id);
+    },
+    onSuccess: (_deleted, id) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", id.toString()]
+      });
+    }
+  });
+}
+function useAddOrderPhoto() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.addOrderPhoto(token, input.id, input.photo);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()]
+      });
+    }
+  });
+}
+function useRemoveOrderPhoto() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (input) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.removeOrderPhoto(token, input.id, input.photoId);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()]
+      });
+    }
+  });
+}
+export {
+  ORDER_STATUS_FLOW as O,
+  useOrderLookups as a,
+  ORDER_STATUS_LABELS as b,
+  ORDER_STATUS_BADGE as c,
+  useCustomers as d,
+  useMotorcycles as e,
+  useCreateOrder as f,
+  errorMessage as g,
+  useAddLabor as h,
+  useParts as i,
+  useLots as j,
+  useAddOrderPart as k,
+  useAddOrderPhoto as l,
+  useRemoveOrderPhoto as m,
+  useFindPartByCode as n,
+  useOrder as o,
+  useUpdateOrderStatus as p,
+  useRemoveOrderPart as q,
+  useRemoveLabor as r,
+  nextStatus as s,
+  useCancelOrder as t,
+  useOrders as u,
+  useDeleteOrder as v
+};

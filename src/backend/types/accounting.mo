@@ -5,7 +5,13 @@ module {
   public type Timestamp = Common.Timestamp;
   public type Money = Common.Money;
 
-  public type LedgerEntryKind = { #income; #expense };
+  // Naturaleza de un asiento del libro de movimientos.
+  //   #income     : ingreso (suma a la utilidad).
+  //   #expense    : gasto (resta de la utilidad).
+  //   #commission : comisión de técnico (resta de la utilidad). Se muestra
+  //                 como movimiento propio para que el libro refleje la
+  //                 comisión que reduce la utilidad neta.
+  public type LedgerEntryKind = { #income; #expense; #commission };
 
   public type LedgerEntry = {
     id : Id;
@@ -23,12 +29,22 @@ module {
     to : ?Timestamp;
   };
 
+  // Resumen contable del periodo.
+  //   totalIncome       : ingresos por facturas pagadas.
+  //   totalExpenses     : gastos operativos.
+  //   totalCommissions  : comisiones de técnicos del periodo (costo que
+  //                       reduce la utilidad).
+  //   profit            : utilidad bruta = totalIncome − totalExpenses.
+  //   netProfit         : utilidad neta = profit − totalCommissions. Es la
+  //                       utilidad consolidada después de comisiones.
   public type AccountingSummary = {
     from : ?Timestamp;
     to : ?Timestamp;
     totalIncome : Money;
     totalExpenses : Money;
+    totalCommissions : Money;
     profit : Int;
+    netProfit : Int;
     invoiceCount : Nat;
     expenseCount : Nat;
   };
@@ -103,6 +119,13 @@ module {
     services : ProfitBlock;
     total : ProfitBlock;
     serviceLines : [ServiceProfitLine];
+    // Comisión total de técnicos del periodo (suma de `services.commission`).
+    // Es el costo que el total consolidado descuenta para obtener la utilidad
+    // neta.
+    totalCommission : Money;
+    // Utilidad neta consolidada = total.margin − totalCommission. Puede ser
+    // negativa.
+    netProfit : Int;
   };
 
   public type AccountingError = {

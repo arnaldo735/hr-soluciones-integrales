@@ -1,5 +1,6 @@
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { useRole } from "@/hooks/use-role";
 import { formatMoney } from "@/lib/format";
@@ -21,8 +22,12 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-const RESULT_LIMIT = 5n;
-const MIN_TERM_LENGTH = 2;
+/**
+ * Upper bound requested from the paginated catalogs. The global search shows
+ * every match per group in a scrollable panel, so it asks for a page large
+ * enough to cover the whole catalog instead of a small fixed cap.
+ */
+const SEARCH_PAGE_LIMIT = 1000n;
 
 interface GlobalSearchResult {
   key: string;
@@ -46,6 +51,7 @@ interface GlobalSearchGroup {
  */
 export function GlobalSearch() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const { isAdmin } = useRole();
   const navigate = useNavigate();
   const containerRef = useRef<HTMLDivElement | null>(null);
@@ -59,14 +65,13 @@ export function GlobalSearch() {
     return () => window.clearTimeout(handle);
   }, [term]);
 
-  const enabled =
-    !!actor && !isFetching && debouncedTerm.length >= MIN_TERM_LENGTH;
+  const enabled = !!actor && !isFetching && debouncedTerm.length > 0;
 
   const customersQuery = useQuery({
     queryKey: ["global-search", "customers", debouncedTerm],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listCustomers(debouncedTerm);
+      return actor.listCustomers(token, debouncedTerm);
     },
     enabled,
     staleTime: 30_000,
@@ -76,7 +81,7 @@ export function GlobalSearch() {
     queryKey: ["global-search", "suppliers", debouncedTerm],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listSuppliers(debouncedTerm);
+      return actor.listSuppliers(token, debouncedTerm);
     },
     enabled: enabled && isAdmin,
     staleTime: 30_000,
@@ -87,10 +92,11 @@ export function GlobalSearch() {
     queryFn: async () => {
       if (!actor) return { items: [], total: 0n, offset: 0n, limit: 0n };
       return actor.listServices(
+        token,
         { search: debouncedTerm },
         ServiceSort.name,
         0n,
-        RESULT_LIMIT,
+        SEARCH_PAGE_LIMIT,
       );
     },
     enabled,
@@ -102,10 +108,11 @@ export function GlobalSearch() {
     queryFn: async () => {
       if (!actor) return { items: [], total: 0n, offset: 0n, limit: 0n };
       return actor.listParts(
+        token,
         { search: debouncedTerm },
         PartSort.name,
         0n,
-        RESULT_LIMIT,
+        SEARCH_PAGE_LIMIT,
       );
     },
     enabled,
@@ -116,7 +123,7 @@ export function GlobalSearch() {
     queryKey: ["global-search", "technicians", debouncedTerm],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listTechnicians({ search: debouncedTerm });
+      return actor.listTechnicians(token, { search: debouncedTerm });
     },
     enabled,
     staleTime: 30_000,
@@ -126,7 +133,7 @@ export function GlobalSearch() {
     queryKey: ["global-search", "categories", debouncedTerm],
     queryFn: async () => {
       if (!actor) return [];
-      return actor.listServiceCategories({ search: debouncedTerm });
+      return actor.listServiceCategories(token, { search: debouncedTerm });
     },
     enabled: enabled && isAdmin,
     staleTime: 30_000,
@@ -142,7 +149,7 @@ export function GlobalSearch() {
   const groups = useMemo<GlobalSearchGroup[]>(() => {
     const next: GlobalSearchGroup[] = [];
 
-    const customers = (customersQuery.data ?? []).slice(0, 5);
+    const customers = customersQuery.data ?? [];
     if (customers.length > 0) {
       next.push({
         id: "clientes",
@@ -158,7 +165,7 @@ export function GlobalSearch() {
       });
     }
 
-    const suppliers = (suppliersQuery.data ?? []).slice(0, 5);
+    const suppliers = suppliersQuery.data ?? [];
     if (suppliers.length > 0) {
       next.push({
         id: "proveedores",
@@ -174,7 +181,7 @@ export function GlobalSearch() {
       });
     }
 
-    const services = (servicesQuery.data?.items ?? []).slice(0, 5);
+    const services = servicesQuery.data?.items ?? [];
     if (services.length > 0) {
       next.push({
         id: "servicios",
@@ -189,7 +196,7 @@ export function GlobalSearch() {
       });
     }
 
-    const parts = (partsQuery.data?.items ?? []).slice(0, 5);
+    const parts = partsQuery.data?.items ?? [];
     if (parts.length > 0) {
       next.push({
         id: "inventario",
@@ -205,7 +212,7 @@ export function GlobalSearch() {
       });
     }
 
-    const technicians = (techniciansQuery.data ?? []).slice(0, 5);
+    const technicians = techniciansQuery.data ?? [];
     if (technicians.length > 0) {
       next.push({
         id: "tecnicos",
@@ -220,7 +227,7 @@ export function GlobalSearch() {
       });
     }
 
-    const categories = (categoriesQuery.data ?? []).slice(0, 5);
+    const categories = categoriesQuery.data ?? [];
     if (categories.length > 0) {
       next.push({
         id: "categorias",
@@ -246,7 +253,7 @@ export function GlobalSearch() {
   ]);
 
   const hasResults = groups.length > 0;
-  const showPanel = open && debouncedTerm.length >= MIN_TERM_LENGTH;
+  const showPanel = open && debouncedTerm.length > 0;
 
   // Close the panel when the user clicks outside the search surface.
   useEffect(() => {

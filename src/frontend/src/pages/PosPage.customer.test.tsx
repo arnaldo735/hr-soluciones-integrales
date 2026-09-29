@@ -73,6 +73,7 @@ function part(overrides: Partial<PartView> = {}): PartView {
     costPrice: 12000n,
     lowStockThreshold: 5n,
     totalStock: 12n,
+    barcode: "",
     lowStock: false,
     createdAt: 1_700_000_000_000_000_000n,
     ...overrides,
@@ -180,6 +181,16 @@ function preparedWhatsApp(
   };
 }
 
+/**
+ * Types a term into the POS product search so the picker queries the catalog
+ * and renders its results. The picker no longer lists the catalog by default,
+ * so every product-selection journey starts by typing.
+ */
+async function searchProducts(term = "balata") {
+  await userEvent.type(screen.getByTestId("pos.search_input"), term);
+  await screen.findByTestId("pos.product_item.1");
+}
+
 describe("PosPage customer seam", () => {
   beforeEach(() => {
     listPartsMock.mockReset();
@@ -231,6 +242,7 @@ describe("PosPage customer seam", () => {
     createPosSaleMock.mockResolvedValue(sale());
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.click(screen.getByTestId("pos.customer_select"));
     await userEvent.click(
@@ -253,6 +265,7 @@ describe("PosPage customer seam", () => {
     createPosSaleMock.mockResolvedValue(sale());
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.type(
       screen.getByTestId("pos.amount_received_input"),
@@ -270,6 +283,7 @@ describe("PosPage customer seam", () => {
     createPosSaleMock.mockResolvedValue(sale({ customerName: "Ana Pérez" }));
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.click(screen.getByTestId("pos.customer_select"));
     await userEvent.click(

@@ -35,6 +35,7 @@ const listPartsMock = vi.fn();
 const listSupplierOrdersMock = vi.fn();
 const createSupplierOrderMock = vi.fn();
 const getCompanyProfileMock = vi.fn();
+const deletePurchaseMock = vi.fn();
 
 vi.mock("@/hooks/use-backend", () => ({
   useBackend: () => ({
@@ -49,6 +50,7 @@ vi.mock("@/hooks/use-backend", () => ({
       listSupplierOrders: listSupplierOrdersMock,
       createSupplierOrder: createSupplierOrderMock,
       getCompanyProfile: getCompanyProfileMock,
+      deletePurchase: deletePurchaseMock,
     },
     isFetching: false,
   }),
@@ -110,6 +112,7 @@ function part(overrides: Partial<PartView> = {}): PartView {
     costPrice: 12000n,
     lowStockThreshold: 5n,
     totalStock: 12n,
+    barcode: "",
     lowStock: false,
     createdAt: TS,
     ...overrides,
@@ -145,6 +148,7 @@ function purchase(overrides: Partial<Purchase> = {}): Purchase {
         unitCost: 50000n,
       },
     ],
+    accepted: true,
     ...overrides,
   };
 }
@@ -173,6 +177,7 @@ describe("SupplierDetailPage", () => {
     listSupplierOrdersMock.mockReset();
     createSupplierOrderMock.mockReset();
     getCompanyProfileMock.mockReset();
+    deletePurchaseMock.mockReset();
 
     getCompanyProfileMock.mockResolvedValue(null);
     getSupplierMock.mockResolvedValue(supplier());
@@ -542,5 +547,76 @@ describe("SupplierDetailPage", () => {
     expect(
       screen.getByTestId("supplier_detail.preview_button"),
     ).toBeInTheDocument();
+  });
+
+  // --- Accepted behavior: deleting a non-accepted purchase ------------------
+  //
+  // The accepted change lets a purchase that has not been accepted be deleted,
+  // reverting its lots and inventory movements. The page mirrors the backend
+  // guard: the delete action is offered only while the purchase is not accepted,
+  // and the backend's Spanish rejection is surfaced inside the dialog.
+
+  it("deletes a non-accepted purchase through the backend", async () => {
+    listPurchasesMock.mockResolvedValue([purchase({ accepted: false })]);
+    deletePurchaseMock.mockResolvedValue(true);
+    renderWithProviders(<SupplierDetailPage />);
+
+    await screen.findByTestId("supplier_detail.purchases.table");
+    await userEvent.click(
+      screen.getByTestId("supplier_detail.delete_purchase_button.1"),
+    );
+
+    const dialog = await screen.findByTestId(
+      "supplier_detail.delete_purchase_dialog",
+    );
+    await userEvent.click(
+      within(dialog).getByTestId(
+        "supplier_detail.delete_purchase_confirm_button",
+      ),
+    );
+
+    await waitFor(() => expect(deletePurchaseMock).toHaveBeenCalledTimes(1));
+    expect(deletePurchaseMock).toHaveBeenCalledWith(null, 11n);
+  });
+
+  it("hides the delete action for an accepted purchase", async () => {
+    listPurchasesMock.mockResolvedValue([purchase({ accepted: true })]);
+    renderWithProviders(<SupplierDetailPage />);
+
+    await screen.findByTestId("supplier_detail.purchases.table");
+    expect(
+      screen.queryByTestId("supplier_detail.delete_purchase_button.1"),
+    ).not.toBeInTheDocument();
+    // The accepted purchase shows its badge instead.
+    expect(
+      screen.getByTestId("supplier_detail.purchase_accepted_badge.1"),
+    ).toBeInTheDocument();
+  });
+
+  it("surfaces the backend rejection when the purchase deletion fails", async () => {
+    listPurchasesMock.mockResolvedValue([purchase({ accepted: false })]);
+    deletePurchaseMock.mockRejectedValue(
+      new Error("No se puede eliminar una compra ya aceptada"),
+    );
+    renderWithProviders(<SupplierDetailPage />);
+
+    await screen.findByTestId("supplier_detail.purchases.table");
+    await userEvent.click(
+      screen.getByTestId("supplier_detail.delete_purchase_button.1"),
+    );
+    const dialog = await screen.findByTestId(
+      "supplier_detail.delete_purchase_dialog",
+    );
+    await userEvent.click(
+      within(dialog).getByTestId(
+        "supplier_detail.delete_purchase_confirm_button",
+      ),
+    );
+
+    expect(
+      await within(dialog).findByTestId(
+        "supplier_detail.delete_purchase_error",
+      ),
+    ).toHaveTextContent("No se puede eliminar una compra ya aceptada");
   });
 });

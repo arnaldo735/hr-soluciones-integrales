@@ -62,6 +62,12 @@ type WhatsAppContactKind =
    customer;
    supplier;
  };
+type WarrantyTermsSettingsRawInput = record {"text": text;};
+type WarrantyTermsSettings = 
+ record {
+   "text": text;
+   updatedAt: Timestamp;
+ };
 type Value = 
  variant {
    "bool": bool;
@@ -70,13 +76,6 @@ type Value =
    "nat": nat;
    "null";
    "text": text;
- };
-type UserView = 
- record {
-   createdAt: Timestamp;
-   name: text;
-   "principal": Principal;
-   role: UserRole;
  };
 type UserRole = 
  variant {
@@ -89,6 +88,23 @@ type UserProfile =
    createdAt: Timestamp;
    name: text;
    role: UserRole;
+ };
+type UserPage = 
+ record {
+   items: vec UserListItem;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type UserListItem = 
+ record {
+   active: bool;
+   createdAt: Timestamp;
+   id: Id;
+   name: text;
+   roleId: Id;
+   roleName: text;
+   username: text;
  };
 type TransformationOutput = 
  record {
@@ -233,6 +249,57 @@ type StatusChange =
    performedBy: principal;
    to: OrderStatus;
  };
+type ShiftStatus = 
+ variant {
+   closed;
+   open;
+ };
+type ShiftPage = 
+ record {
+   items: vec Shift;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type ShiftFilter = 
+ record {
+   from: opt Timestamp;
+   status: opt ShiftStatus;
+   to: opt Timestamp;
+ };
+type Shift = 
+ record {
+   closedAt: opt Timestamp;
+   closedBy: opt principal;
+   computedClosingBank: Money;
+   computedClosingCash: Money;
+   declaredClosingBank: opt Money;
+   declaredClosingCash: opt Money;
+   differenceBank: int;
+   differenceCash: int;
+   id: Id;
+   notes: opt text;
+   openedAt: Timestamp;
+   openedBy: principal;
+   openingBank: Money;
+   openingCash: Money;
+   status: ShiftStatus;
+ };
+type SessionInfo = 
+ record {
+   modules: vec ModuleKey;
+   name: text;
+   roleId: Id;
+   roleName: text;
+   userId: Id;
+   username: text;
+ };
+type ServiceTermsSettingsRawInput = record {"text": text;};
+type ServiceTermsSettings = 
+ record {
+   "text": text;
+   updatedAt: Timestamp;
+ };
 type ServiceSort = 
  variant {
    category;
@@ -307,6 +374,24 @@ type Service =
    laborRate: Money;
    name: text;
  };
+type RoleKind = 
+ variant {
+   builtin;
+   custom;
+ };
+type RoleInput = 
+ record {
+   modules: vec ModuleKey;
+   name: text;
+ };
+type Role = 
+ record {
+   createdAt: Timestamp;
+   id: Id;
+   kind: RoleKind;
+   modules: vec ModuleKey;
+   name: text;
+ };
 type Result__1 = 
  variant {
    err: Error;
@@ -316,6 +401,144 @@ type Result =
  record {
    hasMore: bool;
    rows: vec vec Cell;
+ };
+type RestoreSectionStatus = 
+ variant {
+   error: text;
+   restored;
+   skipped;
+ };
+type RestoreSectionResult = 
+ record {
+   index: nat;
+   key: text;
+   restored: nat;
+   status: RestoreSectionStatus;
+ };
+type RestoreSectionOutcome = 
+ variant {
+   err: RestoreError;
+   ok: RestoreSectionResult;
+ };
+type RestoreSectionInfo = 
+ record {
+   count: nat;
+   index: nat;
+   key: text;
+ };
+type RestorePreviewOutcome = 
+ variant {
+   err: RestoreError;
+   ok: RestorePreview;
+ };
+type RestorePreview = 
+ record {
+   formatVersion: nat;
+   generatedAt: int;
+   sections: vec RestoreSectionInfo;
+   totalSections: nat;
+ };
+type RestoreError = 
+ variant {
+   incompatibleVersion: nat;
+   invalidFormat: text;
+   invalidSection: text;
+   noKnownSections;
+   notAuthorized;
+   unknownSection: text;
+ };
+type ResetPasswordResult = 
+ record {
+   temporaryPassword: text;
+   userId: Id;
+ };
+type RemindersSummary = 
+ record {
+   appointments: opt ReminderSection;
+   finishedOrders: opt ReminderSection_1;
+   generatedAt: Timestamp;
+   payables: opt ReminderSection_2;
+   pendingQuotes: opt ReminderSection_3;
+   receivables: opt ReminderSection_4;
+   unapprovedOrders: opt ReminderSection_5;
+ };
+type ReminderSection_5 = 
+ record {
+   count: nat;
+   items: vec ReminderOrder;
+ };
+type ReminderSection_4 = 
+ record {
+   count: nat;
+   items: vec ReminderReceivable;
+ };
+type ReminderSection_3 = 
+ record {
+   count: nat;
+   items: vec ReminderQuote;
+ };
+type ReminderSection_2 = 
+ record {
+   count: nat;
+   items: vec ReminderPayable;
+ };
+type ReminderSection_1 = 
+ record {
+   count: nat;
+   items: vec ReminderFinishedOrder;
+ };
+type ReminderSection = 
+ record {
+   count: nat;
+   items: vec ReminderAppointment;
+ };
+type ReminderReceivable = 
+ record {
+   balance: Money;
+   customerName: text;
+   dueDate: Timestamp;
+   invoiceId: Id;
+   invoiceNumber: text;
+   status: text;
+ };
+type ReminderQuote = 
+ record {
+   createdAt: Timestamp;
+   customerName: text;
+   id: Id;
+   quoteNumber: text;
+   status: text;
+ };
+type ReminderPayable = 
+ record {
+   balance: Money;
+   dueDate: Timestamp;
+   status: text;
+   supplierId: Id;
+   supplierName: text;
+ };
+type ReminderOrder = 
+ record {
+   customerName: text;
+   id: Id;
+   orderNumber: text;
+   plate: text;
+ };
+type ReminderFinishedOrder = 
+ record {
+   customerName: text;
+   daysInWorkshop: nat;
+   id: Id;
+   orderNumber: text;
+   plate: text;
+ };
+type ReminderAppointment = 
+ record {
+   customerId: Id;
+   customerName: text;
+   id: Id;
+   scheduledAt: Timestamp;
+   status: text;
  };
 type ReceivableSummary = 
  record {
@@ -526,6 +749,7 @@ type PurchaseInput =
  };
 type Purchase = 
  record {
+   accepted: bool;
    createdAt: Timestamp;
    id: Id;
    items: vec PurchaseItem;
@@ -535,10 +759,12 @@ type Purchase =
  };
 type ProfitBreakdown = 
  record {
+   netProfit: int;
    parts: ProfitBlock;
    serviceLines: vec ServiceProfitLine;
    services: ProfitBlock;
    total: ProfitBlock;
+   totalCommission: Money;
  };
 type ProfitBlock = 
  record {
@@ -548,7 +774,6 @@ type ProfitBlock =
    margin: int;
    marginBps: BasisPoints;
  };
-type Principal = principal;
 type PosSalePage = 
  record {
    items: vec PosSale;
@@ -611,6 +836,12 @@ type PaymentStatus =
    paid;
    pending;
  };
+type PaymentMethodTotal = 
+ record {
+   expense: Money;
+   income: Money;
+   method: PaymentMethod;
+ };
 type PaymentMethodBreakdown = 
  record {
    method: text;
@@ -665,6 +896,7 @@ type Payable =
  };
 type PartView = 
  record {
+   barcode: text;
    brand: text;
    category: text;
    costPrice: Money;
@@ -692,8 +924,14 @@ type PartPage =
    offset: nat;
    total: nat;
  };
+type PartLookupResult = 
+ variant {
+   found: PartView;
+   notFound;
+ };
 type PartInput = 
  record {
+   barcode: text;
    brand: text;
    category: text;
    costPrice: Money;
@@ -793,6 +1031,12 @@ type OrderFilter =
    search: opt text;
    status: opt OrderStatus;
  };
+type OpenShiftInput = 
+ record {
+   notes: opt text;
+   openingBank: Money;
+   openingCash: Money;
+ };
 type NotificationSource = 
  variant {
    invoice;
@@ -873,6 +1117,7 @@ type Motorcycle =
    year: nat;
  };
 type Money = nat;
+type ModuleKey = text;
 type LowStockItem = 
  record {
    lowStockThreshold: nat;
@@ -892,11 +1137,19 @@ type Lot =
    supplierId: opt Id;
    unitCost: Money;
  };
-type LocalBackup = 
+type LoginResult = 
+ record {
+   expiresAt: Timestamp;
+   token: text;
+   user: SessionInfo;
+ };
+type LocalBackupManifest = 
  record {
    fileName: text;
    generatedAt: int;
-   json: text;
+   maxPageSize: nat;
+   sections: vec text;
+   totalSections: nat;
  };
 type LineMatchStatus = 
  variant {
@@ -912,6 +1165,7 @@ type LineApplyStatus =
  };
 type LedgerEntryKind = 
  variant {
+   commission;
    expense;
    income;
  };
@@ -1125,6 +1379,7 @@ type InventoryImportRowResult =
  };
 type InventoryImportRow = 
  record {
+   barcode: text;
    brand: text;
    category: text;
    costPrice: Money;
@@ -1145,6 +1400,7 @@ type InventoryImportResult =
  };
 type InventoryCsvRow = 
  record {
+   barcode: text;
    brand: text;
    category: text;
    costPrice: Money;
@@ -1186,6 +1442,34 @@ type HttpHeader =
  record {
    name: text;
    value: text;
+ };
+type HopeSettingsRawInput = 
+ record {
+   enabled: bool;
+   manualCitation: text;
+   manualText: text;
+   mode: text;
+ };
+type HopeSettings = 
+ record {
+   enabled: bool;
+   manualCitation: text;
+   manualText: text;
+   mode: HopeMode;
+   updatedAt: Timestamp;
+ };
+type HopeMode = 
+ variant {
+   auto;
+   manual;
+ };
+type HopeMessage = 
+ record {
+   citation: text;
+   enabled: bool;
+   mode: HopeMode;
+   referenceDate: text;
+   "text": text;
  };
 type FiscalRegime = 
  variant {
@@ -1328,6 +1612,18 @@ type DashboardSummary =
    lowStock: vec LowStockItem;
    pendingPayablesCount: nat;
    pendingPayablesTotal: Money;
+ };
+type DailyShiftReport = 
+ record {
+   bankExpense: Money;
+   bankIncome: Money;
+   byPaymentMethod: vec PaymentMethodTotal;
+   cashExpense: Money;
+   cashIncome: Money;
+   movements: vec CashMovement;
+   shift: Shift;
+   totalExpense: Money;
+   totalIncome: Money;
  };
 type CustomerSort = 
  variant {
@@ -1529,6 +1825,12 @@ type CommissionLine =
    technicianId: Id;
    technicianName: text;
  };
+type CloseShiftInput = 
+ record {
+   declaredClosingBank: Money;
+   declaredClosingCash: Money;
+   notes: opt text;
+ };
 type Cell = 
  record {
    name: text;
@@ -1538,6 +1840,66 @@ type CategoryBreakdown =
  record {
    category: text;
    total: Money;
+ };
+type CashMovementSource = 
+ variant {
+   commission;
+   expense;
+   invoice;
+   manual;
+   other;
+   pos;
+   purchase;
+   receivable;
+ };
+type CashMovementPage = 
+ record {
+   items: vec CashMovement;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type CashMovementKind = 
+ variant {
+   expense;
+   income;
+ };
+type CashMovementInput = 
+ record {
+   account: CashAccount;
+   amount: Money;
+   description: text;
+   kind: CashMovementKind;
+   paymentMethod: PaymentMethod;
+   reference: opt text;
+   source: CashMovementSource;
+ };
+type CashMovementFilter = 
+ record {
+   account: opt CashAccount;
+   from: opt Timestamp;
+   kind: opt CashMovementKind;
+   paymentMethod: opt PaymentMethod;
+   shiftId: opt Id;
+   to: opt Timestamp;
+ };
+type CashMovement = 
+ record {
+   account: CashAccount;
+   amount: Money;
+   description: text;
+   id: Id;
+   kind: CashMovementKind;
+   paymentMethod: PaymentMethod;
+   reference: opt text;
+   shiftId: Id;
+   source: CashMovementSource;
+   timestamp: Timestamp;
+ };
+type CashAccount = 
+ variant {
+   bank;
+   cash;
  };
 type BusinessSettings = 
  record {
@@ -1563,6 +1925,16 @@ type BulkResult =
    updated: nat;
  };
 type BasisPoints = nat;
+type BackupSectionChunk = 
+ record {
+   done: bool;
+   index: nat;
+   json: text;
+   key: text;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
 type BackupResult = 
  record {
    createdAt: int;
@@ -1650,8 +2022,10 @@ type AccountingSummary =
    expenseCount: nat;
    from: opt Timestamp;
    invoiceCount: nat;
+   netProfit: int;
    profit: int;
    to: opt Timestamp;
+   totalCommissions: Money;
    totalExpenses: Money;
    totalIncome: Money;
  };
@@ -1681,235 +2055,362 @@ service : {
   _initialize_access_control: () -> ();
   _internet_identity_sign_in_finish: () -> (Result__1);
   _internet_identity_sign_in_start: () -> (blob);
-  addLabor: (id: Id, input: LaborInput) -> (OrderView);
-  addOrderPart: (id: Id, input: OrderPartInput) -> (OrderView);
-  addOrderPhoto: (id: Id, input: OrderPhotoInput) -> (OrderView);
-  adjustStock: (input: AdjustmentInput) -> (Movement);
+  addLabor: (token: opt text, id: Id, input: LaborInput) -> (OrderView);
+  addOrderPart: (token: opt text, id: Id, input: OrderPartInput) ->
+   (OrderView);
+  addOrderPhoto: (token: opt text, id: Id, input: OrderPhotoInput) ->
+   (OrderView);
+  adjustStock: (token: opt text, input: AdjustmentInput) -> (Movement);
   assignCallerUserRole: (user: principal, role: UserRole) -> ();
-  assignTechnician: (id: Id, technicianId: Id) -> (OrderView);
-  bulkCreateCustomers: (inputs: vec CustomerInput) -> (BulkResult);
-  bulkCreateParts: (inputs: vec PartInput) -> (BulkResult);
-  bulkCreateServices: (inputs: vec ServiceInput) -> (vec Service);
-  bulkUpdateCustomers: (updates: vec record {
-                                       Id;
-                                       CustomerInput;
-                                     }) -> (BulkResult);
-  bulkUpdateParts: (updates: vec record {
-                                   Id;
-                                   PartInput;
-                                 }) -> (BulkResult);
-  bulkUpdateServices: (updates: vec record {
-                                      Id;
-                                      ServiceInput;
-                                    }) -> (vec Service);
-  cancelOrder: (id: Id, reason: text) -> (OrderView);
+  assignTechnician: (token: opt text, id: Id, technicianId: Id) ->
+   (OrderView);
+  bulkCreateCustomers: (token: opt text, inputs: vec CustomerInput) ->
+   (BulkResult);
+  bulkCreateParts: (token: opt text, inputs: vec PartInput) -> (BulkResult);
+  bulkCreateServices: (token: opt text, inputs: vec ServiceInput) ->
+   (vec Service);
+  bulkUpdateCustomers: (token: opt text, updates:
+   vec record {
+         Id;
+         CustomerInput;
+       }) -> (BulkResult);
+  bulkUpdateParts: (token: opt text, updates: vec record {
+                                                    Id;
+                                                    PartInput;
+                                                  }) -> (BulkResult);
+  bulkUpdateServices: (token: opt text, updates:
+   vec record {
+         Id;
+         ServiceInput;
+       }) -> (vec Service);
+  cancelOrder: (token: opt text, id: Id, reason: text) -> (OrderView);
+  changeOwnPassword: (token: text, currentPassword: text, newPassword:
+   text) -> (bool);
+  closeShift: (token: opt text, id: Id, input: CloseShiftInput) -> (Shift);
   /// Completa la autorización OAuth con el código devuelto por Google.
-  completeDriveAuthorization: (code: text, state: text) -> (DriveAuthResult);
-  confirmPurchaseInvoice: (invoiceId: Id) -> (InvoiceApplyResult);
-  convertAppointmentToOrder: (id: Id) -> (OrderView);
-  convertQuoteToInvoice: (id: Id, paymentMethod: PaymentMethod) -> (Invoice);
-  convertQuoteToOrder: (id: Id) -> (OrderView);
-  createAppointment: (input: AppointmentInput) -> (Appointment);
+  completeDriveAuthorization: (token: opt text, code: text, state: text) ->
+   (DriveAuthResult);
+  confirmPurchaseInvoice: (token: opt text, invoiceId: Id) ->
+   (InvoiceApplyResult);
+  convertAppointmentToOrder: (token: opt text, id: Id) -> (OrderView);
+  convertQuoteToInvoice: (token: opt text, id: Id, paymentMethod:
+   PaymentMethod) -> (Invoice);
+  convertQuoteToOrder: (token: opt text, id: Id) -> (OrderView);
+  createAppointment: (token: opt text, input: AppointmentInput) ->
+   (Appointment);
   /// Genera el respaldo y lo sube al Drive del administrador.
-  createBackup: () -> (BackupOutcome);
-  createCustomer: (input: CustomerInput) -> (Customer);
-  createExpense: (input: ExpenseInput) -> (Expense);
-  createExpenseCategory: (input: ExpenseCategoryInput) -> (ExpenseCategory);
-  createInvoiceFromOrder: (orderId: Id, paymentMethod: PaymentMethod,
-   paymentCondition: PaymentCondition, creditPlan: opt CreditPlanInput) ->
-   (Invoice);
-  createInvoiceFromPosSale: (posSaleId: Id, customerId: opt Id, customerName:
-   opt text, lines: vec InvoiceLine, discount: Money, paymentMethod:
+  createBackup: (token: opt text) -> (BackupOutcome);
+  createCustomer: (token: opt text, input: CustomerInput) -> (Customer);
+  createExpense: (token: opt text, input: ExpenseInput) -> (Expense);
+  createExpenseCategory: (token: opt text, input: ExpenseCategoryInput) ->
+   (ExpenseCategory);
+  createInvoiceFromOrder: (token: opt text, orderId: Id, paymentMethod:
    PaymentMethod, paymentCondition: PaymentCondition, creditPlan:
    opt CreditPlanInput) -> (Invoice);
-  createInvoiceFromQuote: (quoteId: Id, customerId: Id, lines:
-   vec InvoiceLine, discount: Money, paymentMethod: PaymentMethod,
+  createInvoiceFromPosSale: (token: opt text, posSaleId: Id, customerId:
+   opt Id, customerName: opt text, lines: vec InvoiceLine, discount: 
+   Money, paymentMethod: PaymentMethod, paymentCondition: PaymentCondition,
+   creditPlan: opt CreditPlanInput) -> (Invoice);
+  createInvoiceFromQuote: (token: opt text, quoteId: Id, customerId: 
+   Id, lines: vec InvoiceLine, discount: Money, paymentMethod: PaymentMethod,
    paymentCondition: PaymentCondition, creditPlan: opt CreditPlanInput) ->
    (Invoice);
-  createMotorcycle: (input: MotorcycleInput) -> (Motorcycle);
-  createOrder: (input: OrderInput) -> (OrderView);
-  createPart: (input: PartInput) -> (PartView);
-  createPosSale: (input: PosSaleInput) -> (PosSale);
-  createPurchase: (input: PurchaseInput) -> (Purchase);
-  createPurchaseInvoiceDraft: (input: CreateInvoiceInput) ->
+  createMotorcycle: (token: opt text, input: MotorcycleInput) -> (Motorcycle);
+  createOrder: (token: opt text, input: OrderInput) -> (OrderView);
+  createPart: (token: opt text, input: PartInput) -> (PartView);
+  createPosSale: (token: opt text, input: PosSaleInput) -> (PosSale);
+  createPurchase: (token: opt text, input: PurchaseInput) -> (Purchase);
+  createPurchaseInvoiceDraft: (token: opt text, input: CreateInvoiceInput) ->
    (PurchaseInvoice);
-  createQuote: (input: QuoteInput) -> (QuoteView);
-  createService: (input: ServiceInput) -> (Service);
-  createServiceCategory: (input: ServiceCategoryInput) -> (ServiceCategory);
-  createSupplier: (input: SupplierInput) -> (Supplier);
-  createSupplierOrder: (input: SupplierOrderInput) -> (SupplierOrder);
-  createTechnician: (input: TechnicianInput) -> (Technician);
-  createTechnicianLoan: (input: TechnicianLoanInput) -> (TechnicianLoan);
-  deleteAppointment: (id: Id) -> (bool);
-  deleteExpense: (id: Id) -> (bool);
-  deleteExpenseCategory: (id: Id) -> (bool);
-  deleteOrder: (id: Id) -> (bool);
-  deleteQuote: (id: Id) -> (bool);
-  deleteService: (id: Id) -> (bool);
-  deleteServiceCategory: (id: Id) -> (bool);
-  deleteTechnician: (id: Id) -> (bool);
-  deleteTechnicianLoan: (id: Id) -> (bool);
+  createQuote: (token: opt text, input: QuoteInput) -> (QuoteView);
+  createRole: (token: opt text, input: RoleInput) -> (Role);
+  createService: (token: opt text, input: ServiceInput) -> (Service);
+  createServiceCategory: (token: opt text, input: ServiceCategoryInput) ->
+   (ServiceCategory);
+  createSupplier: (token: opt text, input: SupplierInput) -> (Supplier);
+  createSupplierOrder: (token: opt text, input: SupplierOrderInput) ->
+   (SupplierOrder);
+  createTechnician: (token: opt text, input: TechnicianInput) -> (Technician);
+  createTechnicianLoan: (token: opt text, input: TechnicianLoanInput) ->
+   (TechnicianLoan);
+  createUser: (token: opt text, username: text, name: text, roleId: Id,
+   temporaryPassword: text) -> (UserListItem);
+  deleteAppointment: (token: opt text, id: Id) -> (bool);
+  deleteExpense: (token: opt text, id: Id) -> (bool);
+  deleteExpenseCategory: (token: opt text, id: Id) -> (bool);
+  deleteInvoice: (token: opt text, id: Id) -> (bool);
+  deleteOrder: (token: opt text, id: Id) -> (bool);
+  deletePurchase: (token: opt text, id: Id) -> (bool);
+  deleteQuote: (token: opt text, id: Id) -> (bool);
+  deleteRole: (token: opt text, roleId: Id) -> (bool);
+  deleteService: (token: opt text, id: Id) -> (bool);
+  deleteServiceCategory: (token: opt text, id: Id) -> (bool);
+  deleteTechnician: (token: opt text, id: Id) -> (bool);
+  deleteTechnicianLoan: (token: opt text, id: Id) -> (bool);
+  deleteUser: (token: opt text, userId: Id) -> (bool);
   /// Revoca la conexión con Google Drive del administrador.
-  disconnectDrive: () -> ();
-  /// Genera la copia de seguridad local: devuelve el mismo JSON que el
-  /// respaldo a Drive y el nombre del archivo con fecha y hora, para que el
-  /// frontend lo descargue en el equipo del usuario. Es una **consulta** de
-  /// solo lectura: no espera a ningún canister ni muta estado.
-  downloadLocalBackup: () -> (LocalBackup) query;
+  disconnectDrive: (token: opt text) -> ();
   execute: (qJson: text) -> (Result) query;
-  exportCustomersAggregated: () -> (vec CustomerExportRow) query;
-  exportInventoryCsv: () -> (vec InventoryCsvRow) query;
-  findTechnicianByCode: (code: text) -> (opt Technician) query;
-  getAccountingReport: (period: AccountingPeriod) -> (AccountingReport) query;
-  getAccountingSummary: (period: AccountingPeriod) ->
+  exportCustomersAggregated: (token: opt text) ->
+   (vec CustomerExportRow) query;
+  exportInventoryCsv: (token: opt text) -> (vec InventoryCsvRow) query;
+  /// Busca un repuesto por **código de barras o SKU**. La comparación ignora
+  /// mayúsculas y espacios externos; el código de barras tiene prioridad sobre
+  /// el SKU. Devuelve `#found` con la vista del repuesto o `#notFound` cuando
+  /// el código está vacío o no coincide con ningún repuesto. Es la vía que usa
+  /// el lector de códigos de barras del POS y de los demás formatos.
+  findPartByCode: (token: opt text, code: text) -> (PartLookupResult) query;
+  findTechnicianByCode: (token: opt text, code: text) ->
+   (opt Technician) query;
+  getAccountingReport: (token: opt text, period: AccountingPeriod) ->
+   (AccountingReport) query;
+  getAccountingSummary: (token: opt text, period: AccountingPeriod) ->
    (AccountingSummary) query;
   getApiDoc: () -> (text) query;
-  getAppointment: (id: Id) -> (opt Appointment) query;
-  getBusinessSettings: () -> (BusinessSettings) query;
+  getAppointment: (token: opt text, id: Id) -> (opt Appointment) query;
+  /// Devuelve una página de una sección del respaldo. `index` es la posición
+  /// dentro de `manifest.sections`; `offset` y `limit` paginan las secciones de
+  /// colección (las de un único registro los ignoran). `limit` se acota a
+  /// `manifest.maxPageSize`. El frontend concatena las páginas de cada sección
+  /// hasta que `done` sea `true`.
+  /// 
+  /// Es una **consulta** de solo lectura: serializa únicamente la página
+  /// pedida, de modo que ninguna llamada se acerca al límite de instrucciones
+  /// por mensaje.
+  getBackupSection: (token: opt text, index: nat, offset: nat, limit: 
+   nat) -> (BackupSectionChunk) query;
+  getBusinessSettings: (token: opt text) -> (BusinessSettings) query;
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
-  getCommissionPayment: (id: Id) -> (opt CommissionPayment) query;
-  getCommissionReport: (period: CommissionPeriod) -> (CommissionReport) query;
-  getCompanyProfile: () -> (CompanyProfile) query;
-  getCustomer: (id: Id) -> (opt Customer) query;
-  getCustomerDetail: (id: Id) -> (opt CustomerDetail) query;
-  getDashboardSummary: () -> (DashboardSummary) query;
+  getCommissionPayment: (token: opt text, id: Id) ->
+   (opt CommissionPayment) query;
+  getCommissionReport: (token: opt text, period: CommissionPeriod) ->
+   (CommissionReport) query;
+  getCompanyProfile: (token: opt text) -> (CompanyProfile) query;
+  getCustomer: (token: opt text, id: Id) -> (opt Customer) query;
+  getCustomerDetail: (token: opt text, id: Id) -> (opt CustomerDetail) query;
+  getDailyHopeMessage: () -> (HopeMessage) query;
+  getDailyShiftReport: (token: opt text, shiftId: Id) ->
+   (DailyShiftReport) query;
+  getDashboardSummary: (token: opt text) -> (DashboardSummary) query;
   /// Estado de la conexión con Google Drive del administrador. Es tolerante a
   /// credenciales ausentes: nunca lanza un trap por configuración faltante y
   /// siempre incluye `configuration` con las variables ausentes. Es una
   /// actualización (no consulta) porque lee las variables de entorno del
   /// canister, que requieren la capacidad `<system>`.
-  getDriveConnectionStatus: () -> (DriveConnectionStatus);
-  getExpense: (id: Id) -> (opt Expense) query;
-  getExpenseCategory: (id: Id) -> (opt ExpenseCategory) query;
-  getExpenseSummary: (filter: ExpenseFilter) -> (ExpenseSummary) query;
-  getInventoryValuation: () -> (InventoryValuation) query;
-  getInvoice: (id: Id) -> (opt Invoice) query;
-  getOrder: (id: Id) -> (opt OrderView) query;
-  getPart: (id: Id) -> (opt PartView) query;
-  getPayable: (supplierId: Id) -> (opt Payable) query;
-  getPosSale: (id: Id) -> (opt PosSale) query;
-  getPurchaseInvoice: (invoiceId: Id) -> (opt PurchaseInvoice) query;
-  getQuote: (id: Id) -> (opt QuoteView) query;
-  getReceivableSummary: () -> (ReceivableSummary) query;
-  getService: (id: Id) -> (opt Service) query;
-  getServiceCategory: (id: Id) -> (opt ServiceCategory) query;
-  getSupplier: (id: Id) -> (opt Supplier) query;
-  getTechnician: (id: Id) -> (opt Technician) query;
-  getTechnicianCommissionSummary: (technicianId: Id, period:
+  getDriveConnectionStatus: (token: opt text) -> (DriveConnectionStatus);
+  getExpense: (token: opt text, id: Id) -> (opt Expense) query;
+  getExpenseCategory: (token: opt text, id: Id) ->
+   (opt ExpenseCategory) query;
+  getExpenseSummary: (token: opt text, filter: ExpenseFilter) ->
+   (ExpenseSummary) query;
+  getHopeSettings: (token: opt text) -> (HopeSettings) query;
+  getInventoryValuation: (token: opt text) -> (InventoryValuation) query;
+  getInvoice: (token: opt text, id: Id) -> (opt Invoice) query;
+  /// Manifiesto de la copia de seguridad local: devuelve el nombre del archivo,
+  /// el momento de generación y el plan ordenado de secciones, **sin**
+  /// serializar ningún dato. Es una **consulta** de solo lectura.
+  /// 
+  /// El frontend arma el JSON raíz así:
+  /// `{ "generatedAt": <generatedAt>, "<sections[0]>": <valor>, ... }`, donde
+  /// cada valor se obtiene con `getBackupSection(index, offset, limit)`.
+  getLocalBackupManifest: (token: opt text) -> (LocalBackupManifest) query;
+  getOpenShift: (token: opt text) -> (opt Shift) query;
+  getOrder: (token: opt text, id: Id) -> (opt OrderView) query;
+  getPart: (token: opt text, id: Id) -> (opt PartView) query;
+  getPayable: (token: opt text, supplierId: Id) -> (opt Payable) query;
+  getPosSale: (token: opt text, id: Id) -> (opt PosSale) query;
+  getPurchaseInvoice: (token: opt text, invoiceId: Id) ->
+   (opt PurchaseInvoice) query;
+  getQuote: (token: opt text, id: Id) -> (opt QuoteView) query;
+  getReceivableSummary: (token: opt text) -> (ReceivableSummary) query;
+  getRemindersSummary: (token: opt text) -> (RemindersSummary) query;
+  getService: (token: opt text, id: Id) -> (opt Service) query;
+  getServiceCategory: (token: opt text, id: Id) ->
+   (opt ServiceCategory) query;
+  getServiceTermsSettings: (token: opt text) -> (ServiceTermsSettings) query;
+  getSession: (token: text) -> (opt SessionInfo) query;
+  getShift: (token: opt text, id: Id) -> (opt Shift) query;
+  getSupplier: (token: opt text, id: Id) -> (opt Supplier) query;
+  getTechnician: (token: opt text, id: Id) -> (opt Technician) query;
+  getTechnicianCommissionSummary: (token: opt text, technicianId: Id, period:
    CommissionPeriod) -> (opt TechnicianCommissionSummary) query;
-  getTechnicianLoan: (id: Id) -> (opt TechnicianLoan) query;
-  getTechnicianWorkload: (technicianId: Id) -> (opt TechnicianWorkload) query;
-  importInventoryCsv: (rows: vec InventoryImportRow) ->
+  getTechnicianLoan: (token: opt text, id: Id) -> (opt TechnicianLoan) query;
+  getTechnicianWorkload: (token: opt text, technicianId: Id) ->
+   (opt TechnicianWorkload) query;
+  getWarrantyTermsSettings: (token: opt text) ->
+   (WarrantyTermsSettings) query;
+  importInventoryCsv: (token: opt text, rows: vec InventoryImportRow) ->
    (InventoryImportResult);
   isCallerAdmin: () -> (bool) query;
-  listAppointments: (filter: AppointmentFilter) -> (vec Appointment) query;
+  listAppointments: (token: opt text, filter: AppointmentFilter) ->
+   (vec Appointment) query;
   /// Lista los respaldos recientes desde el Drive del administrador.
-  listBackups: () -> (BackupListOutcome);
-  listCommissionLines: (technicianId: opt Id, period: CommissionPeriod) ->
-   (vec CommissionLine) query;
-  listCommissionPayments: (filter: CommissionPaymentFilter) ->
-   (vec CommissionPayment) query;
-  listCustomers: (search: opt text) -> (vec Customer) query;
-  listCustomersPage: (filter: CustomerFilter, sort: CustomerSort, offset:
-   nat, limit: nat) -> (CustomerPage) query;
-  listCustomersPageDir: (filter: CustomerFilter, sort: CustomerSort,
-   descending: bool, offset: nat, limit: nat) -> (CustomerPage) query;
-  listExpenseCategories: (filter: ExpenseCategoryFilter) ->
+  listBackups: (token: opt text) -> (BackupListOutcome);
+  listCashMovements: (token: opt text, filter: CashMovementFilter, offset:
+   nat, limit: nat) -> (CashMovementPage) query;
+  listCommissionLines: (token: opt text, technicianId: opt Id, period:
+   CommissionPeriod) -> (vec CommissionLine) query;
+  listCommissionPayments: (token: opt text, filter:
+   CommissionPaymentFilter) -> (vec CommissionPayment) query;
+  listCustomers: (token: opt text, search: opt text) -> (vec Customer) query;
+  listCustomersPage: (token: opt text, filter: CustomerFilter, sort:
+   CustomerSort, offset: nat, limit: nat) -> (CustomerPage) query;
+  listCustomersPageDir: (token: opt text, filter: CustomerFilter, sort:
+   CustomerSort, descending: bool, offset: nat, limit: nat) ->
+   (CustomerPage) query;
+  listExpenseCategories: (token: opt text, filter: ExpenseCategoryFilter) ->
    (vec ExpenseCategoryUsage) query;
-  listExpenses: (filter: ExpenseFilter, offset: nat, limit: nat) ->
-   (ExpensePage) query;
-  listInvoices: (filter: InvoiceFilter__1, offset: nat, limit: nat) ->
-   (InvoicePage__1) query;
-  listLedgerEntries: (period: AccountingPeriod) -> (vec LedgerEntry) query;
-  listLots: (partId: Id) -> (vec Lot) query;
-  listMotorcycleCountsByCustomers: (ids: vec Id) ->
+  listExpenses: (token: opt text, filter: ExpenseFilter, offset: nat, limit:
+   nat) -> (ExpensePage) query;
+  listInvoices: (token: opt text, filter: InvoiceFilter__1, offset: nat,
+   limit: nat) -> (InvoicePage__1) query;
+  listLedgerEntries: (token: opt text, period: AccountingPeriod) ->
+   (vec LedgerEntry) query;
+  listLots: (token: opt text, partId: Id) -> (vec Lot) query;
+  listMotorcycleCountsByCustomers: (token: opt text, ids: vec Id) ->
    (vec record {
           Id;
           nat;
         }) query;
-  listMotorcycles: (customerId: Id) -> (vec Motorcycle) query;
-  listMotorcyclesPage: (filter: MotorcycleFilter, sort: MotorcycleSort,
-   offset: nat, limit: nat) -> (MotorcyclePage) query;
-  listMotorcyclesPageDir: (filter: MotorcycleFilter, sort: MotorcycleSort,
-   descending: bool, offset: nat, limit: nat) -> (MotorcyclePage) query;
-  listMovements: (partId: Id) -> (vec Movement) query;
-  listOrders: (filter: OrderFilter, offset: nat, limit: nat) ->
-   (OrderPage) query;
-  listPartFacets: () -> (PartFacets) query;
-  listParts: (filter: PartFilter, sort: PartSort, offset: nat, limit: 
-   nat) -> (PartPage) query;
-  listPartsDir: (filter: PartFilter, sort: PartSort, descending: bool,
-   offset: nat, limit: nat) -> (PartPage) query;
-  listPayables: () -> (vec Payable) query;
-  listPayments: (supplierId: opt Id) -> (vec Payment) query;
-  listPosSales: (filter: PosSaleFilter, offset: nat, limit: nat) ->
-   (PosSalePage) query;
-  listPurchaseInvoices: (filter: InvoiceFilter, sort: InvoiceSort, offset:
-   nat, limit: nat) -> (InvoicePage) query;
-  listPurchases: (supplierId: opt Id) -> (vec Purchase) query;
-  listQuotes: (filter: QuoteFilter, sort: QuoteSort, offset: nat, limit:
-   nat) -> (QuotePage) query;
-  listReceivables: (filter: ReceivableFilter) -> (vec Receivable) query;
-  listServiceCategories: (filter: ServiceCategoryFilter) ->
+  listMotorcycles: (token: opt text, customerId: Id) ->
+   (vec Motorcycle) query;
+  listMotorcyclesPage: (token: opt text, filter: MotorcycleFilter, sort:
+   MotorcycleSort, offset: nat, limit: nat) -> (MotorcyclePage) query;
+  listMotorcyclesPageDir: (token: opt text, filter: MotorcycleFilter, sort:
+   MotorcycleSort, descending: bool, offset: nat, limit: nat) ->
+   (MotorcyclePage) query;
+  listMovements: (token: opt text, partId: Id) -> (vec Movement) query;
+  listOrders: (token: opt text, filter: OrderFilter, offset: nat, limit:
+   nat) -> (OrderPage) query;
+  listPartFacets: (token: opt text) -> (PartFacets) query;
+  listParts: (token: opt text, filter: PartFilter, sort: PartSort, offset:
+   nat, limit: nat) -> (PartPage) query;
+  listPartsDir: (token: opt text, filter: PartFilter, sort: PartSort,
+   descending: bool, offset: nat, limit: nat) -> (PartPage) query;
+  listPayables: (token: opt text) -> (vec Payable) query;
+  listPayments: (token: opt text, supplierId: opt Id) -> (vec Payment) query;
+  listPosSales: (token: opt text, filter: PosSaleFilter, offset: nat, limit:
+   nat) -> (PosSalePage) query;
+  listPurchaseInvoices: (token: opt text, filter: InvoiceFilter, sort:
+   InvoiceSort, offset: nat, limit: nat) -> (InvoicePage) query;
+  listPurchases: (token: opt text, supplierId: opt Id) ->
+   (vec Purchase) query;
+  listQuotes: (token: opt text, filter: QuoteFilter, sort: QuoteSort, offset:
+   nat, limit: nat) -> (QuotePage) query;
+  listReceivables: (token: opt text, filter: ReceivableFilter) ->
+   (vec Receivable) query;
+  listRoles: (token: opt text) -> (vec Role) query;
+  listServiceCategories: (token: opt text, filter: ServiceCategoryFilter) ->
    (vec ServiceCategoryUsage) query;
-  listServices: (filter: ServiceFilter, sort: ServiceSort, offset: nat,
-   limit: nat) -> (ServicePage) query;
-  listSupplierOrders: (filter: SupplierOrderFilter) ->
+  listServices: (token: opt text, filter: ServiceFilter, sort: ServiceSort,
+   offset: nat, limit: nat) -> (ServicePage) query;
+  listShifts: (token: opt text, filter: ShiftFilter, offset: nat, limit:
+   nat) -> (ShiftPage) query;
+  listSupplierOrders: (token: opt text, filter: SupplierOrderFilter) ->
    (vec SupplierOrder) query;
-  listSuppliers: (search: opt text) -> (vec Supplier) query;
-  listTechnicianLoans: (filter: TechnicianLoanFilter) ->
+  listSuppliers: (token: opt text, search: opt text) -> (vec Supplier) query;
+  listTechnicianLoans: (token: opt text, filter: TechnicianLoanFilter) ->
    (vec TechnicianLoan) query;
-  listTechnicianWorkload: () -> (vec TechnicianWorkload) query;
-  listTechnicians: (filter: TechnicianFilter) -> (vec Technician) query;
-  listUsers: () -> (vec UserView) query;
-  lowStockParts: () -> (vec PartView) query;
-  markInvoicePaid: (id: Id, paymentMethod: PaymentMethod) -> (Invoice);
+  listTechnicianWorkload: (token: opt text) -> (vec TechnicianWorkload) query;
+  listTechnicians: (token: opt text, filter: TechnicianFilter) ->
+   (vec Technician) query;
+  listUsersPage: (token: opt text, search: opt text, offset: nat, limit:
+   nat) -> (UserPage) query;
+  login: (username: text, password: text) -> (LoginResult);
+  logout: (token: text) -> (bool);
+  lowStockParts: (token: opt text) -> (vec PartView) query;
+  markInvoicePaid: (token: opt text, id: Id, paymentMethod: PaymentMethod) ->
+   (Invoice);
   notifyCustomer: (input: CustomerNotificationInput) ->
    (CustomerNotificationResult);
-  payTechnicianCommission: (input: CommissionPaymentInput) ->
-   (CommissionPayment);
+  openShift: (token: opt text, input: OpenShiftInput) -> (Shift);
+  payTechnicianCommission: (token: opt text, input:
+   CommissionPaymentInput) -> (CommissionPayment);
   prepareWhatsAppMessage: (input: WhatsAppMessageInput) ->
    (WhatsAppMessageResult) query;
-  registerInstallmentPayment: (id: Id, installmentNumber: nat) -> (Invoice);
-  registerPayment: (input: PaymentInput) -> (Payment);
-  registerReceivablePayment: (input: ReceivablePaymentInput) ->
-   (ReceivablePayment);
-  removeLabor: (id: Id, laborId: Id) -> (OrderView);
-  removeOrderPart: (id: Id, orderPartId: Id) -> (OrderView);
-  removeOrderPhoto: (id: Id, photoId: Id) -> (OrderView);
-  runPurchaseInvoiceExtraction: (invoiceId: Id) -> (PurchaseInvoice);
+  registerCashMovement: (token: opt text, input: CashMovementInput) ->
+   (CashMovement);
+  registerInstallmentPayment: (token: opt text, id: Id, installmentNumber:
+   nat) -> (Invoice);
+  registerPayment: (token: opt text, input: PaymentInput) -> (Payment);
+  registerReceivablePayment: (token: opt text, input:
+   ReceivablePaymentInput) -> (ReceivablePayment);
+  removeLabor: (token: opt text, id: Id, laborId: Id) -> (OrderView);
+  removeOrderPart: (token: opt text, id: Id, orderPartId: Id) -> (OrderView);
+  removeOrderPhoto: (token: opt text, id: Id, photoId: Id) -> (OrderView);
+  resetUserPassword: (token: opt text, userId: Id) -> (ResetPasswordResult);
+  /// Restaura **una** sección del archivo de copia local, sobrescribiendo solo
+  /// esa colección. `index` es la posición dentro de `manifest.sections`
+  /// (el mismo orden de `SECTION_KEYS`). El frontend llama una vez por sección
+  /// seleccionada, de modo que ninguna llamada procesa el archivo completo y
+  /// se respeta el límite de instrucciones por mensaje.
+  /// 
+  /// Un archivo inválido, una versión incompatible o una sección con formato
+  /// incorrecto se rechazan con un error tipado **sin alterar los datos**.
+  restoreSection: (token: opt text, json: text, index: nat) ->
+   (RestoreSectionOutcome);
+  runPurchaseInvoiceExtraction: (token: opt text, invoiceId: Id) ->
+   (PurchaseInvoice);
   saveCallerUserProfile: (name: text) -> (UserProfile);
   schema: () -> (text) query;
-  setUserRole: (user: principal, role: UserRole) -> (UserView);
+  setUserActive: (token: opt text, userId: Id, active: bool) ->
+   (UserListItem);
   /// Inicia la autorización OAuth (PKCE) de la cuenta propia del
   /// administrador.
-  startDriveAuthorization: () -> (DriveAuthStart);
+  startDriveAuthorization: (token: opt text) -> (DriveAuthStart);
   transform: (input: TransformationInput) -> (TransformationOutput) query;
-  unassignTechnician: (id: Id, technicianId: Id) -> (OrderView);
-  updateAppointment: (id: Id, input: AppointmentInput) -> (Appointment);
-  updateAppointmentStatus: (id: Id, status: AppointmentStatus) ->
-   (Appointment);
-  updateBusinessSettings: (settings: BusinessSettings) -> (BusinessSettings);
-  updateCompanyProfile: (input: CompanyProfileRawInput) -> (CompanyProfile);
-  updateCustomer: (id: Id, input: CustomerInput) -> (Customer);
-  updateExpense: (id: Id, input: ExpenseInput) -> (Expense);
-  updateExpenseCategory: (id: Id, input: ExpenseCategoryInput) ->
-   (ExpenseCategory);
-  updateLaborTechnician: (id: Id, laborId: Id, technicianId: opt Id) ->
+  unassignTechnician: (token: opt text, id: Id, technicianId: Id) ->
    (OrderView);
-  updateMotorcycle: (id: Id, input: MotorcycleInput) -> (Motorcycle);
-  updateOrderStatus: (id: Id, status: OrderStatus) -> (OrderView);
-  updatePart: (id: Id, input: PartInput) -> (PartView);
-  updatePurchaseInvoiceReview: (invoiceId: Id, input: InvoiceReviewInput) ->
-   (PurchaseInvoice);
-  updateQuote: (id: Id, input: QuoteInput) -> (QuoteView);
-  updateQuoteStatus: (id: Id, status: QuoteStatus) -> (QuoteView);
-  updateService: (id: Id, input: ServiceInput) -> (Service);
-  updateServiceCategory: (id: Id, input: ServiceCategoryInput) ->
-   (ServiceCategory);
-  updateSupplier: (id: Id, input: SupplierInput) -> (Supplier);
-  updateTechnician: (id: Id, input: TechnicianInput) -> (Technician);
-  zeroInventory: () -> (ZeroInventoryResult);
-  zeroServices: () -> (ZeroServicesResult);
+  updateAppointment: (token: opt text, id: Id, input: AppointmentInput) ->
+   (Appointment);
+  updateAppointmentStatus: (token: opt text, id: Id, status:
+   AppointmentStatus) -> (Appointment);
+  updateBusinessSettings: (token: opt text, settings: BusinessSettings) ->
+   (BusinessSettings);
+  updateCallerName: (token: text, name: text) -> (SessionInfo);
+  updateCompanyProfile: (token: opt text, input: CompanyProfileRawInput) ->
+   (CompanyProfile);
+  updateCustomer: (token: opt text, id: Id, input: CustomerInput) ->
+   (Customer);
+  updateExpense: (token: opt text, id: Id, input: ExpenseInput) -> (Expense);
+  updateExpenseCategory: (token: opt text, id: Id, input:
+   ExpenseCategoryInput) -> (ExpenseCategory);
+  updateHopeSettings: (token: opt text, input: HopeSettingsRawInput) ->
+   (HopeSettings);
+  updateLaborTechnician: (token: opt text, id: Id, laborId: Id, technicianId:
+   opt Id) -> (OrderView);
+  updateMotorcycle: (token: opt text, id: Id, input: MotorcycleInput) ->
+   (Motorcycle);
+  updateOrderStatus: (token: opt text, id: Id, status: OrderStatus) ->
+   (OrderView);
+  updatePart: (token: opt text, id: Id, input: PartInput) -> (PartView);
+  updatePurchaseInvoiceReview: (token: opt text, invoiceId: Id, input:
+   InvoiceReviewInput) -> (PurchaseInvoice);
+  updateQuote: (token: opt text, id: Id, input: QuoteInput) -> (QuoteView);
+  updateQuoteStatus: (token: opt text, id: Id, status: QuoteStatus) ->
+   (QuoteView);
+  updateRole: (token: opt text, roleId: Id, input: RoleInput) -> (Role);
+  updateService: (token: opt text, id: Id, input: ServiceInput) -> (Service);
+  updateServiceCategory: (token: opt text, id: Id, input:
+   ServiceCategoryInput) -> (ServiceCategory);
+  updateServiceTermsSettings: (token: opt text, input:
+   ServiceTermsSettingsRawInput) -> (ServiceTermsSettings);
+  updateSupplier: (token: opt text, id: Id, input: SupplierInput) ->
+   (Supplier);
+  updateTechnician: (token: opt text, id: Id, input: TechnicianInput) ->
+   (Technician);
+  updateUserRole: (token: opt text, userId: Id, roleId: Id) -> (UserListItem);
+  updateWarrantyTermsSettings: (token: opt text, input:
+   WarrantyTermsSettingsRawInput) -> (WarrantyTermsSettings);
+  /// Valida un archivo de copia local y devuelve su vista previa (fecha de
+  /// generación y secciones presentes) **sin alterar ningún dato**. El
+  /// frontend la usa para mostrar la confirmación antes de restaurar.
+  /// 
+  /// Es una **actualización** (no consulta) porque recibe el contenido del
+  /// archivo como parámetro; no modifica el estado.
+  validateRestoreFile: (token: opt text, json: text) ->
+   (RestorePreviewOutcome);
+  zeroInventory: (token: opt text) -> (ZeroInventoryResult);
+  zeroServices: (token: opt text) -> (ZeroServicesResult);
 }

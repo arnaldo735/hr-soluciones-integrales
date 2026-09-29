@@ -23,12 +23,14 @@ export interface AccountingReport {
 }
 export interface AccountingSummary {
   'to' : [] | [Timestamp],
+  'totalCommissions' : Money,
   'expenseCount' : bigint,
   'invoiceCount' : bigint,
   'from' : [] | [Timestamp],
   'totalIncome' : Money,
   'totalExpenses' : Money,
   'profit' : bigint,
+  'netProfit' : bigint,
 }
 export type AdjustmentDirection = { 'in' : null } |
   { 'out' : null };
@@ -91,6 +93,15 @@ export interface BackupResult {
   'fileId' : string,
   'webViewLink' : string,
 }
+export interface BackupSectionChunk {
+  'key' : string,
+  'total' : bigint,
+  'done' : boolean,
+  'json' : string,
+  'offset' : bigint,
+  'limit' : bigint,
+  'index' : bigint,
+}
 export type BasisPoints = bigint;
 export interface BulkResult {
   'created' : bigint,
@@ -112,8 +123,60 @@ export interface BusinessSettings {
   'phone' : string,
   'taxRate' : TaxRate,
 }
+export type CashAccount = { 'bank' : null } |
+  { 'cash' : null };
+export interface CashMovement {
+  'id' : Id,
+  'paymentMethod' : PaymentMethod,
+  'source' : CashMovementSource,
+  'kind' : CashMovementKind,
+  'reference' : [] | [string],
+  'description' : string,
+  'account' : CashAccount,
+  'timestamp' : Timestamp,
+  'amount' : Money,
+  'shiftId' : Id,
+}
+export interface CashMovementFilter {
+  'to' : [] | [Timestamp],
+  'paymentMethod' : [] | [PaymentMethod],
+  'from' : [] | [Timestamp],
+  'kind' : [] | [CashMovementKind],
+  'account' : [] | [CashAccount],
+  'shiftId' : [] | [Id],
+}
+export interface CashMovementInput {
+  'paymentMethod' : PaymentMethod,
+  'source' : CashMovementSource,
+  'kind' : CashMovementKind,
+  'reference' : [] | [string],
+  'description' : string,
+  'account' : CashAccount,
+  'amount' : Money,
+}
+export type CashMovementKind = { 'expense' : null } |
+  { 'income' : null };
+export interface CashMovementPage {
+  'total' : bigint,
+  'offset' : bigint,
+  'limit' : bigint,
+  'items' : Array<CashMovement>,
+}
+export type CashMovementSource = { 'pos' : null } |
+  { 'expense' : null } |
+  { 'other' : null } |
+  { 'invoice' : null } |
+  { 'commission' : null } |
+  { 'receivable' : null } |
+  { 'manual' : null } |
+  { 'purchase' : null };
 export interface CategoryBreakdown { 'total' : Money, 'category' : string }
 export interface Cell { 'value' : Value, 'name' : string }
+export interface CloseShiftInput {
+  'notes' : [] | [string],
+  'declaredClosingBank' : Money,
+  'declaredClosingCash' : Money,
+}
 export interface CommissionLine {
   'at' : Timestamp,
   'serviceDate' : Timestamp,
@@ -290,6 +353,17 @@ export interface CustomerPage {
 export type CustomerSort = { 'name' : null } |
   { 'createdAt' : null } |
   { 'motorcycleCount' : null };
+export interface DailyShiftReport {
+  'movements' : Array<CashMovement>,
+  'bankIncome' : Money,
+  'totalIncome' : Money,
+  'byPaymentMethod' : Array<PaymentMethodTotal>,
+  'shift' : Shift,
+  'cashExpense' : Money,
+  'cashIncome' : Money,
+  'bankExpense' : Money,
+  'totalExpense' : Money,
+}
 export interface DashboardSummary {
   'pendingPayablesTotal' : Money,
   'pendingPayablesCount' : bigint,
@@ -402,6 +476,28 @@ export type ExtractionStatus = { 'pending' : null } |
   { 'failed' : null };
 export type FiscalRegime = { 'noResponsableIva' : null } |
   { 'responsableIva' : null };
+export interface HopeMessage {
+  'mode' : HopeMode,
+  'text' : string,
+  'enabled' : boolean,
+  'referenceDate' : string,
+  'citation' : string,
+}
+export type HopeMode = { 'auto' : null } |
+  { 'manual' : null };
+export interface HopeSettings {
+  'mode' : HopeMode,
+  'enabled' : boolean,
+  'updatedAt' : Timestamp,
+  'manualText' : string,
+  'manualCitation' : string,
+}
+export interface HopeSettingsRawInput {
+  'mode' : string,
+  'enabled' : boolean,
+  'manualText' : string,
+  'manualCitation' : string,
+}
 export interface HttpHeader { 'value' : string, 'name' : string }
 export interface HttpRequestResult {
   'status' : bigint,
@@ -429,6 +525,7 @@ export interface InventoryCsvRow {
   'lowStockThreshold' : bigint,
   'name' : string,
   'unit' : string,
+  'barcode' : string,
   'quantity' : bigint,
   'category' : string,
   'salePrice' : Money,
@@ -446,6 +543,7 @@ export interface InventoryImportRow {
   'lowStockThreshold' : bigint,
   'name' : string,
   'unit' : string,
+  'barcode' : string,
   'quantity' : bigint,
   'category' : string,
   'salePrice' : Money,
@@ -630,6 +728,7 @@ export interface LedgerEntry {
   'amount' : Money,
 }
 export type LedgerEntryKind = { 'expense' : null } |
+  { 'commission' : null } |
   { 'income' : null };
 export type LineApplyStatus = { 'created' : null } |
   { 'pending' : null } |
@@ -637,10 +736,17 @@ export type LineApplyStatus = { 'created' : null } |
   { 'updated' : null };
 export type LineMatchStatus = { 'new' : null } |
   { 'existing' : null };
-export interface LocalBackup {
+export interface LocalBackupManifest {
   'generatedAt' : bigint,
-  'json' : string,
   'fileName' : string,
+  'sections' : Array<string>,
+  'maxPageSize' : bigint,
+  'totalSections' : bigint,
+}
+export interface LoginResult {
+  'token' : string,
+  'expiresAt' : Timestamp,
+  'user' : SessionInfo,
 }
 export interface Lot {
   'id' : Id,
@@ -659,6 +765,7 @@ export interface LowStockItem {
   'totalStock' : bigint,
   'partId' : Id,
 }
+export type ModuleKey = string;
 export type Money = bigint;
 export interface Motorcycle {
   'id' : Id,
@@ -724,6 +831,11 @@ export type NotificationSource = { 'pos' : null } |
   { 'order' : null } |
   { 'invoice' : null } |
   { 'quote' : null };
+export interface OpenShiftInput {
+  'openingBank' : Money,
+  'openingCash' : Money,
+  'notes' : [] | [string],
+}
 export interface OrderFilter {
   'status' : [] | [OrderStatus],
   'search' : [] | [string],
@@ -798,11 +910,14 @@ export interface PartInput {
   'lowStockThreshold' : bigint,
   'name' : string,
   'unit' : string,
+  'barcode' : string,
   'category' : string,
   'salePrice' : Money,
   'brand' : string,
   'costPrice' : Money,
 }
+export type PartLookupResult = { 'found' : PartView } |
+  { 'notFound' : null };
 export interface PartPage {
   'total' : bigint,
   'offset' : bigint,
@@ -821,6 +936,7 @@ export interface PartView {
   'createdAt' : Timestamp,
   'unit' : string,
   'totalStock' : bigint,
+  'barcode' : string,
   'category' : string,
   'salePrice' : Money,
   'brand' : string,
@@ -863,6 +979,11 @@ export type PaymentMethod = { 'mixed' : null } |
   { 'cash' : null } |
   { 'transfer' : null };
 export interface PaymentMethodBreakdown { 'method' : string, 'total' : Money }
+export interface PaymentMethodTotal {
+  'method' : PaymentMethod,
+  'expense' : Money,
+  'income' : Money,
+}
 export type PaymentStatus = { 'pending' : null } |
   { 'paid' : null };
 export interface PosSale {
@@ -916,7 +1037,6 @@ export interface PosSalePage {
   'limit' : bigint,
   'items' : Array<PosSale>,
 }
-export type Principal = Principal;
 export interface ProfitBlock {
   'cost' : Money,
   'commission' : Money,
@@ -926,15 +1046,18 @@ export interface ProfitBlock {
 }
 export interface ProfitBreakdown {
   'total' : ProfitBlock,
+  'totalCommission' : Money,
   'serviceLines' : Array<ServiceProfitLine>,
   'parts' : ProfitBlock,
   'services' : ProfitBlock,
+  'netProfit' : bigint,
 }
 export interface Purchase {
   'id' : Id,
   'total' : Money,
   'createdAt' : Timestamp,
   'items' : Array<PurchaseItem>,
+  'accepted' : boolean,
   'paidAmount' : Money,
   'supplierId' : Id,
 }
@@ -1110,9 +1233,128 @@ export interface ReceivableSummary {
   'totalOutstanding' : Money,
   'openCount' : bigint,
 }
+export interface ReminderAppointment {
+  'id' : Id,
+  'customerName' : string,
+  'status' : string,
+  'customerId' : Id,
+  'scheduledAt' : Timestamp,
+}
+export interface ReminderFinishedOrder {
+  'id' : Id,
+  'customerName' : string,
+  'plate' : string,
+  'orderNumber' : string,
+  'daysInWorkshop' : bigint,
+}
+export interface ReminderOrder {
+  'id' : Id,
+  'customerName' : string,
+  'plate' : string,
+  'orderNumber' : string,
+}
+export interface ReminderPayable {
+  'status' : string,
+  'balance' : Money,
+  'supplierName' : string,
+  'dueDate' : Timestamp,
+  'supplierId' : Id,
+}
+export interface ReminderQuote {
+  'id' : Id,
+  'customerName' : string,
+  'status' : string,
+  'createdAt' : Timestamp,
+  'quoteNumber' : string,
+}
+export interface ReminderReceivable {
+  'customerName' : string,
+  'status' : string,
+  'balance' : Money,
+  'dueDate' : Timestamp,
+  'invoiceId' : Id,
+  'invoiceNumber' : string,
+}
+export interface ReminderSection {
+  'count' : bigint,
+  'items' : Array<ReminderAppointment>,
+}
+export interface ReminderSection_1 {
+  'count' : bigint,
+  'items' : Array<ReminderFinishedOrder>,
+}
+export interface ReminderSection_2 {
+  'count' : bigint,
+  'items' : Array<ReminderPayable>,
+}
+export interface ReminderSection_3 {
+  'count' : bigint,
+  'items' : Array<ReminderQuote>,
+}
+export interface ReminderSection_4 {
+  'count' : bigint,
+  'items' : Array<ReminderReceivable>,
+}
+export interface ReminderSection_5 {
+  'count' : bigint,
+  'items' : Array<ReminderOrder>,
+}
+export interface RemindersSummary {
+  'payables' : [] | [ReminderSection_2],
+  'generatedAt' : Timestamp,
+  'unapprovedOrders' : [] | [ReminderSection_5],
+  'appointments' : [] | [ReminderSection],
+  'finishedOrders' : [] | [ReminderSection_1],
+  'receivables' : [] | [ReminderSection_4],
+  'pendingQuotes' : [] | [ReminderSection_3],
+}
+export interface ResetPasswordResult {
+  'userId' : Id,
+  'temporaryPassword' : string,
+}
+export type RestoreError = { 'invalidFormat' : string } |
+  { 'invalidSection' : string } |
+  { 'incompatibleVersion' : bigint } |
+  { 'notAuthorized' : null } |
+  { 'noKnownSections' : null } |
+  { 'unknownSection' : string };
+export interface RestorePreview {
+  'generatedAt' : bigint,
+  'formatVersion' : bigint,
+  'sections' : Array<RestoreSectionInfo>,
+  'totalSections' : bigint,
+}
+export type RestorePreviewOutcome = { 'ok' : RestorePreview } |
+  { 'err' : RestoreError };
+export interface RestoreSectionInfo {
+  'key' : string,
+  'count' : bigint,
+  'index' : bigint,
+}
+export type RestoreSectionOutcome = { 'ok' : RestoreSectionResult } |
+  { 'err' : RestoreError };
+export interface RestoreSectionResult {
+  'key' : string,
+  'status' : RestoreSectionStatus,
+  'index' : bigint,
+  'restored' : bigint,
+}
+export type RestoreSectionStatus = { 'skipped' : null } |
+  { 'error' : string } |
+  { 'restored' : null };
 export interface Result { 'hasMore' : boolean, 'rows' : Array<Array<Cell>> }
 export type Result__1 = { 'ok' : null } |
   { 'err' : Error };
+export interface Role {
+  'id' : Id,
+  'kind' : RoleKind,
+  'name' : string,
+  'createdAt' : Timestamp,
+  'modules' : Array<ModuleKey>,
+}
+export interface RoleInput { 'name' : string, 'modules' : Array<ModuleKey> }
+export type RoleKind = { 'custom' : null } |
+  { 'builtin' : null };
 export interface Service {
   'id' : Id,
   'active' : boolean,
@@ -1176,6 +1418,49 @@ export type ServiceSort = { 'code' : null } |
   { 'name' : null } |
   { 'category' : null } |
   { 'laborRate' : null };
+export interface ServiceTermsSettings {
+  'text' : string,
+  'updatedAt' : Timestamp,
+}
+export interface ServiceTermsSettingsRawInput { 'text' : string }
+export interface SessionInfo {
+  'roleName' : string,
+  'username' : string,
+  'userId' : Id,
+  'name' : string,
+  'roleId' : Id,
+  'modules' : Array<ModuleKey>,
+}
+export interface Shift {
+  'id' : Id,
+  'status' : ShiftStatus,
+  'openingBank' : Money,
+  'openingCash' : Money,
+  'differenceBank' : bigint,
+  'differenceCash' : bigint,
+  'closedAt' : [] | [Timestamp],
+  'closedBy' : [] | [Principal],
+  'notes' : [] | [string],
+  'declaredClosingBank' : [] | [Money],
+  'declaredClosingCash' : [] | [Money],
+  'computedClosingBank' : Money,
+  'computedClosingCash' : Money,
+  'openedAt' : Timestamp,
+  'openedBy' : Principal,
+}
+export interface ShiftFilter {
+  'to' : [] | [Timestamp],
+  'status' : [] | [ShiftStatus],
+  'from' : [] | [Timestamp],
+}
+export interface ShiftPage {
+  'total' : bigint,
+  'offset' : bigint,
+  'limit' : bigint,
+  'items' : Array<Shift>,
+}
+export type ShiftStatus = { 'closed' : null } |
+  { 'open' : null };
 export interface StatusChange {
   'at' : Timestamp,
   'to' : OrderStatus,
@@ -1300,6 +1585,21 @@ export interface TransformationOutput {
   'body' : Uint8Array,
   'headers' : Array<HttpHeader>,
 }
+export interface UserListItem {
+  'id' : Id,
+  'roleName' : string,
+  'active' : boolean,
+  'username' : string,
+  'name' : string,
+  'createdAt' : Timestamp,
+  'roleId' : Id,
+}
+export interface UserPage {
+  'total' : bigint,
+  'offset' : bigint,
+  'limit' : bigint,
+  'items' : Array<UserListItem>,
+}
 export interface UserProfile {
   'name' : string,
   'createdAt' : Timestamp,
@@ -1308,18 +1608,17 @@ export interface UserProfile {
 export type UserRole = { 'admin' : null } |
   { 'user' : null } |
   { 'guest' : null };
-export interface UserView {
-  'principal' : Principal,
-  'name' : string,
-  'createdAt' : Timestamp,
-  'role' : UserRole,
-}
 export type Value = { 'int' : bigint } |
   { 'nat' : bigint } |
   { 'float' : number } |
   { 'bool' : boolean } |
   { 'null' : null } |
   { 'text' : string };
+export interface WarrantyTermsSettings {
+  'text' : string,
+  'updatedAt' : Timestamp,
+}
+export interface WarrantyTermsSettingsRawInput { 'text' : string }
 export type WhatsAppContactKind = { 'customer' : null } |
   { 'supplier' : null };
 export type WhatsAppContext = { 'service' : null } |
@@ -1395,47 +1694,86 @@ export interface _SERVICE {
   '_initialize_access_control' : ActorMethod<[], undefined>,
   '_internet_identity_sign_in_finish' : ActorMethod<[], Result__1>,
   '_internet_identity_sign_in_start' : ActorMethod<[], Uint8Array>,
-  'addLabor' : ActorMethod<[Id, LaborInput], OrderView>,
-  'addOrderPart' : ActorMethod<[Id, OrderPartInput], OrderView>,
-  'addOrderPhoto' : ActorMethod<[Id, OrderPhotoInput], OrderView>,
-  'adjustStock' : ActorMethod<[AdjustmentInput], Movement>,
+  'addLabor' : ActorMethod<[[] | [string], Id, LaborInput], OrderView>,
+  'addOrderPart' : ActorMethod<[[] | [string], Id, OrderPartInput], OrderView>,
+  'addOrderPhoto' : ActorMethod<
+    [[] | [string], Id, OrderPhotoInput],
+    OrderView
+  >,
+  'adjustStock' : ActorMethod<[[] | [string], AdjustmentInput], Movement>,
   'assignCallerUserRole' : ActorMethod<[Principal, UserRole], undefined>,
-  'assignTechnician' : ActorMethod<[Id, Id], OrderView>,
-  'bulkCreateCustomers' : ActorMethod<[Array<CustomerInput>], BulkResult>,
-  'bulkCreateParts' : ActorMethod<[Array<PartInput>], BulkResult>,
-  'bulkCreateServices' : ActorMethod<[Array<ServiceInput>], Array<Service>>,
-  'bulkUpdateCustomers' : ActorMethod<[Array<[Id, CustomerInput]>], BulkResult>,
-  'bulkUpdateParts' : ActorMethod<[Array<[Id, PartInput]>], BulkResult>,
-  'bulkUpdateServices' : ActorMethod<
-    [Array<[Id, ServiceInput]>],
+  'assignTechnician' : ActorMethod<[[] | [string], Id, Id], OrderView>,
+  'bulkCreateCustomers' : ActorMethod<
+    [[] | [string], Array<CustomerInput>],
+    BulkResult
+  >,
+  'bulkCreateParts' : ActorMethod<
+    [[] | [string], Array<PartInput>],
+    BulkResult
+  >,
+  'bulkCreateServices' : ActorMethod<
+    [[] | [string], Array<ServiceInput>],
     Array<Service>
   >,
-  'cancelOrder' : ActorMethod<[Id, string], OrderView>,
+  'bulkUpdateCustomers' : ActorMethod<
+    [[] | [string], Array<[Id, CustomerInput]>],
+    BulkResult
+  >,
+  'bulkUpdateParts' : ActorMethod<
+    [[] | [string], Array<[Id, PartInput]>],
+    BulkResult
+  >,
+  'bulkUpdateServices' : ActorMethod<
+    [[] | [string], Array<[Id, ServiceInput]>],
+    Array<Service>
+  >,
+  'cancelOrder' : ActorMethod<[[] | [string], Id, string], OrderView>,
+  'changeOwnPassword' : ActorMethod<[string, string, string], boolean>,
+  'closeShift' : ActorMethod<[[] | [string], Id, CloseShiftInput], Shift>,
   /**
    * / Completa la autorización OAuth con el código devuelto por Google.
    */
-  'completeDriveAuthorization' : ActorMethod<[string, string], DriveAuthResult>,
-  'confirmPurchaseInvoice' : ActorMethod<[Id], InvoiceApplyResult>,
-  'convertAppointmentToOrder' : ActorMethod<[Id], OrderView>,
-  'convertQuoteToInvoice' : ActorMethod<[Id, PaymentMethod], Invoice>,
-  'convertQuoteToOrder' : ActorMethod<[Id], OrderView>,
-  'createAppointment' : ActorMethod<[AppointmentInput], Appointment>,
+  'completeDriveAuthorization' : ActorMethod<
+    [[] | [string], string, string],
+    DriveAuthResult
+  >,
+  'confirmPurchaseInvoice' : ActorMethod<
+    [[] | [string], Id],
+    InvoiceApplyResult
+  >,
+  'convertAppointmentToOrder' : ActorMethod<[[] | [string], Id], OrderView>,
+  'convertQuoteToInvoice' : ActorMethod<
+    [[] | [string], Id, PaymentMethod],
+    Invoice
+  >,
+  'convertQuoteToOrder' : ActorMethod<[[] | [string], Id], OrderView>,
+  'createAppointment' : ActorMethod<
+    [[] | [string], AppointmentInput],
+    Appointment
+  >,
   /**
    * / Genera el respaldo y lo sube al Drive del administrador.
    */
-  'createBackup' : ActorMethod<[], BackupOutcome>,
-  'createCustomer' : ActorMethod<[CustomerInput], Customer>,
-  'createExpense' : ActorMethod<[ExpenseInput], Expense>,
+  'createBackup' : ActorMethod<[[] | [string]], BackupOutcome>,
+  'createCustomer' : ActorMethod<[[] | [string], CustomerInput], Customer>,
+  'createExpense' : ActorMethod<[[] | [string], ExpenseInput], Expense>,
   'createExpenseCategory' : ActorMethod<
-    [ExpenseCategoryInput],
+    [[] | [string], ExpenseCategoryInput],
     ExpenseCategory
   >,
   'createInvoiceFromOrder' : ActorMethod<
-    [Id, PaymentMethod, PaymentCondition, [] | [CreditPlanInput]],
+    [
+      [] | [string],
+      Id,
+      PaymentMethod,
+      PaymentCondition,
+      [] | [CreditPlanInput],
+    ],
     Invoice
   >,
   'createInvoiceFromPosSale' : ActorMethod<
     [
+      [] | [string],
       Id,
       [] | [Id],
       [] | [string],
@@ -1449,6 +1787,7 @@ export interface _SERVICE {
   >,
   'createInvoiceFromQuote' : ActorMethod<
     [
+      [] | [string],
       Id,
       Id,
       Array<InvoiceLine>,
@@ -1459,62 +1798,119 @@ export interface _SERVICE {
     ],
     Invoice
   >,
-  'createMotorcycle' : ActorMethod<[MotorcycleInput], Motorcycle>,
-  'createOrder' : ActorMethod<[OrderInput], OrderView>,
-  'createPart' : ActorMethod<[PartInput], PartView>,
-  'createPosSale' : ActorMethod<[PosSaleInput], PosSale>,
-  'createPurchase' : ActorMethod<[PurchaseInput], Purchase>,
+  'createMotorcycle' : ActorMethod<
+    [[] | [string], MotorcycleInput],
+    Motorcycle
+  >,
+  'createOrder' : ActorMethod<[[] | [string], OrderInput], OrderView>,
+  'createPart' : ActorMethod<[[] | [string], PartInput], PartView>,
+  'createPosSale' : ActorMethod<[[] | [string], PosSaleInput], PosSale>,
+  'createPurchase' : ActorMethod<[[] | [string], PurchaseInput], Purchase>,
   'createPurchaseInvoiceDraft' : ActorMethod<
-    [CreateInvoiceInput],
+    [[] | [string], CreateInvoiceInput],
     PurchaseInvoice
   >,
-  'createQuote' : ActorMethod<[QuoteInput], QuoteView>,
-  'createService' : ActorMethod<[ServiceInput], Service>,
+  'createQuote' : ActorMethod<[[] | [string], QuoteInput], QuoteView>,
+  'createRole' : ActorMethod<[[] | [string], RoleInput], Role>,
+  'createService' : ActorMethod<[[] | [string], ServiceInput], Service>,
   'createServiceCategory' : ActorMethod<
-    [ServiceCategoryInput],
+    [[] | [string], ServiceCategoryInput],
     ServiceCategory
   >,
-  'createSupplier' : ActorMethod<[SupplierInput], Supplier>,
-  'createSupplierOrder' : ActorMethod<[SupplierOrderInput], SupplierOrder>,
-  'createTechnician' : ActorMethod<[TechnicianInput], Technician>,
-  'createTechnicianLoan' : ActorMethod<[TechnicianLoanInput], TechnicianLoan>,
-  'deleteAppointment' : ActorMethod<[Id], boolean>,
-  'deleteExpense' : ActorMethod<[Id], boolean>,
-  'deleteExpenseCategory' : ActorMethod<[Id], boolean>,
-  'deleteOrder' : ActorMethod<[Id], boolean>,
-  'deleteQuote' : ActorMethod<[Id], boolean>,
-  'deleteService' : ActorMethod<[Id], boolean>,
-  'deleteServiceCategory' : ActorMethod<[Id], boolean>,
-  'deleteTechnician' : ActorMethod<[Id], boolean>,
-  'deleteTechnicianLoan' : ActorMethod<[Id], boolean>,
+  'createSupplier' : ActorMethod<[[] | [string], SupplierInput], Supplier>,
+  'createSupplierOrder' : ActorMethod<
+    [[] | [string], SupplierOrderInput],
+    SupplierOrder
+  >,
+  'createTechnician' : ActorMethod<
+    [[] | [string], TechnicianInput],
+    Technician
+  >,
+  'createTechnicianLoan' : ActorMethod<
+    [[] | [string], TechnicianLoanInput],
+    TechnicianLoan
+  >,
+  'createUser' : ActorMethod<
+    [[] | [string], string, string, Id, string],
+    UserListItem
+  >,
+  'deleteAppointment' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteExpense' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteExpenseCategory' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteInvoice' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteOrder' : ActorMethod<[[] | [string], Id], boolean>,
+  'deletePurchase' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteQuote' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteRole' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteService' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteServiceCategory' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteTechnician' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteTechnicianLoan' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteUser' : ActorMethod<[[] | [string], Id], boolean>,
   /**
    * / Revoca la conexión con Google Drive del administrador.
    */
-  'disconnectDrive' : ActorMethod<[], undefined>,
-  /**
-   * / Genera la copia de seguridad local: devuelve el mismo JSON que el
-   * / respaldo a Drive y el nombre del archivo con fecha y hora, para que el
-   * / frontend lo descargue en el equipo del usuario. Es una **consulta** de
-   * / solo lectura: no espera a ningún canister ni muta estado.
-   */
-  'downloadLocalBackup' : ActorMethod<[], LocalBackup>,
+  'disconnectDrive' : ActorMethod<[[] | [string]], undefined>,
   'execute' : ActorMethod<[string], Result>,
-  'exportCustomersAggregated' : ActorMethod<[], Array<CustomerExportRow>>,
-  'exportInventoryCsv' : ActorMethod<[], Array<InventoryCsvRow>>,
-  'findTechnicianByCode' : ActorMethod<[string], [] | [Technician]>,
-  'getAccountingReport' : ActorMethod<[AccountingPeriod], AccountingReport>,
-  'getAccountingSummary' : ActorMethod<[AccountingPeriod], AccountingSummary>,
+  'exportCustomersAggregated' : ActorMethod<
+    [[] | [string]],
+    Array<CustomerExportRow>
+  >,
+  'exportInventoryCsv' : ActorMethod<[[] | [string]], Array<InventoryCsvRow>>,
+  /**
+   * / Busca un repuesto por **código de barras o SKU**. La comparación ignora
+   * / mayúsculas y espacios externos; el código de barras tiene prioridad sobre
+   * / el SKU. Devuelve `#found` con la vista del repuesto o `#notFound` cuando
+   * / el código está vacío o no coincide con ningún repuesto. Es la vía que usa
+   * / el lector de códigos de barras del POS y de los demás formatos.
+   */
+  'findPartByCode' : ActorMethod<[[] | [string], string], PartLookupResult>,
+  'findTechnicianByCode' : ActorMethod<
+    [[] | [string], string],
+    [] | [Technician]
+  >,
+  'getAccountingReport' : ActorMethod<
+    [[] | [string], AccountingPeriod],
+    AccountingReport
+  >,
+  'getAccountingSummary' : ActorMethod<
+    [[] | [string], AccountingPeriod],
+    AccountingSummary
+  >,
   'getApiDoc' : ActorMethod<[], string>,
-  'getAppointment' : ActorMethod<[Id], [] | [Appointment]>,
-  'getBusinessSettings' : ActorMethod<[], BusinessSettings>,
+  'getAppointment' : ActorMethod<[[] | [string], Id], [] | [Appointment]>,
+  /**
+   * / Devuelve una página de una sección del respaldo. `index` es la posición
+   * / dentro de `manifest.sections`; `offset` y `limit` paginan las secciones de
+   * / colección (las de un único registro los ignoran). `limit` se acota a
+   * / `manifest.maxPageSize`. El frontend concatena las páginas de cada sección
+   * / hasta que `done` sea `true`.
+   * /
+   * / Es una **consulta** de solo lectura: serializa únicamente la página
+   * / pedida, de modo que ninguna llamada se acerca al límite de instrucciones
+   * / por mensaje.
+   */
+  'getBackupSection' : ActorMethod<
+    [[] | [string], bigint, bigint, bigint],
+    BackupSectionChunk
+  >,
+  'getBusinessSettings' : ActorMethod<[[] | [string]], BusinessSettings>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
-  'getCommissionPayment' : ActorMethod<[Id], [] | [CommissionPayment]>,
-  'getCommissionReport' : ActorMethod<[CommissionPeriod], CommissionReport>,
-  'getCompanyProfile' : ActorMethod<[], CompanyProfile>,
-  'getCustomer' : ActorMethod<[Id], [] | [Customer]>,
-  'getCustomerDetail' : ActorMethod<[Id], [] | [CustomerDetail]>,
-  'getDashboardSummary' : ActorMethod<[], DashboardSummary>,
+  'getCommissionPayment' : ActorMethod<
+    [[] | [string], Id],
+    [] | [CommissionPayment]
+  >,
+  'getCommissionReport' : ActorMethod<
+    [[] | [string], CommissionPeriod],
+    CommissionReport
+  >,
+  'getCompanyProfile' : ActorMethod<[[] | [string]], CompanyProfile>,
+  'getCustomer' : ActorMethod<[[] | [string], Id], [] | [Customer]>,
+  'getCustomerDetail' : ActorMethod<[[] | [string], Id], [] | [CustomerDetail]>,
+  'getDailyHopeMessage' : ActorMethod<[], HopeMessage>,
+  'getDailyShiftReport' : ActorMethod<[[] | [string], Id], DailyShiftReport>,
+  'getDashboardSummary' : ActorMethod<[[] | [string]], DashboardSummary>,
   /**
    * / Estado de la conexión con Google Drive del administrador. Es tolerante a
    * / credenciales ausentes: nunca lanza un trap por configuración faltante y
@@ -1522,187 +1918,352 @@ export interface _SERVICE {
    * / actualización (no consulta) porque lee las variables de entorno del
    * / canister, que requieren la capacidad `<system>`.
    */
-  'getDriveConnectionStatus' : ActorMethod<[], DriveConnectionStatus>,
-  'getExpense' : ActorMethod<[Id], [] | [Expense]>,
-  'getExpenseCategory' : ActorMethod<[Id], [] | [ExpenseCategory]>,
-  'getExpenseSummary' : ActorMethod<[ExpenseFilter], ExpenseSummary>,
-  'getInventoryValuation' : ActorMethod<[], InventoryValuation>,
-  'getInvoice' : ActorMethod<[Id], [] | [Invoice]>,
-  'getOrder' : ActorMethod<[Id], [] | [OrderView]>,
-  'getPart' : ActorMethod<[Id], [] | [PartView]>,
-  'getPayable' : ActorMethod<[Id], [] | [Payable]>,
-  'getPosSale' : ActorMethod<[Id], [] | [PosSale]>,
-  'getPurchaseInvoice' : ActorMethod<[Id], [] | [PurchaseInvoice]>,
-  'getQuote' : ActorMethod<[Id], [] | [QuoteView]>,
-  'getReceivableSummary' : ActorMethod<[], ReceivableSummary>,
-  'getService' : ActorMethod<[Id], [] | [Service]>,
-  'getServiceCategory' : ActorMethod<[Id], [] | [ServiceCategory]>,
-  'getSupplier' : ActorMethod<[Id], [] | [Supplier]>,
-  'getTechnician' : ActorMethod<[Id], [] | [Technician]>,
+  'getDriveConnectionStatus' : ActorMethod<
+    [[] | [string]],
+    DriveConnectionStatus
+  >,
+  'getExpense' : ActorMethod<[[] | [string], Id], [] | [Expense]>,
+  'getExpenseCategory' : ActorMethod<
+    [[] | [string], Id],
+    [] | [ExpenseCategory]
+  >,
+  'getExpenseSummary' : ActorMethod<
+    [[] | [string], ExpenseFilter],
+    ExpenseSummary
+  >,
+  'getHopeSettings' : ActorMethod<[[] | [string]], HopeSettings>,
+  'getInventoryValuation' : ActorMethod<[[] | [string]], InventoryValuation>,
+  'getInvoice' : ActorMethod<[[] | [string], Id], [] | [Invoice]>,
+  /**
+   * / Manifiesto de la copia de seguridad local: devuelve el nombre del archivo,
+   * / el momento de generación y el plan ordenado de secciones, **sin**
+   * / serializar ningún dato. Es una **consulta** de solo lectura.
+   * /
+   * / El frontend arma el JSON raíz así:
+   * / `{ "generatedAt": <generatedAt>, "<sections[0]>": <valor>, ... }`, donde
+   * / cada valor se obtiene con `getBackupSection(index, offset, limit)`.
+   */
+  'getLocalBackupManifest' : ActorMethod<[[] | [string]], LocalBackupManifest>,
+  'getOpenShift' : ActorMethod<[[] | [string]], [] | [Shift]>,
+  'getOrder' : ActorMethod<[[] | [string], Id], [] | [OrderView]>,
+  'getPart' : ActorMethod<[[] | [string], Id], [] | [PartView]>,
+  'getPayable' : ActorMethod<[[] | [string], Id], [] | [Payable]>,
+  'getPosSale' : ActorMethod<[[] | [string], Id], [] | [PosSale]>,
+  'getPurchaseInvoice' : ActorMethod<
+    [[] | [string], Id],
+    [] | [PurchaseInvoice]
+  >,
+  'getQuote' : ActorMethod<[[] | [string], Id], [] | [QuoteView]>,
+  'getReceivableSummary' : ActorMethod<[[] | [string]], ReceivableSummary>,
+  'getRemindersSummary' : ActorMethod<[[] | [string]], RemindersSummary>,
+  'getService' : ActorMethod<[[] | [string], Id], [] | [Service]>,
+  'getServiceCategory' : ActorMethod<
+    [[] | [string], Id],
+    [] | [ServiceCategory]
+  >,
+  'getServiceTermsSettings' : ActorMethod<
+    [[] | [string]],
+    ServiceTermsSettings
+  >,
+  'getSession' : ActorMethod<[string], [] | [SessionInfo]>,
+  'getShift' : ActorMethod<[[] | [string], Id], [] | [Shift]>,
+  'getSupplier' : ActorMethod<[[] | [string], Id], [] | [Supplier]>,
+  'getTechnician' : ActorMethod<[[] | [string], Id], [] | [Technician]>,
   'getTechnicianCommissionSummary' : ActorMethod<
-    [Id, CommissionPeriod],
+    [[] | [string], Id, CommissionPeriod],
     [] | [TechnicianCommissionSummary]
   >,
-  'getTechnicianLoan' : ActorMethod<[Id], [] | [TechnicianLoan]>,
-  'getTechnicianWorkload' : ActorMethod<[Id], [] | [TechnicianWorkload]>,
+  'getTechnicianLoan' : ActorMethod<[[] | [string], Id], [] | [TechnicianLoan]>,
+  'getTechnicianWorkload' : ActorMethod<
+    [[] | [string], Id],
+    [] | [TechnicianWorkload]
+  >,
+  'getWarrantyTermsSettings' : ActorMethod<
+    [[] | [string]],
+    WarrantyTermsSettings
+  >,
   'importInventoryCsv' : ActorMethod<
-    [Array<InventoryImportRow>],
+    [[] | [string], Array<InventoryImportRow>],
     InventoryImportResult
   >,
   'isCallerAdmin' : ActorMethod<[], boolean>,
-  'listAppointments' : ActorMethod<[AppointmentFilter], Array<Appointment>>,
+  'listAppointments' : ActorMethod<
+    [[] | [string], AppointmentFilter],
+    Array<Appointment>
+  >,
   /**
    * / Lista los respaldos recientes desde el Drive del administrador.
    */
-  'listBackups' : ActorMethod<[], BackupListOutcome>,
+  'listBackups' : ActorMethod<[[] | [string]], BackupListOutcome>,
+  'listCashMovements' : ActorMethod<
+    [[] | [string], CashMovementFilter, bigint, bigint],
+    CashMovementPage
+  >,
   'listCommissionLines' : ActorMethod<
-    [[] | [Id], CommissionPeriod],
+    [[] | [string], [] | [Id], CommissionPeriod],
     Array<CommissionLine>
   >,
   'listCommissionPayments' : ActorMethod<
-    [CommissionPaymentFilter],
+    [[] | [string], CommissionPaymentFilter],
     Array<CommissionPayment>
   >,
-  'listCustomers' : ActorMethod<[[] | [string]], Array<Customer>>,
+  'listCustomers' : ActorMethod<
+    [[] | [string], [] | [string]],
+    Array<Customer>
+  >,
   'listCustomersPage' : ActorMethod<
-    [CustomerFilter, CustomerSort, bigint, bigint],
+    [[] | [string], CustomerFilter, CustomerSort, bigint, bigint],
     CustomerPage
   >,
   'listCustomersPageDir' : ActorMethod<
-    [CustomerFilter, CustomerSort, boolean, bigint, bigint],
+    [[] | [string], CustomerFilter, CustomerSort, boolean, bigint, bigint],
     CustomerPage
   >,
   'listExpenseCategories' : ActorMethod<
-    [ExpenseCategoryFilter],
+    [[] | [string], ExpenseCategoryFilter],
     Array<ExpenseCategoryUsage>
   >,
-  'listExpenses' : ActorMethod<[ExpenseFilter, bigint, bigint], ExpensePage>,
+  'listExpenses' : ActorMethod<
+    [[] | [string], ExpenseFilter, bigint, bigint],
+    ExpensePage
+  >,
   'listInvoices' : ActorMethod<
-    [InvoiceFilter__1, bigint, bigint],
+    [[] | [string], InvoiceFilter__1, bigint, bigint],
     InvoicePage__1
   >,
-  'listLedgerEntries' : ActorMethod<[AccountingPeriod], Array<LedgerEntry>>,
-  'listLots' : ActorMethod<[Id], Array<Lot>>,
+  'listLedgerEntries' : ActorMethod<
+    [[] | [string], AccountingPeriod],
+    Array<LedgerEntry>
+  >,
+  'listLots' : ActorMethod<[[] | [string], Id], Array<Lot>>,
   'listMotorcycleCountsByCustomers' : ActorMethod<
-    [Array<Id>],
+    [[] | [string], Array<Id>],
     Array<[Id, bigint]>
   >,
-  'listMotorcycles' : ActorMethod<[Id], Array<Motorcycle>>,
+  'listMotorcycles' : ActorMethod<[[] | [string], Id], Array<Motorcycle>>,
   'listMotorcyclesPage' : ActorMethod<
-    [MotorcycleFilter, MotorcycleSort, bigint, bigint],
+    [[] | [string], MotorcycleFilter, MotorcycleSort, bigint, bigint],
     MotorcyclePage
   >,
   'listMotorcyclesPageDir' : ActorMethod<
-    [MotorcycleFilter, MotorcycleSort, boolean, bigint, bigint],
+    [[] | [string], MotorcycleFilter, MotorcycleSort, boolean, bigint, bigint],
     MotorcyclePage
   >,
-  'listMovements' : ActorMethod<[Id], Array<Movement>>,
-  'listOrders' : ActorMethod<[OrderFilter, bigint, bigint], OrderPage>,
-  'listPartFacets' : ActorMethod<[], PartFacets>,
-  'listParts' : ActorMethod<[PartFilter, PartSort, bigint, bigint], PartPage>,
-  'listPartsDir' : ActorMethod<
-    [PartFilter, PartSort, boolean, bigint, bigint],
+  'listMovements' : ActorMethod<[[] | [string], Id], Array<Movement>>,
+  'listOrders' : ActorMethod<
+    [[] | [string], OrderFilter, bigint, bigint],
+    OrderPage
+  >,
+  'listPartFacets' : ActorMethod<[[] | [string]], PartFacets>,
+  'listParts' : ActorMethod<
+    [[] | [string], PartFilter, PartSort, bigint, bigint],
     PartPage
   >,
-  'listPayables' : ActorMethod<[], Array<Payable>>,
-  'listPayments' : ActorMethod<[[] | [Id]], Array<Payment>>,
-  'listPosSales' : ActorMethod<[PosSaleFilter, bigint, bigint], PosSalePage>,
+  'listPartsDir' : ActorMethod<
+    [[] | [string], PartFilter, PartSort, boolean, bigint, bigint],
+    PartPage
+  >,
+  'listPayables' : ActorMethod<[[] | [string]], Array<Payable>>,
+  'listPayments' : ActorMethod<[[] | [string], [] | [Id]], Array<Payment>>,
+  'listPosSales' : ActorMethod<
+    [[] | [string], PosSaleFilter, bigint, bigint],
+    PosSalePage
+  >,
   'listPurchaseInvoices' : ActorMethod<
-    [InvoiceFilter, InvoiceSort, bigint, bigint],
+    [[] | [string], InvoiceFilter, InvoiceSort, bigint, bigint],
     InvoicePage
   >,
-  'listPurchases' : ActorMethod<[[] | [Id]], Array<Purchase>>,
+  'listPurchases' : ActorMethod<[[] | [string], [] | [Id]], Array<Purchase>>,
   'listQuotes' : ActorMethod<
-    [QuoteFilter, QuoteSort, bigint, bigint],
+    [[] | [string], QuoteFilter, QuoteSort, bigint, bigint],
     QuotePage
   >,
-  'listReceivables' : ActorMethod<[ReceivableFilter], Array<Receivable>>,
+  'listReceivables' : ActorMethod<
+    [[] | [string], ReceivableFilter],
+    Array<Receivable>
+  >,
+  'listRoles' : ActorMethod<[[] | [string]], Array<Role>>,
   'listServiceCategories' : ActorMethod<
-    [ServiceCategoryFilter],
+    [[] | [string], ServiceCategoryFilter],
     Array<ServiceCategoryUsage>
   >,
   'listServices' : ActorMethod<
-    [ServiceFilter, ServiceSort, bigint, bigint],
+    [[] | [string], ServiceFilter, ServiceSort, bigint, bigint],
     ServicePage
   >,
+  'listShifts' : ActorMethod<
+    [[] | [string], ShiftFilter, bigint, bigint],
+    ShiftPage
+  >,
   'listSupplierOrders' : ActorMethod<
-    [SupplierOrderFilter],
+    [[] | [string], SupplierOrderFilter],
     Array<SupplierOrder>
   >,
-  'listSuppliers' : ActorMethod<[[] | [string]], Array<Supplier>>,
+  'listSuppliers' : ActorMethod<
+    [[] | [string], [] | [string]],
+    Array<Supplier>
+  >,
   'listTechnicianLoans' : ActorMethod<
-    [TechnicianLoanFilter],
+    [[] | [string], TechnicianLoanFilter],
     Array<TechnicianLoan>
   >,
-  'listTechnicianWorkload' : ActorMethod<[], Array<TechnicianWorkload>>,
-  'listTechnicians' : ActorMethod<[TechnicianFilter], Array<Technician>>,
-  'listUsers' : ActorMethod<[], Array<UserView>>,
-  'lowStockParts' : ActorMethod<[], Array<PartView>>,
-  'markInvoicePaid' : ActorMethod<[Id, PaymentMethod], Invoice>,
+  'listTechnicianWorkload' : ActorMethod<
+    [[] | [string]],
+    Array<TechnicianWorkload>
+  >,
+  'listTechnicians' : ActorMethod<
+    [[] | [string], TechnicianFilter],
+    Array<Technician>
+  >,
+  'listUsersPage' : ActorMethod<
+    [[] | [string], [] | [string], bigint, bigint],
+    UserPage
+  >,
+  'login' : ActorMethod<[string, string], LoginResult>,
+  'logout' : ActorMethod<[string], boolean>,
+  'lowStockParts' : ActorMethod<[[] | [string]], Array<PartView>>,
+  'markInvoicePaid' : ActorMethod<[[] | [string], Id, PaymentMethod], Invoice>,
   'notifyCustomer' : ActorMethod<
     [CustomerNotificationInput],
     CustomerNotificationResult
   >,
+  'openShift' : ActorMethod<[[] | [string], OpenShiftInput], Shift>,
   'payTechnicianCommission' : ActorMethod<
-    [CommissionPaymentInput],
+    [[] | [string], CommissionPaymentInput],
     CommissionPayment
   >,
   'prepareWhatsAppMessage' : ActorMethod<
     [WhatsAppMessageInput],
     WhatsAppMessageResult
   >,
-  'registerInstallmentPayment' : ActorMethod<[Id, bigint], Invoice>,
-  'registerPayment' : ActorMethod<[PaymentInput], Payment>,
+  'registerCashMovement' : ActorMethod<
+    [[] | [string], CashMovementInput],
+    CashMovement
+  >,
+  'registerInstallmentPayment' : ActorMethod<
+    [[] | [string], Id, bigint],
+    Invoice
+  >,
+  'registerPayment' : ActorMethod<[[] | [string], PaymentInput], Payment>,
   'registerReceivablePayment' : ActorMethod<
-    [ReceivablePaymentInput],
+    [[] | [string], ReceivablePaymentInput],
     ReceivablePayment
   >,
-  'removeLabor' : ActorMethod<[Id, Id], OrderView>,
-  'removeOrderPart' : ActorMethod<[Id, Id], OrderView>,
-  'removeOrderPhoto' : ActorMethod<[Id, Id], OrderView>,
-  'runPurchaseInvoiceExtraction' : ActorMethod<[Id], PurchaseInvoice>,
+  'removeLabor' : ActorMethod<[[] | [string], Id, Id], OrderView>,
+  'removeOrderPart' : ActorMethod<[[] | [string], Id, Id], OrderView>,
+  'removeOrderPhoto' : ActorMethod<[[] | [string], Id, Id], OrderView>,
+  'resetUserPassword' : ActorMethod<[[] | [string], Id], ResetPasswordResult>,
+  /**
+   * / Restaura **una** sección del archivo de copia local, sobrescribiendo solo
+   * / esa colección. `index` es la posición dentro de `manifest.sections`
+   * / (el mismo orden de `SECTION_KEYS`). El frontend llama una vez por sección
+   * / seleccionada, de modo que ninguna llamada procesa el archivo completo y
+   * / se respeta el límite de instrucciones por mensaje.
+   * /
+   * / Un archivo inválido, una versión incompatible o una sección con formato
+   * / incorrecto se rechazan con un error tipado **sin alterar los datos**.
+   */
+  'restoreSection' : ActorMethod<
+    [[] | [string], string, bigint],
+    RestoreSectionOutcome
+  >,
+  'runPurchaseInvoiceExtraction' : ActorMethod<
+    [[] | [string], Id],
+    PurchaseInvoice
+  >,
   'saveCallerUserProfile' : ActorMethod<[string], UserProfile>,
   'schema' : ActorMethod<[], string>,
-  'setUserRole' : ActorMethod<[Principal, UserRole], UserView>,
+  'setUserActive' : ActorMethod<[[] | [string], Id, boolean], UserListItem>,
   /**
    * / Inicia la autorización OAuth (PKCE) de la cuenta propia del
    * / administrador.
    */
-  'startDriveAuthorization' : ActorMethod<[], DriveAuthStart>,
+  'startDriveAuthorization' : ActorMethod<[[] | [string]], DriveAuthStart>,
   'transform' : ActorMethod<[TransformationInput], TransformationOutput>,
-  'unassignTechnician' : ActorMethod<[Id, Id], OrderView>,
-  'updateAppointment' : ActorMethod<[Id, AppointmentInput], Appointment>,
-  'updateAppointmentStatus' : ActorMethod<[Id, AppointmentStatus], Appointment>,
-  'updateBusinessSettings' : ActorMethod<[BusinessSettings], BusinessSettings>,
+  'unassignTechnician' : ActorMethod<[[] | [string], Id, Id], OrderView>,
+  'updateAppointment' : ActorMethod<
+    [[] | [string], Id, AppointmentInput],
+    Appointment
+  >,
+  'updateAppointmentStatus' : ActorMethod<
+    [[] | [string], Id, AppointmentStatus],
+    Appointment
+  >,
+  'updateBusinessSettings' : ActorMethod<
+    [[] | [string], BusinessSettings],
+    BusinessSettings
+  >,
+  'updateCallerName' : ActorMethod<[string, string], SessionInfo>,
   'updateCompanyProfile' : ActorMethod<
-    [CompanyProfileRawInput],
+    [[] | [string], CompanyProfileRawInput],
     CompanyProfile
   >,
-  'updateCustomer' : ActorMethod<[Id, CustomerInput], Customer>,
-  'updateExpense' : ActorMethod<[Id, ExpenseInput], Expense>,
+  'updateCustomer' : ActorMethod<[[] | [string], Id, CustomerInput], Customer>,
+  'updateExpense' : ActorMethod<[[] | [string], Id, ExpenseInput], Expense>,
   'updateExpenseCategory' : ActorMethod<
-    [Id, ExpenseCategoryInput],
+    [[] | [string], Id, ExpenseCategoryInput],
     ExpenseCategory
   >,
-  'updateLaborTechnician' : ActorMethod<[Id, Id, [] | [Id]], OrderView>,
-  'updateMotorcycle' : ActorMethod<[Id, MotorcycleInput], Motorcycle>,
-  'updateOrderStatus' : ActorMethod<[Id, OrderStatus], OrderView>,
-  'updatePart' : ActorMethod<[Id, PartInput], PartView>,
+  'updateHopeSettings' : ActorMethod<
+    [[] | [string], HopeSettingsRawInput],
+    HopeSettings
+  >,
+  'updateLaborTechnician' : ActorMethod<
+    [[] | [string], Id, Id, [] | [Id]],
+    OrderView
+  >,
+  'updateMotorcycle' : ActorMethod<
+    [[] | [string], Id, MotorcycleInput],
+    Motorcycle
+  >,
+  'updateOrderStatus' : ActorMethod<
+    [[] | [string], Id, OrderStatus],
+    OrderView
+  >,
+  'updatePart' : ActorMethod<[[] | [string], Id, PartInput], PartView>,
   'updatePurchaseInvoiceReview' : ActorMethod<
-    [Id, InvoiceReviewInput],
+    [[] | [string], Id, InvoiceReviewInput],
     PurchaseInvoice
   >,
-  'updateQuote' : ActorMethod<[Id, QuoteInput], QuoteView>,
-  'updateQuoteStatus' : ActorMethod<[Id, QuoteStatus], QuoteView>,
-  'updateService' : ActorMethod<[Id, ServiceInput], Service>,
+  'updateQuote' : ActorMethod<[[] | [string], Id, QuoteInput], QuoteView>,
+  'updateQuoteStatus' : ActorMethod<
+    [[] | [string], Id, QuoteStatus],
+    QuoteView
+  >,
+  'updateRole' : ActorMethod<[[] | [string], Id, RoleInput], Role>,
+  'updateService' : ActorMethod<[[] | [string], Id, ServiceInput], Service>,
   'updateServiceCategory' : ActorMethod<
-    [Id, ServiceCategoryInput],
+    [[] | [string], Id, ServiceCategoryInput],
     ServiceCategory
   >,
-  'updateSupplier' : ActorMethod<[Id, SupplierInput], Supplier>,
-  'updateTechnician' : ActorMethod<[Id, TechnicianInput], Technician>,
-  'zeroInventory' : ActorMethod<[], ZeroInventoryResult>,
-  'zeroServices' : ActorMethod<[], ZeroServicesResult>,
+  'updateServiceTermsSettings' : ActorMethod<
+    [[] | [string], ServiceTermsSettingsRawInput],
+    ServiceTermsSettings
+  >,
+  'updateSupplier' : ActorMethod<[[] | [string], Id, SupplierInput], Supplier>,
+  'updateTechnician' : ActorMethod<
+    [[] | [string], Id, TechnicianInput],
+    Technician
+  >,
+  'updateUserRole' : ActorMethod<[[] | [string], Id, Id], UserListItem>,
+  'updateWarrantyTermsSettings' : ActorMethod<
+    [[] | [string], WarrantyTermsSettingsRawInput],
+    WarrantyTermsSettings
+  >,
+  /**
+   * / Valida un archivo de copia local y devuelve su vista previa (fecha de
+   * / generación y secciones presentes) **sin alterar ningún dato**. El
+   * / frontend la usa para mostrar la confirmación antes de restaurar.
+   * /
+   * / Es una **actualización** (no consulta) porque recibe el contenido del
+   * / archivo como parámetro; no modifica el estado.
+   */
+  'validateRestoreFile' : ActorMethod<
+    [[] | [string], string],
+    RestorePreviewOutcome
+  >,
+  'zeroInventory' : ActorMethod<[[] | [string]], ZeroInventoryResult>,
+  'zeroServices' : ActorMethod<[[] | [string]], ZeroServicesResult>,
 }
 export declare const idlService: IDL.ServiceClass;
 export declare const idlInitArgs: IDL.Type[];

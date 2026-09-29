@@ -21,7 +21,7 @@ import { formatMoney, formatNumber } from "@/lib/format";
 import type { Id, Supplier } from "@/lib/types";
 import { LineMatchStatus } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, ScanLine, Trash2 } from "lucide-react";
 
 /** Sentinel value for the "create a new supplier" option in the select. */
 export const NEW_SUPPLIER_VALUE = "__new__";
@@ -72,6 +72,11 @@ interface InvoiceReviewPanelProps {
   onLineChange: (key: string, patch: Partial<ReviewLine>) => void;
   onAddLine: () => void;
   onRemoveLine: (key: string) => void;
+  /**
+   * Opens the barcode scanner for one line so a scanned code can fill its
+   * code, description and unit cost. Omitted when scanning is unavailable.
+   */
+  onScanLine?: (key: string) => void;
   suppliers: Supplier[];
   suppliersLoading: boolean;
   /** True while the review is being saved to the backend. */
@@ -184,6 +189,7 @@ export function InvoiceReviewPanel({
   onLineChange,
   onAddLine,
   onRemoveLine,
+  onScanLine,
   suppliers,
   suppliersLoading,
   isSaving,
@@ -427,7 +433,7 @@ export function InvoiceReviewPanel({
               <TableHead className="w-[110px] font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 Coincidencia
               </TableHead>
-              <TableHead className="w-[56px] pr-3 text-right font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+              <TableHead className="w-[96px] pr-3 text-right font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                 <span className="sr-only">Acciones</span>
               </TableHead>
             </TableRow>
@@ -566,18 +572,34 @@ export function InvoiceReviewPanel({
                       <MatchBadge status={line.matchStatus} />
                     </TableCell>
                     <TableCell className="align-top pr-3 text-right">
-                      <Button
-                        type="button"
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => onRemoveLine(line.key)}
-                        disabled={confirmed}
-                        aria-label={`Eliminar la línea ${index + 1}`}
-                        data-ocid={`purchase_invoices.line_delete_button.${index + 1}`}
-                        className="size-8 text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 className="size-4" aria-hidden="true" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        {onScanLine ? (
+                          <Button
+                            type="button"
+                            size="icon"
+                            variant="ghost"
+                            onClick={() => onScanLine(line.key)}
+                            disabled={confirmed}
+                            aria-label={`Escanear código para la línea ${index + 1}`}
+                            data-ocid={`purchase_invoices.line_scan_button.${index + 1}`}
+                            className="size-8 text-muted-foreground hover:text-primary"
+                          >
+                            <ScanLine className="size-4" aria-hidden="true" />
+                          </Button>
+                        ) : null}
+                        <Button
+                          type="button"
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => onRemoveLine(line.key)}
+                          disabled={confirmed}
+                          aria-label={`Eliminar la línea ${index + 1}`}
+                          data-ocid={`purchase_invoices.line_delete_button.${index + 1}`}
+                          className="size-8 text-muted-foreground hover:text-destructive"
+                        >
+                          <Trash2 className="size-4" aria-hidden="true" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 );

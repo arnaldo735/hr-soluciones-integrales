@@ -17,7 +17,17 @@ import {
   useCompanyProfile,
   useIvaSettings,
 } from "@/hooks/use-company";
+import { useDailyHopeMessage } from "@/hooks/use-hope";
 import { usePosSale, usePosSales } from "@/hooks/use-pos";
+import {
+  SERVICE_TERMS_DEFAULT_TEXT,
+  useServiceTermsSettings,
+} from "@/hooks/use-service-terms";
+import {
+  companyContactLine,
+  companyFiscalLines,
+  companyHeaderFromProfile,
+} from "@/lib/company-header";
 import { downloadFile } from "@/lib/download";
 import {
   formatDateTime,
@@ -26,6 +36,8 @@ import {
   formatTaxRate,
 } from "@/lib/format";
 import { loadPdfLibs, pdfCompanyFromProfile } from "@/lib/pdf";
+import { drawHopeMessage, hopeMessageContent } from "@/lib/pdf";
+import type { HopeMessageContent } from "@/lib/pdf";
 import type {
   DataColumn,
   DocumentFormat,
@@ -88,6 +100,7 @@ async function buildReceiptPdf(
   lines: DocumentLine[],
   totals: DocumentTotals[],
   footer: string,
+  hope: HopeMessageContent | null,
 ): Promise<jsPDF> {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const narrow = format === "receipt80";
@@ -211,11 +224,15 @@ async function buildReceiptPdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(narrow ? 6 : 7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(
-    doc.splitTextToSize(footer, right - margin),
-    margin,
-    afterTotals + (narrow ? 6 : 10),
-  );
+  const footerY = afterTotals + (narrow ? 6 : 10);
+  const footerLines = doc.splitTextToSize(footer, right - margin);
+  doc.text(footerLines, margin, footerY);
+  drawHopeMessage(doc, hope, {
+    x: margin,
+    right,
+    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    narrow,
+  });
 
   return doc;
 }
@@ -230,12 +247,24 @@ function ReceiptDialog({
   const saleQuery = usePosSale(saleId);
   const businessQuery = useBusinessSettings();
   const companyQuery = useCompanyProfile();
+  const dailyHopeQuery = useDailyHopeMessage();
+  const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
+  const serviceTermsQuery = useServiceTermsSettings();
   const { isIvaResponsible } = useIvaSettings();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const sale = saleQuery.data ?? null;
   const business = businessQuery.data ?? null;
-  const companyLogoUrl = companyQuery.data?.logoUrl ?? undefined;
+
+  // Complete company identity for the reprinted receipt: logo, razón social,
+  // NIT con dígito de verificación, régimen, responsabilidad, dirección,
+  // ciudad, teléfono, correo y web. Unconfigured fields are omitted cleanly.
+  const companyHeader = companyHeaderFromProfile(companyQuery.data);
+  const receiptCompanyName =
+    companyHeader?.legalName ?? business?.name ?? "HR SOLUCIONES INTEGRALES";
+  const receiptCompanyLogoUrl = companyHeader?.logoUrl;
+  const receiptCompanyContact = companyContactLine(companyHeader);
+  const receiptCompanyFiscal = companyFiscalLines(companyHeader);
 
   const lines: DocumentLine[] = (sale?.lines ?? []).map((line) => ({
     description: line.description,
@@ -273,7 +302,12 @@ function ReceiptDialog({
       ]
     : [];
 
-  const receiptFooter = "Gracias por su compra. Conserve este comprobante.";
+  // Pie de página editable "Términos y condiciones del Servicio". Mientras la
+  // configuración carga, o cuando el administrador la dejó vacía, se usa el
+  // texto de recepción por defecto para que el comprobante nunca quede sin pie.
+  const serviceTermsText = serviceTermsQuery.data?.text?.trim() ?? "";
+  const receiptFooter =
+    serviceTermsText !== "" ? serviceTermsText : SERVICE_TERMS_DEFAULT_TEXT;
 
   async function handleDownloadPdf(nextFormat: DocumentFormat) {
     if (!sale) return;
@@ -288,6 +322,7 @@ function ReceiptDialog({
         lines,
         totals,
         receiptFooter,
+        hopeMessage,
       );
       await downloadFile({
         filename: `Comprobante-${sale.saleNumber}.pdf`,
@@ -346,19 +381,15 @@ function ReceiptDialog({
             <DocumentPreview
               title="Comprobante"
               number={sale.saleNumber}
-              companyName={business?.name ?? "HR SOLUCIONES INTEGRALES"}
-              companyLogoUrl={companyLogoUrl}
-              companyContact={
-                business
-                  ? [business.address, business.phone]
-                      .filter((value) => value.length > 0)
-                      .join(" · ")
-                  : undefined
-              }
+              companyName={receiptCompanyName}
+              companyLogoUrl={receiptCompanyLogoUrl}
+              companyContact={receiptCompanyContact}
+              companyFiscal={receiptCompanyFiscal}
               meta={meta}
               lines={lines}
               totals={totals}
               footer={receiptFooter}
+              hopeMessage={hopeMessage}
               format="a4"
               ocid="pos_history.receipt_a4"
               onDownloadPdf={handleDownloadPdf}
@@ -367,12 +398,15 @@ function ReceiptDialog({
             <DocumentPreview
               title="Comprobante"
               number={sale.saleNumber}
-              companyName={business?.name ?? "HR SOLUCIONES INTEGRALES"}
-              companyLogoUrl={companyLogoUrl}
+              companyName={receiptCompanyName}
+              companyLogoUrl={receiptCompanyLogoUrl}
+              companyContact={receiptCompanyContact}
+              companyFiscal={receiptCompanyFiscal}
               meta={meta}
               lines={lines}
               totals={totals}
-              footer="Gracias por su compra."
+              footer={receiptFooter}
+              hopeMessage={hopeMessage}
               format="receipt80"
               ocid="pos_history.receipt_80mm"
               onDownloadPdf={handleDownloadPdf}

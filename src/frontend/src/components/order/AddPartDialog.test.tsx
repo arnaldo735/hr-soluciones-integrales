@@ -44,6 +44,7 @@ function part(overrides: Partial<PartView> = {}): PartView {
     createdAt: 1_700_000_000_000_000_000n,
     unit: "pza",
     totalStock: 8n,
+    barcode: "",
     category: "Frenos",
     salePrice: 25000n,
     brand: "Genérico",
@@ -139,6 +140,11 @@ describe("AddPartDialog", () => {
 
     renderWithProviders(
       <AddPartDialog orderId={42n} open onOpenChange={vi.fn()} />,
+    );
+
+    await userEvent.type(
+      screen.getByTestId("order_detail.add_part.search_input"),
+      "a",
     );
 
     const list = within(
@@ -287,18 +293,21 @@ describe("AddPartDialog", () => {
     });
   });
 
-  it("shows the empty catalog state when no parts exist", async () => {
-    listPartsMock.mockReturnValue(loadedParts([]));
-
+  it("shows the write-a-term prompt before anything is typed", async () => {
     renderWithProviders(
       <AddPartDialog orderId={42n} open onOpenChange={vi.fn()} />,
     );
 
+    // The catalog is only searched on demand, so the empty state is a prompt
+    // rather than a list of every part.
     expect(
-      await screen.findByText(
-        "No hay repuestos con existencia disponible en el inventario.",
-      ),
-    ).toBeInTheDocument();
+      await screen.findByTestId("order_detail.add_part.prompt_state"),
+    ).toHaveTextContent(
+      "Escribe el SKU o el nombre del repuesto para ver coincidencias.",
+    );
+    expect(
+      screen.queryByTestId("order_detail.add_part.list"),
+    ).not.toBeInTheDocument();
     expect(
       screen.getByTestId("order_detail.add_part.submit_button"),
     ).toBeDisabled();

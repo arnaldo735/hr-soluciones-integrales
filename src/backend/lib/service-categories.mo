@@ -1,4 +1,3 @@
-import Char "mo:core/Char";
 import List "mo:core/List";
 import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
@@ -8,6 +7,7 @@ import Time "mo:core/Time";
 import Common "../types/common";
 import Types "../types/service-categories";
 import ServiceTypes "../types/services";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -23,7 +23,7 @@ module {
   // --- helpers -------------------------------------------------------------
 
   func normalize(name : Text) : Text {
-    name.trim(#predicate (func(c : Char) : Bool { c.isWhitespace() })).toLower();
+    Search.normalize(name);
   };
 
   func matches(category : Types.ServiceCategory, needle : ?Text) : Bool {
@@ -31,7 +31,7 @@ module {
       case null { true };
       case (?n) {
         if (n == "") { true } else {
-          category.name.toLower().contains(#text n) or category.description.toLower().contains(#text n);
+          Search.containsAny([category.name, category.description], n);
         };
       };
     };
@@ -96,7 +96,7 @@ module {
       if (matches(category, needle)) { matched.add(usageFrom(category, usage)) };
     };
     matched.toArray().sort(
-      func (a, b) = Text.compare(a.category.name.toLower(), b.category.name.toLower())
+      func (a, b) = Text.compare(Search.sortKey(a.category.name), Search.sortKey(b.category.name))
     );
   };
 

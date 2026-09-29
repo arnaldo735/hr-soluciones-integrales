@@ -14,11 +14,14 @@ import {
   FileSpreadsheet,
   FileText,
   HandCoins,
+  KeyRound,
+  Landmark,
   LayoutDashboard,
   Package,
   Receipt,
   ScanBarcode,
   Settings,
+  ShieldCheck,
   ShoppingCart,
   Tags,
   Truck,
@@ -34,6 +37,11 @@ interface FlowModule {
   to: string;
   icon: LucideIcon;
   adminOnly: boolean;
+  /**
+   * Clave de módulo del backend que habilita esta entrada. `null` significa que
+   * la entrada no depende de un módulo del rol (p. ej. el panel de resumen).
+   */
+  moduleKey: string | null;
 }
 
 interface FlowGroup {
@@ -58,6 +66,7 @@ const NAV_FLOWS: FlowGroup[] = [
         to: "/",
         icon: LayoutDashboard,
         adminOnly: false,
+        moduleKey: null,
       },
     ],
   },
@@ -71,9 +80,22 @@ const NAV_FLOWS: FlowGroup[] = [
         to: "/ordenes",
         icon: ClipboardList,
         adminOnly: false,
+        moduleKey: "workshop",
       },
-      { label: "Citas", to: "/citas", icon: CalendarClock, adminOnly: false },
-      { label: "Técnicos", to: "/tecnicos", icon: Users, adminOnly: false },
+      {
+        label: "Citas",
+        to: "/citas",
+        icon: CalendarClock,
+        adminOnly: false,
+        moduleKey: "appointments",
+      },
+      {
+        label: "Técnicos",
+        to: "/tecnicos",
+        icon: Users,
+        adminOnly: false,
+        moduleKey: "technicians",
+      },
     ],
   },
   {
@@ -86,31 +108,42 @@ const NAV_FLOWS: FlowGroup[] = [
         to: "/inventario",
         icon: Package,
         adminOnly: false,
+        moduleKey: "inventory",
       },
-      { label: "Servicios", to: "/servicios", icon: Wrench, adminOnly: false },
+      {
+        label: "Servicios",
+        to: "/servicios",
+        icon: Wrench,
+        adminOnly: false,
+        moduleKey: "services",
+      },
       {
         label: "Categorías de servicios",
         to: "/servicios/categorias",
         icon: Tags,
         adminOnly: true,
+        moduleKey: "serviceCategories",
       },
       {
         label: "Clientes y motos",
         to: "/clientes",
         icon: Users,
         adminOnly: false,
+        moduleKey: "customers",
       },
       {
         label: "Motocicletas",
         to: "/motos",
         icon: Bike,
         adminOnly: true,
+        moduleKey: "motorcycles",
       },
       {
         label: "Proveedores",
         to: "/proveedores",
         icon: Truck,
         adminOnly: true,
+        moduleKey: "suppliers",
       },
     ],
   },
@@ -124,13 +157,21 @@ const NAV_FLOWS: FlowGroup[] = [
         to: "/cotizaciones",
         icon: FileText,
         adminOnly: false,
+        moduleKey: "quotes",
       },
-      { label: "Facturas", to: "/facturas", icon: Receipt, adminOnly: true },
+      {
+        label: "Facturas",
+        to: "/facturas",
+        icon: Receipt,
+        adminOnly: true,
+        moduleKey: "billing",
+      },
       {
         label: "POS mostrador",
         to: "/pos",
         icon: ScanBarcode,
         adminOnly: false,
+        moduleKey: "pos",
       },
     ],
   },
@@ -139,18 +180,26 @@ const NAV_FLOWS: FlowGroup[] = [
     label: "Compras",
     icon: Truck,
     modules: [
-      { label: "Compras", to: "/proveedores", icon: Truck, adminOnly: true },
+      {
+        label: "Compras",
+        to: "/proveedores",
+        icon: Truck,
+        adminOnly: true,
+        moduleKey: "purchases",
+      },
       {
         label: "Facturas de compra",
         to: "/facturas-compra",
         icon: Receipt,
         adminOnly: true,
+        moduleKey: "purchaseInvoices",
       },
       {
         label: "Cuentas por pagar",
         to: "/proveedores",
         icon: Wallet,
         adminOnly: true,
+        moduleKey: "payables",
       },
     ],
   },
@@ -159,43 +208,82 @@ const NAV_FLOWS: FlowGroup[] = [
     label: "Administración",
     icon: Settings,
     modules: [
-      { label: "Empresa", to: "/empresa", icon: Building2, adminOnly: true },
-      { label: "Gastos", to: "/gastos", icon: Banknote, adminOnly: true },
+      {
+        label: "Empresa",
+        to: "/empresa",
+        icon: Building2,
+        adminOnly: true,
+        moduleKey: "company",
+      },
+      {
+        label: "Gastos",
+        to: "/gastos",
+        icon: Banknote,
+        adminOnly: true,
+        moduleKey: "expenses",
+      },
       {
         label: "Comisiones y préstamos",
         to: "/comisiones",
         icon: HandCoins,
         adminOnly: true,
+        moduleKey: "commissions",
       },
       {
         label: "Contabilidad",
         to: "/contabilidad",
         icon: FileSpreadsheet,
         adminOnly: true,
+        moduleKey: "accounting",
+      },
+      {
+        label: "Caja y bancos",
+        to: "/caja",
+        icon: Landmark,
+        adminOnly: true,
+        moduleKey: "cash",
       },
       {
         label: "Cuentas por cobrar",
         to: "/cuentas-por-cobrar",
         icon: HandCoins,
         adminOnly: true,
+        moduleKey: "receivables",
       },
       {
         label: "Cuentas por pagar",
         to: "/cuentas-por-pagar",
         icon: Wallet,
         adminOnly: true,
+        moduleKey: "payables",
+      },
+      {
+        label: "Usuarios",
+        to: "/configuracion/usuarios",
+        icon: Users,
+        adminOnly: true,
+        moduleKey: "users",
+      },
+      {
+        label: "Roles",
+        to: "/configuracion/roles",
+        icon: ShieldCheck,
+        adminOnly: true,
+        moduleKey: "roles",
       },
       {
         label: "Configuración",
         to: "/configuracion",
         icon: Settings,
         adminOnly: true,
+        moduleKey: "settings",
       },
       {
         label: "Respaldos en Drive",
         to: "/configuracion",
         icon: CloudUpload,
         adminOnly: true,
+        moduleKey: "settings",
       },
     ],
   },
@@ -240,7 +328,7 @@ interface AppSidebarProps {
 }
 
 export function AppSidebar({ onNavigate }: AppSidebarProps) {
-  const { isAdmin } = useRole();
+  const { isAdmin, modules } = useRole();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
@@ -274,9 +362,16 @@ export function AppSidebar({ onNavigate }: AppSidebarProps) {
     );
   }, []);
 
+  // Con una sesión de contraseña, los módulos permitidos del rol deciden qué
+  // entradas se ven; sin sesión (Internet Identity) se conserva la regla de
+  // administrador. Las entradas sin módulo (el panel) siempre están visibles.
   const visibleFlows = NAV_FLOWS.map((flow) => ({
     ...flow,
-    modules: flow.modules.filter((module) => !module.adminOnly || isAdmin),
+    modules: flow.modules.filter((module) => {
+      if (module.moduleKey === null) return true;
+      if (modules !== null) return modules.includes(module.moduleKey);
+      return !module.adminOnly || isAdmin;
+    }),
   })).filter((flow) => flow.modules.length > 0);
 
   return (

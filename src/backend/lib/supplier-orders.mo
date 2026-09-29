@@ -7,6 +7,7 @@ import Time "mo:core/Time";
 import Common "../types/common";
 import Types "../types/supplier-orders";
 import PurchasingTypes "../types/purchasing";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -20,7 +21,7 @@ module {
   };
 
   func matches(haystack : Text, needle : Text) : Bool {
-    haystack.toLower().contains(#text (needle.toLower()));
+    Search.contains(haystack, needle);
   };
 
   // Lista los pedidos a proveedor, filtrando por proveedor y por búsqueda en

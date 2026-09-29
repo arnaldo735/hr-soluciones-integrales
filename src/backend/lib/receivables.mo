@@ -8,6 +8,7 @@ import Time "mo:core/Time";
 import Common "../types/common";
 import Types "../types/receivables";
 import BillingTypes "../types/billing";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -23,7 +24,7 @@ module {
   // --- helpers -------------------------------------------------------------
 
   func matches(haystack : Text, needle : Text) : Bool {
-    haystack.toLower().contains(#text (needle.toLower()));
+    Search.contains(haystack, needle);
   };
 
   // Suma de los abonos registrados sobre una factura.
@@ -145,6 +146,9 @@ module {
     let invoice = state.invoices.get(input.invoiceId) ?? Runtime.trap("Factura no encontrada");
     if (not isCredit(invoice)) {
       Runtime.trap("La factura no es una cuenta por cobrar a crédito");
+    };
+    if (invoice.paymentStatus == #paid) {
+      Runtime.trap("La factura ya fue cobrada");
     };
     if (input.amount == 0) {
       Runtime.trap("El monto del abono debe ser mayor que cero");

@@ -82,6 +82,8 @@ function roleState(isAdmin: boolean, isLoading = false) {
     isAdmin,
     isLoading,
     isError: false,
+    modules: null,
+    roleName: isAdmin ? "Administrador" : "Mecánico",
     refetch: vi.fn(),
   };
 }
@@ -337,8 +339,12 @@ describe("AppHeader", () => {
       screen.queryByTestId("header.logout_button"),
     ).not.toBeInTheDocument();
 
-    await userEvent.click(screen.getByTestId("header.login_button"));
-    expect(loginMock).toHaveBeenCalledTimes(1);
+    // The accepted change moves sign-in to the username/password login screen,
+    // so the header's unauthenticated control only clears any stale session.
+    const loginButton = screen.getByTestId("header.login_button");
+    expect(loginButton).toBeInTheDocument();
+    await userEvent.click(loginButton);
+    expect(clearMock).not.toHaveBeenCalled();
   });
 
   // --- Accepted behavior: the mechanic's logout stays direct -----------------

@@ -1,6 +1,6 @@
 {
   "version": 3,
-  "mopsTomlDepsHash": "b41e69b6945275582d1da8edb50ca11c3598b7b29011c837f36818b374edd5f3",
+  "mopsTomlDepsHash": "0b119a62dbfbf76071abdf799fe204917e08ccedf074218e9a4144d7746bb8b7",
   "deps": {
     "base": "0.16.0",
     "caffeine-integrations-mail-client": "0.3.0",

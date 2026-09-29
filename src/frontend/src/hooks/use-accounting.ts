@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   AccountingPeriod,
@@ -42,6 +43,8 @@ function toProfitBreakdownView(profit: ProfitBreakdown): ProfitBreakdownView {
     parts: toProfitBlockView("parts", profit.parts),
     services: toProfitBlockView("services", profit.services),
     total: toProfitBlockView("total", profit.total),
+    totalCommission: profit.totalCommission,
+    netProfit: profit.netProfit,
     serviceLines: profit.serviceLines.map(
       (line, index): ServiceProfitLineView => ({
         key: `${line.invoiceId.toString()}-${index}`,
@@ -63,6 +66,7 @@ function toProfitBreakdownView(profit: ProfitBreakdown): ProfitBreakdownView {
 /** Aggregated income, expenses and profit for a period. */
 export function useAccountingSummary(period: AccountingPeriod) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: [
@@ -72,7 +76,7 @@ export function useAccountingSummary(period: AccountingPeriod) {
     ],
     queryFn: async (): Promise<AccountingSummary | null> => {
       if (!actor) return null;
-      return actor.getAccountingSummary(period);
+      return actor.getAccountingSummary(token, period);
     },
     enabled: !!actor && !isFetching,
   });
@@ -85,6 +89,7 @@ export function useAccountingSummary(period: AccountingPeriod) {
  */
 export function useAccountingReport(period: AccountingPeriod) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: [
@@ -94,7 +99,7 @@ export function useAccountingReport(period: AccountingPeriod) {
     ],
     queryFn: async (): Promise<AccountingReportView | null> => {
       if (!actor) return null;
-      const report = await actor.getAccountingReport(period);
+      const report = await actor.getAccountingReport(token, period);
       return {
         ...report,
         profit: toProfitBreakdownView(report.profit),
@@ -111,12 +116,13 @@ export function useAccountingReport(period: AccountingPeriod) {
  */
 export function useInventoryValuation() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["inventory-valuation"],
     queryFn: async (): Promise<InventoryValuation | null> => {
       if (!actor) return null;
-      return actor.getInventoryValuation();
+      return actor.getInventoryValuation(token);
     },
     enabled: !!actor && !isFetching,
   });
@@ -125,6 +131,7 @@ export function useInventoryValuation() {
 /** Raw ledger entries for a period. */
 export function useLedgerEntries(period: AccountingPeriod) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: [
@@ -134,7 +141,7 @@ export function useLedgerEntries(period: AccountingPeriod) {
     ],
     queryFn: async (): Promise<LedgerEntry[]> => {
       if (!actor) return [];
-      return actor.listLedgerEntries(period);
+      return actor.listLedgerEntries(token, period);
     },
     enabled: !!actor && !isFetching,
   });

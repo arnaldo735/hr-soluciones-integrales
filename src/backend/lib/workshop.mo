@@ -10,6 +10,7 @@ import CustomerTypes "../types/customers";
 import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
 import ServiceTypes "../types/services";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -148,19 +149,17 @@ module {
   };
 
   func matchesSearch(state : State, order : Types.WorkshopOrder, term : Text) : Bool {
-    let lower = term.toLower();
-    if (order.orderNumber.toLower().contains(#text lower)) { return true };
+    let needle = Search.normalize(term);
+    if (Search.contains(order.orderNumber, needle)) { return true };
     switch (state.customers.get(order.customerId)) {
       case (?customer) {
-        if (customer.name.toLower().contains(#text lower)) { return true };
+        if (Search.contains(customer.name, needle)) { return true };
       };
       case null {};
     };
     switch (state.motorcycles.get(order.motorcycleId)) {
       case (?moto) {
-        if (moto.plate.toLower().contains(#text lower)) { return true };
-        if (moto.brand.toLower().contains(#text lower)) { return true };
-        if (moto.model.toLower().contains(#text lower)) { return true };
+        if (Search.containsAny([moto.plate, moto.brand, moto.model], needle)) { return true };
       };
       case null {};
     };

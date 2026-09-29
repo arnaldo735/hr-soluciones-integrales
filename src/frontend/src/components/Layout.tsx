@@ -1,12 +1,34 @@
 import { AppHeader } from "@/components/AppHeader";
 import { AppSidebar } from "@/components/AppSidebar";
-import { Button } from "@/components/ui/button";
+import { LoginScreen } from "@/components/LoginScreen";
+import { RemindersDialog } from "@/components/RemindersDialog";
 import { Sheet, SheetContent, SheetTitle } from "@/components/ui/sheet";
 import { Toaster } from "@/components/ui/sonner";
-import { useInternetIdentity } from "@caffeineai/core-infrastructure";
+import { useAuth } from "@/hooks/use-auth";
+import { hasAnyReminder, useRemindersSummary } from "@/hooks/use-reminders";
 import { Outlet } from "@tanstack/react-router";
-import { LogIn, Wrench } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+/** Marca de sesión: el diálogo de recordatorios ya se cerró en esta sesión. */
+const REMINDERS_DISMISSED_KEY = "hr-reminders-dismissed";
+
+function readRemindersDismissed(): boolean {
+  if (typeof window === "undefined") return false;
+  try {
+    return window.sessionStorage.getItem(REMINDERS_DISMISSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function writeRemindersDismissed() {
+  if (typeof window === "undefined") return;
+  try {
+    window.sessionStorage.setItem(REMINDERS_DISMISSED_KEY, "1");
+  } catch {
+    // La persistencia es best-effort; el diálogo igual se cierra en memoria.
+  }
+}
 
 function AttributionFooter() {
   return (
@@ -26,45 +48,44 @@ function AttributionFooter() {
   );
 }
 
-function LoginGate() {
-  const { login, isLoggingIn } = useInternetIdentity();
-  return (
-    <div
-      data-ocid="auth.login_state"
-      className="flex min-h-screen flex-col items-center justify-center gap-6 bg-background px-6 text-center"
-    >
-      <div className="flex size-14 items-center justify-center rounded-lg border border-border bg-card shadow-elevated">
-        <Wrench className="size-7 text-primary" aria-hidden="true" />
-      </div>
-      <div className="max-w-sm space-y-2">
-        <h1 className="font-display text-2xl font-semibold tracking-tight">
-          HR SOLUCIONES INTEGRALES
-        </h1>
-        <p className="text-sm text-muted-foreground">
-          Control de inventario, órdenes de taller y facturación para tu taller
-          de motocicletas. Inicia sesión para continuar.
-        </p>
-      </div>
-      <Button
-        type="button"
-        size="lg"
-        onClick={() => login()}
-        disabled={isLoggingIn}
-        data-ocid="auth.login_button"
-        className="gap-2"
-      >
-        <LogIn className="size-4" aria-hidden="true" />
-        {isLoggingIn ? "Conectando…" : "Iniciar sesión"}
-      </Button>
-    </div>
-  );
-}
-
 export function Layout() {
-  const { isAuthenticated, isInitializing } = useInternetIdentity();
+  const { isAuthenticated, isRestoring } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isRemindersOpen, setIsRemindersOpen] = useState(false);
+  const [isRemindersDismissed, setIsRemindersDismissed] = useState(
+    readRemindersDismissed,
+  );
+  const reminders = useRemindersSummary();
 
-  if (isInitializing) {
+  // Muestra el diálogo al iniciar sesión y cada vez que la pestaña vuelve a
+  // estar visible, salvo que el usuario ya lo haya cerrado en esta sesión.
+  useEffect(() => {
+    if (!isAuthenticated || isRemindersDismissed) return;
+    if (!hasAnyReminder(reminders.data)) return;
+
+    setIsRemindersOpen(true);
+
+    function handleVisibility() {
+      if (document.visibilityState === "visible") {
+        setIsRemindersOpen(true);
+      }
+    }
+
+    document.addEventListener("visibilitychange", handleVisibility);
+    return () => {
+      document.removeEventListener("visibilitychange", handleVisibility);
+    };
+  }, [isAuthenticated, isRemindersDismissed, reminders.data]);
+
+  function handleRemindersOpenChange(next: boolean) {
+    setIsRemindersOpen(next);
+    if (!next) {
+      writeRemindersDismissed();
+      setIsRemindersDismissed(true);
+    }
+  }
+
+  if (isRestoring) {
     return (
       <div
         data-ocid="app.loading_state"
@@ -83,7 +104,7 @@ export function Layout() {
   if (!isAuthenticated) {
     return (
       <>
-        <LoginGate />
+        <LoginScreen />
         <Toaster />
       </>
     );
@@ -114,6 +135,10 @@ export function Layout() {
         </main>
         <AttributionFooter />
       </div>
+      <RemindersDialog
+        open={isRemindersOpen}
+        onOpenChange={handleRemindersOpenChange}
+      />
       <Toaster />
     </div>
   );

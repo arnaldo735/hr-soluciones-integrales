@@ -18,6 +18,7 @@ import PdfText "../lib/pdf-text";
 import Types "../types/purchase-invoice-intake";
 import InventoryTypes "../types/inventory";
 import PurchasingTypes "../types/purchasing";
+import Search "../lib/search";
 
 module {
   public type State = {
@@ -58,7 +59,7 @@ module {
   };
 
   func contains(haystack : Text, needle : Text) : Bool {
-    haystack.toLower().contains(#text (needle.toLower()));
+    Search.contains(haystack, needle);
   };
 
   // ── Normalización de números y fechas ───────────────────────────────────
@@ -472,10 +473,10 @@ module {
   // ── Búsqueda de repuestos ───────────────────────────────────────────────
 
   func findPartByCode(state : State, code : Text) : ?InventoryTypes.Part {
-    let needle = trim(code).toLower();
+    let needle = Search.normalize(code);
     if (needle == "") { return null };
     for (part in state.parts.values()) {
-      if (part.sku.toLower() == needle) { return ?part };
+      if (Search.equals(part.sku, needle)) { return ?part };
     };
     null;
   };
@@ -845,6 +846,7 @@ module {
             let part : InventoryTypes.Part = {
               id;
               sku = code;
+              barcode = "";
               name = if (isBlank(line.description)) { code } else { line.description };
               category = "";
               brand = "";
@@ -1004,7 +1006,7 @@ module {
       case (#invoiceNumber) {
         let na = a.invoiceNumber ?? "";
         let nb = b.invoiceNumber ?? "";
-        Text.compare(na.toLower(), nb.toLower());
+        Text.compare(Search.sortKey(na), Search.sortKey(nb));
       };
     };
   };

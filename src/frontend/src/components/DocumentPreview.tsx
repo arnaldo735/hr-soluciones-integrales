@@ -35,6 +35,12 @@ interface DocumentPreviewProps {
   totals: DocumentTotals[];
   /** Optional footer note. */
   footer?: string;
+  /**
+   * Optional daily hope promise rendered below the footer note, in small
+   * italic type with its citation. When absent, disabled or empty, nothing is
+   * rendered and the document keeps its current layout without empty space.
+   */
+  hopeMessage?: { text: string; citation: string } | null;
   /** Paper width: A4 sheet or 80mm receipt roll. */
   format: DocumentFormat;
   /** ocid prefix for deterministic markers. */
@@ -78,6 +84,7 @@ export function DocumentPreview({
   lines,
   totals,
   footer,
+  hopeMessage,
   format,
   ocid,
   onFormatChange,
@@ -114,6 +121,11 @@ export function DocumentPreview({
   const fiscalLines = (companyFiscal ?? []).filter(
     (line) => line.trim() !== "",
   );
+
+  // The 80mm roll is too narrow for a two-column header: the company identity
+  // and the title/number block stack and center. A4 keeps its left/right
+  // header untouched.
+  const isNarrow = activeFormat === "receipt80";
 
   return (
     <div data-ocid={ocid} className="space-y-4">
@@ -178,8 +190,22 @@ export function DocumentPreview({
             activeFormat === "a4" ? "doc-preview-a4" : "doc-preview-80mm",
           )}
         >
-          <header className="flex items-start justify-between gap-4">
-            <div className="flex min-w-0 items-start gap-3">
+          <header
+            className={cn(
+              "doc-header flex gap-4",
+              isNarrow
+                ? "flex-col items-center gap-3 text-center"
+                : "items-start justify-between",
+            )}
+          >
+            <div
+              className={cn(
+                "doc-header-identity flex min-w-0 gap-3",
+                isNarrow
+                  ? "w-full flex-col items-center gap-2 text-center"
+                  : "items-start",
+              )}
+            >
               {companyLogoUrl ? (
                 <img
                   src={companyLogoUrl}
@@ -188,7 +214,12 @@ export function DocumentPreview({
                   className="size-12 shrink-0 object-contain"
                 />
               ) : null}
-              <div className="min-w-0">
+              <div
+                className={cn(
+                  "min-w-0",
+                  isNarrow ? "w-full space-y-1" : undefined,
+                )}
+              >
                 <p className="doc-title font-display text-lg font-bold tracking-tight">
                   {companyName}
                 </p>
@@ -198,7 +229,7 @@ export function DocumentPreview({
                 {fiscalLines.length > 0 ? (
                   <div
                     data-ocid={`${ocid}.fiscal_block`}
-                    className="mt-1 space-y-0.5"
+                    className={cn("space-y-0.5", isNarrow ? "mt-0" : "mt-1")}
                   >
                     {fiscalLines.map((line) => (
                       <p key={line} className="doc-meta text-xs">
@@ -209,7 +240,12 @@ export function DocumentPreview({
                 ) : null}
               </div>
             </div>
-            <div className="text-right">
+            <div
+              className={cn(
+                "doc-header-title",
+                isNarrow ? "w-full text-center" : "text-right",
+              )}
+            >
               <p className="font-display text-sm font-semibold uppercase tracking-wider">
                 {title}
               </p>
@@ -281,6 +317,19 @@ export function DocumentPreview({
               <div className="doc-rule my-3" />
               <p className="doc-meta text-center text-[10px]">{footer}</p>
             </>
+          ) : null}
+
+          {hopeMessage ? (
+            <div
+              data-ocid={`${ocid}.hope_message`}
+              className="doc-hope mt-3"
+              aria-label="Mensaje de esperanza"
+            >
+              <p className="doc-hope-text">{hopeMessage.text}</p>
+              {hopeMessage.citation ? (
+                <p className="doc-hope-citation">{hopeMessage.citation}</p>
+              ) : null}
+            </div>
           ) : null}
         </div>
       </div>

@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   CommissionLine,
@@ -23,13 +24,14 @@ export function useCommissionLines(
   period: CommissionPeriod,
 ) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const [from, to] = periodKey(period);
 
   return useQuery({
     queryKey: ["commission-lines", technicianId?.toString() ?? "all", from, to],
     queryFn: async (): Promise<CommissionLine[]> => {
       if (!actor) return [];
-      return actor.listCommissionLines(technicianId, period);
+      return actor.listCommissionLines(token, technicianId, period);
     },
     enabled: !!actor && !isFetching,
   });
@@ -41,6 +43,7 @@ export function useTechnicianCommissionSummary(
   period: CommissionPeriod,
 ) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const [from, to] = periodKey(period);
 
   return useQuery({
@@ -52,7 +55,7 @@ export function useTechnicianCommissionSummary(
     ],
     queryFn: async (): Promise<TechnicianCommissionSummary | null> => {
       if (!actor || technicianId === null) return null;
-      return actor.getTechnicianCommissionSummary(technicianId, period);
+      return actor.getTechnicianCommissionSummary(token, technicianId, period);
     },
     enabled: !!actor && !isFetching && technicianId !== null,
   });
@@ -61,13 +64,14 @@ export function useTechnicianCommissionSummary(
 /** General commission report across every technician for a period. */
 export function useCommissionReport(period: CommissionPeriod) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const [from, to] = periodKey(period);
 
   return useQuery({
     queryKey: ["commission-report", from, to],
     queryFn: async (): Promise<CommissionReport | null> => {
       if (!actor) return null;
-      return actor.getCommissionReport(period);
+      return actor.getCommissionReport(token, period);
     },
     enabled: !!actor && !isFetching,
   });
@@ -79,6 +83,7 @@ export function useTechnicianLoans(
   pendingOnly = false,
 ) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: [
@@ -88,7 +93,7 @@ export function useTechnicianLoans(
     ],
     queryFn: async (): Promise<TechnicianLoan[]> => {
       if (!actor) return [];
-      return actor.listTechnicianLoans({
+      return actor.listTechnicianLoans(token, {
         technicianId: technicianId ?? undefined,
         pendingOnly: pendingOnly ? true : undefined,
       });
@@ -100,12 +105,13 @@ export function useTechnicianLoans(
 /** Register a loan/advance for a technician. */
 export function useCreateTechnicianLoan() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: TechnicianLoanInput): Promise<TechnicianLoan> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createTechnicianLoan(input);
+      return actor.createTechnicianLoan(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["technician-loans"] });
@@ -120,12 +126,13 @@ export function useCreateTechnicianLoan() {
 /** Remove a pending loan. Deducted loans cannot be deleted. */
 export function useDeleteTechnicianLoan() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: Id): Promise<boolean> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.deleteTechnicianLoan(id);
+      return actor.deleteTechnicianLoan(token, id);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["technician-loans"] });
@@ -143,6 +150,7 @@ export function useDeleteTechnicianLoan() {
  */
 export function usePayTechnicianCommission() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -150,7 +158,7 @@ export function usePayTechnicianCommission() {
       input: CommissionPaymentInput,
     ): Promise<CommissionPayment> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.payTechnicianCommission(input);
+      return actor.payTechnicianCommission(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["commission-lines"] });
@@ -177,6 +185,7 @@ export function useCommissionPayments(
   allPeriods = false,
 ) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const [from, to] = periodKey(period);
 
   return useQuery({
@@ -188,7 +197,7 @@ export function useCommissionPayments(
     ],
     queryFn: async (): Promise<CommissionPayment[]> => {
       if (!actor) return [];
-      return actor.listCommissionPayments({
+      return actor.listCommissionPayments(token, {
         technicianId: technicianId ?? undefined,
         from: allPeriods ? undefined : period.from,
         to: allPeriods ? undefined : period.to,

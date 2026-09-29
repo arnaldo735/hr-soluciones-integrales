@@ -996,7 +996,9 @@ it("keeps the first caller as admin and blocks a non-admin from admin actions", 
   await expect(actor.getCallerUserRole()).resolves.toEqual({ guest: null });
   await expect(actor.isCallerAdmin()).resolves.toBe(false);
   await expect(actor.listSuppliers([])).rejects.toBeDefined();
-  await expect(actor.setUserRole(MECHANIC, { admin: null })).rejects.toBeDefined();
+  // The accepted change replaces the principal-based `setUserRole` with the
+  // session-token `updateUserRole`; a non-admin caller must still be refused.
+  await expect(actor.updateUserRole(null, 1n, 1n)).rejects.toBeDefined();
 });
 
 // --- Characterization: the totals arithmetic the IVA change must keep ------
@@ -3805,84 +3807,188 @@ it("does not mutate state when preparing a message", async () => {
   expect(after).toHaveLength(before.length);
 });
 
-// --- Accepted behavior: the local backup download --------------------------
+// --- Accepted behavior: the paginated local backup -------------------------
 //
-// The accepted change adds an admin-gated `downloadLocalBackup` query that
-// returns the same JSON as the Drive backup plus a file name carrying the
-// generation date and time. These tests call the real canister, so they prove
-// the method is implemented rather than a stub that traps, and they pin the
-// observable rules: the file name carries the date and time, the JSON parses
-// and contains the company collections, and a non-admin is rejected.
+// The accepted change replaces the single `downloadLocalBackup` query with a
+// manifest plus a paginated `getBackupSection`, so no single call serializes
+// all 23 collections. These tests call the real canister, so they prove the
+// methods are implemented rather than stubs that trap, and they pin the
+// observable rules: the manifest names the file and the ordered sections, each
+// section returns valid JSON for its own key, the pages concatenate into the
+// same root object `serializeBackup` produced, and a non-admin is rejected.
 
-it("returns a local backup with a date-and-time file name and valid JSON", async () => {
+/** The 23 root keys, in the order `serializeBackup` emitted them. */
+const BACKUP_SECTION_KEYS = [
+  "parts",
+  "lots",
+  "movements",
+  "customers",
+  "motorcycles",
+  "orders",
+  "suppliers",
+  "purchases",
+  "payments",
+  "invoices",
+  "businessSettings",
+  "userProfiles",
+  "quotes",
+  "services",
+  "serviceCategories",
+  "technicians",
+  "appointments",
+  "expenses",
+  "expenseCategories",
+  "posSales",
+  "receivablePayments",
+  "supplierOrders",
+  "company",
+];
+
+/**
+ * Reassembles the root JSON the way the frontend does: read the manifest, then
+ * page each section until `done`, concatenating collection pages and taking
+ * single-record sections whole.
+ */
+async function collectLocalBackup() {
+  const manifest = await actor.getLocalBackupManifest();
+  const root: Record<string, unknown> = {
+    generatedAt: Number(manifest.generatedAt),
+  };
+  for (let index = 0; index < manifest.sections.length; index += 1) {
+    const key = manifest.sections[index];
+    let offset = 0n;
+    let done = false;
+    let items: unknown[] = [];
+    let single: unknown = null;
+    let isCollection = false;
+    while (!done) {
+      const chunk = await actor.getBackupSection(
+        BigInt(index),
+        offset,
+        manifest.maxPageSize,
+      );
+      const parsed = JSON.parse(chunk.json) as unknown;
+      if (Array.isArray(parsed)) {
+        isCollection = true;
+        items = [...items, ...parsed];
+      } else {
+        single = parsed;
+      }
+      if (chunk.done) {
+        done = true;
+        break;
+      }
+      offset = chunk.offset + chunk.limit;
+    }
+    root[key] = isCollection ? items : single;
+  }
+  return { manifest, root };
+}
+
+it("returns a manifest with the file name and the ordered section plan", async () => {
   actor.setPrincipal(OWNER);
-  const backup = await actor.downloadLocalBackup();
+  const manifest = await actor.getLocalBackupManifest();
 
   // The file name carries the generation date and time, so two copies are
   // distinguishable: `copia-local-hr-AAAA-MM-DD-HHmm.json`.
-  expect(backup.fileName).toMatch(
+  expect(manifest.fileName).toMatch(
     /^copia-local-hr-\d{4}-\d{2}-\d{2}-\d{4}\.json$/,
   );
-  expect(backup.generatedAt).toBeGreaterThan(0n);
+  expect(manifest.generatedAt).toBeGreaterThan(0n);
+  // The plan is the 23 root keys in the exact order `serializeBackup` used.
+  expect(manifest.sections).toEqual(BACKUP_SECTION_KEYS);
+  expect(manifest.totalSections).toBe(BigInt(BACKUP_SECTION_KEYS.length));
+  // The page size is bounded, so no single call serializes a whole collection.
+  expect(manifest.maxPageSize).toBeGreaterThan(0n);
+  expect(manifest.maxPageSize).toBeLessThanOrEqual(200n);
+});
 
-  // The payload is valid JSON, not an opaque string.
-  const parsed = JSON.parse(backup.json) as Record<string, unknown>;
-  expect(parsed).toBeTypeOf("object");
+it("returns each section's own JSON keyed by the manifest index", async () => {
+  actor.setPrincipal(OWNER);
+  const manifest = await actor.getLocalBackupManifest();
 
-  // It carries the company collections the requirement names. The seeded
-  // sample data guarantees the customer, supplier and technician collections
-  // are non-empty, so the JSON reflects real records rather than empty arrays.
-  for (const key of [
-    "customers",
-    "motorcycles",
-    "orders",
-    "parts",
-    "lots",
-    "movements",
-    "suppliers",
-    "purchases",
-    "payments",
-    "invoices",
-    "quotes",
-    "services",
-    "technicians",
-    "appointments",
-    "expenses",
-    "posSales",
-    "receivablePayments",
-    "supplierOrders",
-    "userProfiles",
-  ]) {
-    expect(Array.isArray(parsed[key])).toBe(true);
+  for (let index = 0; index < manifest.sections.length; index += 1) {
+    const chunk = await actor.getBackupSection(BigInt(index), 0n, 200n);
+    expect(chunk.key).toBe(manifest.sections[index]);
+    expect(chunk.index).toBe(BigInt(index));
+    // The payload is valid JSON, not an opaque string.
+    expect(() => JSON.parse(chunk.json)).not.toThrow();
   }
-  expect(parsed.businessSettings).toBeTypeOf("object");
-  expect(parsed.company).toBeTypeOf("object");
+});
 
-  // The seeded customer is present, so the JSON is the real company data.
-  const customers = parsed.customers as Array<{ name?: string }>;
+it("assembles the same root object serializeBackup produced", async () => {
+  actor.setPrincipal(OWNER);
+  const { manifest, root } = await collectLocalBackup();
+
+  // The root object carries exactly the manifest's sections plus the
+  // generation timestamp, so the file keeps the previous shape.
+  expect(Object.keys(root).sort()).toEqual(
+    [...BACKUP_SECTION_KEYS, "generatedAt"].sort(),
+  );
+  expect(root.generatedAt).toBe(Number(manifest.generatedAt));
+
+  // The collection sections are arrays and the two single-record sections are
+  // objects, matching the previous serialization.
+  for (const key of BACKUP_SECTION_KEYS) {
+    if (key === "businessSettings" || key === "company") {
+      expect(root[key]).toBeTypeOf("object");
+    } else {
+      expect(Array.isArray(root[key])).toBe(true);
+    }
+  }
+
+  // The seeded sample data guarantees the customer collection is non-empty, so
+  // the assembled JSON reflects real records rather than empty arrays.
+  const customers = root.customers as Array<{ name?: string }>;
   expect(customers.some((customer) => customer.name === "Juan Pérez")).toBe(
     true,
   );
+
+  // The assembled customer count matches the live read, so the copy is the
+  // real company data.
+  const liveCustomers = await actor.listCustomers([]);
+  expect(customers).toHaveLength(liveCustomers.length);
 });
 
-it("carries the same company data as the Drive backup serialization", async () => {
+it("pages a collection section without repeating or dropping items", async () => {
   actor.setPrincipal(OWNER);
-  const backup = await actor.downloadLocalBackup();
-  const parsed = JSON.parse(backup.json) as {
-    customers: Array<{ id: bigint | number }>;
-    businessSettings: { name?: string };
-  };
+  const manifest = await actor.getLocalBackupManifest();
+  const customersIndex = manifest.sections.indexOf("customers");
+  expect(customersIndex).toBeGreaterThanOrEqual(0);
 
-  // The local copy is the same serialization the Drive backup uploads, so the
-  // customer count matches the live read.
-  const customers = await actor.listCustomers([]);
-  expect(parsed.customers).toHaveLength(customers.length);
-  expect(parsed.businessSettings.name).toBeTypeOf("string");
+  // A page size of one forces several pages for the seeded customer collection.
+  const first = await actor.getBackupSection(BigInt(customersIndex), 0n, 1n);
+  expect(first.limit).toBe(1n);
+  expect(first.total).toBeGreaterThanOrEqual(1n);
+  expect(first.done).toBe(first.total <= 1n);
+
+  // The first page holds exactly one element.
+  expect(JSON.parse(first.json)).toHaveLength(1);
+
+  // Walking the pages with the reported offset yields the whole collection
+  // exactly once, in order.
+  const collected: unknown[] = [];
+  let offset = 0n;
+  let done = false;
+  while (!done) {
+    const chunk = await actor.getBackupSection(
+      BigInt(customersIndex),
+      offset,
+      1n,
+    );
+    collected.push(...(JSON.parse(chunk.json) as unknown[]));
+    done = chunk.done;
+    offset = chunk.offset + chunk.limit;
+  }
+  expect(collected).toHaveLength(Number(first.total));
+  const liveCustomers = await actor.listCustomers([]);
+  expect(collected).toHaveLength(liveCustomers.length);
 });
 
-it("blocks a non-admin from downloading the local backup", async () => {
+it("blocks a non-admin from the local backup manifest and sections", async () => {
   actor.setPrincipal(MECHANIC);
-  await expect(actor.downloadLocalBackup()).rejects.toBeDefined();
+  await expect(actor.getLocalBackupManifest()).rejects.toBeDefined();
+  await expect(actor.getBackupSection(0n, 0n, 200n)).rejects.toBeDefined();
 });
 
 // --- Accepted behavior: purchase-invoice intake ----------------------------
@@ -4927,6 +5033,129 @@ it("combines the service search with the category and active-only filters", asyn
   expect(combined.items.map((service) => service.id)).toEqual([active.id]);
 });
 
+// --- Accepted behavior: searches ignore accents and tildes ------------------
+//
+// The accepted change makes every search accent-insensitive: á=a, é=e, ñ=n,
+// ü=u, in both the term and the stored record. The frontend suite mocks the
+// actor, so this folding is only observable here, against the real canister.
+// These tests call the real public API, so they prove the normalization is
+// implemented rather than a stub that traps, and they pin the observable
+// equivalence the acceptance criteria state.
+
+it("matches a customer by an unaccented term against an accented name", async () => {
+  actor.setPrincipal(OWNER);
+  const jose = await actor.createCustomer({
+    name: "José Álvarez",
+    phone: "300 000 9001",
+    email: [],
+    document: [],
+    address: [],
+  });
+  const maria = await actor.createCustomer({
+    name: "María Peña",
+    phone: "300 000 9002",
+    email: [],
+    document: [],
+    address: [],
+  });
+
+  // Acceptance criterion: typing "jose" finds "José".
+  const joseHits = await actor.listCustomers(["jose"]);
+  expect(joseHits.map((customer) => customer.id)).toContain(jose.id);
+  expect(joseHits.map((customer) => customer.id)).not.toContain(maria.id);
+
+  // Acceptance criterion: typing "MARIA" finds "María".
+  const mariaHits = await actor.listCustomers(["MARIA"]);
+  expect(mariaHits.map((customer) => customer.id)).toContain(maria.id);
+  expect(mariaHits.map((customer) => customer.id)).not.toContain(jose.id);
+
+  // The eñe folds to n: "pena" finds "Peña".
+  const penaHits = await actor.listCustomers(["pena"]);
+  expect(penaHits.map((customer) => customer.id)).toContain(maria.id);
+  expect(penaHits.map((customer) => customer.id)).not.toContain(jose.id);
+});
+
+it("matches a part by an unaccented term against an accented name", async () => {
+  actor.setPrincipal(OWNER);
+  const accented = await actor.createPart({
+    sku: "SRCH-ACC-PART",
+    name: "Bujía de encendido",
+    category: "Encendido",
+    brand: "NGK",
+    unit: "pza",
+    salePrice: 45000n,
+    costPrice: 20000n,
+    lowStockThreshold: 2n,
+  });
+  const plain = await actor.createPart({
+    sku: "SRCH-PLAIN-PART",
+    name: "Filtro de aire",
+    category: "Filtros",
+    brand: "Mann",
+    unit: "pza",
+    salePrice: 30000n,
+    costPrice: 15000n,
+    lowStockThreshold: 2n,
+  });
+
+  // "bujia" (no accent) finds "Bujía" (accented).
+  const hits = await actor.listParts(
+    { search: ["bujia"], category: [], brand: [], lowStockOnly: [] },
+    { name: null },
+    0n,
+    50n,
+  );
+  expect(hits.items.map((part) => part.id)).toContain(accented.id);
+  expect(hits.items.map((part) => part.id)).not.toContain(plain.id);
+});
+
+it("matches a service by an unaccented term against an accented name", async () => {
+  actor.setPrincipal(OWNER);
+  const accented = await actor.createService({
+    code: "SRCH-ACC-SRV",
+    name: "Alineación y balanceo",
+    description: "Servicio de prueba",
+    category: "Mantenimiento",
+    laborRate: 45000n,
+    estimatedMinutes: 60n,
+    active: true,
+  });
+  const plain = await actor.createService({
+    code: "SRCH-PLAIN-SRV",
+    name: "Cambio de aceite",
+    description: "Servicio de prueba",
+    category: "Mantenimiento",
+    laborRate: 45000n,
+    estimatedMinutes: 30n,
+    active: true,
+  });
+
+  // "alineacion" (no accent) finds "Alineación" (accented).
+  const hits = await actor.listServices(
+    { search: ["alineacion"], category: [], activeOnly: [] },
+    { name: null },
+    0n,
+    50n,
+  );
+  expect(hits.items.map((service) => service.id)).toContain(accented.id);
+  expect(hits.items.map((service) => service.id)).not.toContain(plain.id);
+});
+
+it("matches a customer with a single-character term", async () => {
+  actor.setPrincipal(OWNER);
+  const customer = await actor.createCustomer({
+    name: "Zoe Un Caracter",
+    phone: "300 000 9003",
+    email: [],
+    document: [],
+    address: [],
+  });
+
+  // Acceptance criterion: a one-character term is not gated out; it matches.
+  const hits = await actor.listCustomers(["z"]);
+  expect(hits.map((entry) => entry.id)).toContain(customer.id);
+});
+
 // --- Accepted behavior: the public API documentation endpoint --------------
 //
 // The accepted change keeps `getApiDoc` as a public query that returns the
@@ -4945,4 +5174,318 @@ it("serves the public API documentation as a non-empty query", async () => {
   // The document describes the public surface, so it names real methods.
   expect(doc).toContain("listParts");
   expect(doc).toContain("getApiDoc");
+});
+
+// --- Accepted behavior: deleting a pending invoice -------------------------
+//
+// The accepted change lets a pending invoice with no registered payments be
+// deleted, freeing its origin (the POS sale it was issued from) so it can be
+// billed again. An invoice that is already paid, or that has any abono, must be
+// rejected. These tests call the real canister, so they prove the guard is
+// enforced by the backend rather than only hidden in the UI.
+
+it("deletes a pending invoice and frees its POS sale", async () => {
+  actor.setPrincipal(OWNER);
+  const part = await actor.createPart({
+    sku: "REP-DEL-INV",
+    name: "Espejo retrovisor",
+    category: "Accesorios",
+    brand: "Genérico",
+    unit: "pza",
+    salePrice: 40000n,
+    costPrice: 20000n,
+    lowStockThreshold: 1n,
+  });
+  const supplier = await actor.createSupplier({
+    name: "Proveedor Borrado Factura",
+    phone: "+57 300 515 1515",
+    email: [],
+    address: [],
+    taxId: [],
+    contactName: [],
+  });
+  await actor.createPurchase({
+    supplierId: supplier.id,
+    items: [
+      { partId: part.id, lotNumber: "DEL-INV-L1", quantity: 3n, unitCost: 20000n },
+    ],
+  });
+
+  // A cash POS sale issues its invoice immediately and links it back.
+  const sale = await actor.createPosSale({
+    customerId: [],
+    lines: [{ partId: part.id, quantity: 1n, discount: 0n }],
+    paymentMethod: "cash",
+    paymentCondition: { cash: null },
+    creditPlan: [],
+    amountReceived: 40000n,
+  });
+  expect(sale.invoiceId).not.toBe(0n);
+  const invoice = await actor.getInvoice(sale.invoiceId);
+  expect(invoice).toHaveLength(1);
+  expect(invoice[0].paymentStatus).toEqual({ pending: null });
+
+  // The pending invoice can be deleted.
+  await expect(actor.deleteInvoice(sale.invoiceId)).resolves.toBe(true);
+  // It is gone from the read.
+  await expect(actor.getInvoice(sale.invoiceId)).resolves.toHaveLength(0);
+
+  // The POS sale no longer points at the deleted invoice, so it is billable
+  // again.
+  const freed = await actor.getPosSale(sale.id);
+  expect(freed).toHaveLength(1);
+  expect(freed[0].invoiceId).toBe(0n);
+});
+
+it("rejects deleting a paid invoice or one with an abono", async () => {
+  actor.setPrincipal(OWNER);
+  const customer = await actor.createCustomer({
+    name: "Cliente Borrado Bloqueado",
+    phone: "+57 300 616 1616",
+    email: [],
+    document: [],
+    address: [],
+  });
+  const motorcycle = await actor.createMotorcycle({
+    customerId: customer.id,
+    plate: "DEL-BLK",
+    brand: "Honda",
+    model: "CB125",
+    year: 2021n,
+    mileage: 100n,
+  });
+
+  // A paid invoice cannot be deleted.
+  const paidOrder = await actor.createOrder({
+    customerId: customer.id,
+    motorcycleId: motorcycle.id,
+    intakeMileage: 100n,
+    problem: "Factura pagada",
+    technicianIds: [],
+  });
+  await actor.addLabor(paidOrder.order.id, {
+    description: "Servicio pagado",
+    price: 50000n,
+    technicianId: [],
+    serviceId: [],
+  });
+  await actor.updateOrderStatus(paidOrder.order.id, { inRepair: null });
+  await actor.updateOrderStatus(paidOrder.order.id, { ready: null });
+  await actor.updateOrderStatus(paidOrder.order.id, { delivered: null });
+  const paidInvoice = await actor.createInvoiceFromOrder(
+    paidOrder.order.id,
+    { cash: null },
+    { cash: null },
+    [],
+  );
+  await actor.markInvoicePaid(paidInvoice.id, { cash: null });
+  await expect(actor.deleteInvoice(paidInvoice.id)).rejects.toBeDefined();
+  // The rejected deletion left the invoice in place.
+  await expect(actor.getInvoice(paidInvoice.id)).resolves.toHaveLength(1);
+
+  // A still-pending invoice with an abono is also rejected.
+  const creditOrder = await actor.createOrder({
+    customerId: customer.id,
+    motorcycleId: motorcycle.id,
+    intakeMileage: 100n,
+    problem: "Factura con abono",
+    technicianIds: [],
+  });
+  await actor.addLabor(creditOrder.order.id, {
+    description: "Servicio a crédito",
+    price: 100000n,
+    technicianId: [],
+    serviceId: [],
+  });
+  await actor.updateOrderStatus(creditOrder.order.id, { inRepair: null });
+  await actor.updateOrderStatus(creditOrder.order.id, { ready: null });
+  await actor.updateOrderStatus(creditOrder.order.id, { delivered: null });
+  const creditInvoice = await actor.createInvoiceFromOrder(
+    creditOrder.order.id,
+    { cash: null },
+    { credit: null },
+    [{ firstDueDate: 1_800_000_000_000_000_000n, installmentCount: 2n }],
+  );
+  await actor.registerReceivablePayment({
+    invoiceId: creditInvoice.id,
+    amount: 10000n,
+    method: "cash",
+    note: [],
+  });
+  await expect(actor.deleteInvoice(creditInvoice.id)).rejects.toBeDefined();
+  await expect(actor.getInvoice(creditInvoice.id)).resolves.toHaveLength(1);
+});
+
+// --- Accepted behavior: deleting a non-accepted purchase -------------------
+//
+// The accepted change lets a purchase that has not been accepted be deleted,
+// reverting the lots and inventory movements it created. A purchase that was
+// already accepted is rejected. These tests call the real canister, so they
+// prove the reversal and the guard are enforced by the backend.
+
+it("deletes a non-accepted purchase and reverts its lots and movements", async () => {
+  actor.setPrincipal(OWNER);
+  const part = await actor.createPart({
+    sku: "REP-DEL-PUR",
+    name: "Cadena de transmisión",
+    category: "Transmisión",
+    brand: "DID",
+    unit: "pza",
+    salePrice: 60000n,
+    costPrice: 35000n,
+    lowStockThreshold: 1n,
+  });
+  const supplier = await actor.createSupplier({
+    name: "Proveedor Borrado Compra",
+    phone: "+57 300 717 1717",
+    email: [],
+    address: [],
+    taxId: [],
+    contactName: [],
+  });
+  const purchase = await actor.createPurchase({
+    supplierId: supplier.id,
+    items: [
+      { partId: part.id, lotNumber: "DEL-PUR-L1", quantity: 4n, unitCost: 35000n },
+    ],
+  });
+  expect(purchase.accepted).toBe(false);
+
+  // The purchase created one lot, one purchase movement and the stock.
+  expect(await actor.listLots(part.id)).toHaveLength(1);
+  const movementsBefore = await actor.listMovements(part.id);
+  expect(
+    movementsBefore.filter((movement) => movement.kind.purchase !== undefined),
+  ).toHaveLength(1);
+  const before = await actor.getPart(part.id);
+  expect(before[0].totalStock).toBe(4n);
+
+  await expect(actor.deletePurchase(purchase.id)).resolves.toBe(true);
+
+  // The lot and the purchase movement are gone, and the stock is back to zero.
+  expect(await actor.listLots(part.id)).toHaveLength(0);
+  const movementsAfter = await actor.listMovements(part.id);
+  expect(
+    movementsAfter.filter((movement) => movement.kind.purchase !== undefined),
+  ).toHaveLength(0);
+  const after = await actor.getPart(part.id);
+  expect(after[0].totalStock).toBe(0n);
+  // The purchase itself is gone from the list.
+  expect(
+    (await actor.listPurchases([])).some((row) => row.id === purchase.id),
+  ).toBe(false);
+});
+
+// --- Accepted behavior: the cash-register shift ----------------------------
+//
+// The accepted change adds a cash-register module: a shift opens with declared
+// opening balances, movements are classified by payment method (cash hits Caja,
+// transfer/card hit Bancos), closing computes the expected balances and the
+// difference against the declared ones, and the daily report lists every
+// movement with totals by payment method. These tests call the real canister,
+// so they prove the methods are implemented rather than stubs that trap.
+
+it("opens a shift, classifies movements by account and closes with the computed difference", async () => {
+  actor.setPrincipal(OWNER);
+  // No shift is open on a fresh canister.
+  await expect(actor.getOpenShift()).resolves.toHaveLength(0);
+
+  const shift = await actor.openShift({
+    openingCash: 100000n,
+    openingBank: 500000n,
+    notes: ["Apertura de prueba"],
+  });
+  expect(shift.status).toEqual({ open: null });
+  expect(shift.openingCash).toBe(100000n);
+  expect(shift.openingBank).toBe(500000n);
+  // A second shift cannot be opened while one is open.
+  await expect(
+    actor.openShift({ openingCash: 0n, openingBank: 0n, notes: [] }),
+  ).rejects.toBeDefined();
+
+  // A transfer income adds to Bancos; a transfer expense subtracts from it.
+  const transferIncome = await actor.registerCashMovement({
+    kind: { income: null },
+    paymentMethod: "transfer",
+    amount: 250000n,
+    account: { bank: null },
+    description: "Consignación cliente",
+    reference: [],
+    source: { manual: null },
+  });
+  expect(transferIncome.account).toEqual({ bank: null });
+  const transferExpense = await actor.registerCashMovement({
+    kind: { expense: null },
+    paymentMethod: "transfer",
+    amount: 50000n,
+    account: { bank: null },
+    description: "Pago proveedor",
+    reference: [],
+    source: { manual: null },
+  });
+  expect(transferExpense.account).toEqual({ bank: null });
+  // A cash income adds to Caja.
+  const cashIncome = await actor.registerCashMovement({
+    kind: { income: null },
+    paymentMethod: "cash",
+    amount: 30000n,
+    account: { cash: null },
+    description: "Venta de mostrador",
+    reference: [],
+    source: { manual: null },
+  });
+  expect(cashIncome.account).toEqual({ cash: null });
+
+  // The daily report lists all three movements with totals by payment method.
+  const report = await actor.getDailyShiftReport(shift.id);
+  expect(report.movements).toHaveLength(3);
+  expect(report.cashIncome).toBe(30000n);
+  expect(report.cashExpense).toBe(0n);
+  expect(report.bankIncome).toBe(250000n);
+  expect(report.bankExpense).toBe(50000n);
+  expect(report.totalIncome).toBe(280000n);
+  expect(report.totalExpense).toBe(50000n);
+  const transferTotal = report.byPaymentMethod.find(
+    (row) => row.method === "transfer",
+  );
+  expect(transferTotal).toMatchObject({ income: 250000n, expense: 50000n });
+  const cashTotal = report.byPaymentMethod.find((row) => row.method === "cash");
+  expect(cashTotal).toMatchObject({ income: 30000n, expense: 0n });
+
+  // Closing computes Caja = 100000 + 30000 = 130000 and
+  // Bancos = 500000 + 250000 − 50000 = 700000. Declaring exactly those leaves a
+  // zero difference.
+  const closed = await actor.closeShift(shift.id, {
+    declaredClosingCash: 130000n,
+    declaredClosingBank: 700000n,
+    notes: ["Cierre de prueba"],
+  });
+  expect(closed.status).toEqual({ closed: null });
+  expect(closed.computedClosingCash).toBe(130000n);
+  expect(closed.computedClosingBank).toBe(700000n);
+  expect(closed.differenceCash).toBe(0n);
+  expect(closed.differenceBank).toBe(0n);
+
+  // Declaring a different amount would have shown the difference; a closed
+  // shift cannot be closed again.
+  await expect(
+    actor.closeShift(shift.id, {
+      declaredClosingCash: 130000n,
+      declaredClosingBank: 700000n,
+      notes: [],
+    }),
+  ).rejects.toBeDefined();
+  // With the shift closed, no shift is open and a movement is rejected.
+  await expect(actor.getOpenShift()).resolves.toHaveLength(0);
+  await expect(
+    actor.registerCashMovement({
+      kind: { income: null },
+      paymentMethod: "cash",
+      amount: 1000n,
+      account: { cash: null },
+      description: "Sin turno",
+      reference: [],
+      source: { manual: null },
+    }),
+  ).rejects.toBeDefined();
 });

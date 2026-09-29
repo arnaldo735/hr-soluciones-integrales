@@ -20,6 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import {
   CUSTOMER_CSV_HEADERS,
@@ -282,6 +283,7 @@ const CustomerRow = memo(function CustomerRow({
 
 export function CustomersPage() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const navigate = useNavigate();
   const rawSearch = useSearch({ strict: false }) as Record<string, unknown>;
   const search = useMemo(() => resolveSearch(rawSearch), [rawSearch]);
@@ -413,7 +415,7 @@ export function CustomersPage() {
         toast.error("El archivo no contiene filas válidas.");
         return;
       }
-      const existing = await actor.listCustomers(null);
+      const existing = await actor.listCustomers(token, null);
       setImportResult(null);
       setImportFailed(false);
       setImportRows(buildContactImportRows("customer", parsed, existing));

@@ -2,20 +2,13 @@
 
 ## User Preferences
 
-- Toda la interfaz en español (Colombia)
-- No afectar funcionalidad ya construida ni los datos ya cargados
-- Los montos se manejan en centavos enteros
-- Interfaz bonita y organizada profesionalmente, con colores relacionados con mecánica y repuestos
-- Las notificaciones de WhatsApp abren WhatsApp con un mensaje prellenado editable
-- Importación y exportación en Excel (no solo CSV)
-- Todos los formatos generados imprimibles en A4 y tirilla pos 80mm
-- La utilidad por servicio se calcula como valor cobrado menos la comisión del técnico
-- Las facturas de compra se pueden cargar en PDF o foto para actualizar el inventario
-- Prioridad absoluta a la velocidad de apertura de los listados con cientos de registros
-- Paginación, filtros y ordenamiento resueltos en el backend
-- Caché de datos compartidos y actualización solo tras crear, editar o eliminar
-- Debounce en búsqueda y filtros
-- Estados de carga, cancelación de solicitudes obsoletas y manejo de errores
+- Interfaz completamente en español (Colombia)
+- Montos en centavos enteros COP, sin decimales
+- No romper funcionalidad ni datos existentes
+- Diseño responsive: la app se usa desde celular
+- Los buscadores ignoran mayúsculas y tildes (á=a, é=e, ñ=n, ü=u)
+- Los selectores de servicios e inventario solo muestran resultados al escribir un término de búsqueda, no listan todo por defecto
+- Mostrar un mensaje claro cuando una búsqueda no arroje resultados
 
 ## Verified Commands
 
@@ -25,28 +18,28 @@
 
 ## Learnings
 
-- listPartFacets() devuelve { categories, brands } distintos en un solo recorrido; el frontend debe filtrar los valores vacíos o solo-espacios (value.trim() !== '') antes de renderizar los SelectItem de Radix, porque un SelectItem con value='' lanza 'A <Select.Item /> must have a value prop that is not an empty string' y deja la página en blanco.
-- invalidateQueries({queryKey:['parts']}) invalida por prefijo la clave ['parts','facets'], así que la invalidación de facets queda cubierta sin una llamada explícita.
-- Los bindings del frontend (backend.did.js/.d.ts) se generan con `pnpm bindgen` a partir de src/backend/dist/backend.did, que solo existe tras `mops build`; por eso su regeneración corresponde a la fase de check.
-- El preflight local de E2E puede devolver status inconclusive cuando un flujo de descarga (xlsx) no es observable en la evidencia del navegador; es un pass registrado, no un bug de la app, y no debe reintentarse ni repararse.
-- Para que las librerías pesadas (jspdf, jspdf-autotable, exceljs, recharts) no entren en el chunk de arranque ni en el de una página, no basta con que lib/pdf.ts o lib/xlsx.ts usen import() dinámico: cada página que las importe como valores debe convertirse también a loadPdfLibs()/loadExcelJs() y a import type para los tipos.
-- En App.tsx con TanStack Router, envolver cada página en React.lazy dentro de un helper que añade Suspense mantiene intactos los guards adminOnly y las rutas, y cada pantalla queda como chunk propio.
-- Verificación de code-splitting: en dist/assets, jspdf.es.min y jspdf.plugin.autotable deben ser importados solo por el chunk pdf-*.js vía import() dinámico; index.es-*.js es un módulo interno de jspdf y no cuenta como violación; los imports type-only se borran en el build.
-- El preflight local de E2E puede devolver status inconclusive cuando un flujo apunta a un método de backend sin superficie en la interfaz (p. ej. getApiDoc, que no tiene ruta ni enlace); es un pass registrado, no un bug de la app, y no debe reintentarse ni repararse.
-- Los listados de clientes, motos e inventario usan consultas paginadas del backend (listCustomersPageDir, listMotorcyclesPageDir, listPartsDir) con clave de React Query como string estable que codifica filtro/orden/dirección/página; nunca reconstruir la clave como arreglo nuevo.
-- La dirección de orden se resuelve en el backend invirtiendo el arreglo completo ordenado antes de cortar offset/limit; invertir solo los items de la página cargada da un orden incorrecto entre páginas.
-- El conteo de motos por cliente, el propietario por moto y el stock por artículo vienen incluidos en la misma respuesta de página; no se hace ninguna llamada por fila.
-- La exportación de clientes usa exportCustomersAggregated() en una sola llamada; el fan-out de listMotorcycles por cliente quedó eliminado.
-- El listado de motos vive en /motos (MotorcyclesPage) y se registra en App.tsx con createRoute + adminOnly(lazyPage(...)) más una entrada en NAV_FLOWS del sidebar.
-- Un Input de filtro de texto que llama a applySearch en onChange dispara una solicitud por tecla; debe compartir el debounce de 300 ms del buscador principal.
-- getApiDoc debe documentar también las variantes *Dir (listCustomersPageDir, listMotorcyclesPageDir, listPartsDir) con su parámetro descending, no solo las versiones ascendentes.
-- WhatsAppNotifyButton es un componente compartido usado por 13 páginas más ContactDocumentPreview; quitar el botón de una sola página se hace eliminando su inyección en DataTable rowExtraActions, no editando el componente.
-- Al quitar un control de una página hay que eliminar también los imports que quedan huérfanos (Biome noUnusedVariables es error) y actualizar los tests de esa página que aún asertaban el control removido.
-- El preflight local de E2E puede devolver status inconclusive con reason tester_error (reporte persistido inválido) cuando falla el formato del reporte del tester; es un pass registrado, no un bug de la app, y no debe reintentarse ni repararse.
-- El botón de WhatsApp se ha quitado de los listados de Servicios, Clientes y Proveedores y de la ficha de detalle del cliente; sigue presente en órdenes, cotizaciones, facturas, POS, citas, cuentas por cobrar y la ficha de proveedor.
-- En CustomersPage el botón de WhatsApp se renderiza inline dentro del componente memoizado CustomerRow (no vía rowExtraActions); al quitarlo hay que eliminar también el useMemo de attachment y los imports huérfanos.
-- En CustomerDetailPage el import de @/hooks/use-whatsapp (customerContactDocument, motorcycleRow) alimenta la ficha imprimible 'Ver ficha', no el botón de envío; debe conservarse al remover solo el botón de WhatsApp.
-- Al quitar un control de fila hay que actualizar TODOS los tests que hacen clic en su ocid, no solo el archivo de test de la página; los getByTestId obsoletos lanzan y fallan la suite. El patrón correcto es reemplazarlos por queryByTestId(...).toBeNull().
-- El botón de WhatsApp se ha quitado de los listados de Servicios, Clientes y Proveedores y de las fichas de detalle de cliente y de proveedor; sigue presente en órdenes, cotizaciones, facturas, POS, citas, cuentas por cobrar y sus fichas de detalle.
-- En SupplierDetailPage el import de @/hooks/use-whatsapp (supplierContactDocument) alimenta la ficha imprimible 'Ver ficha' vía ContactDocumentPreview, no el botón de envío; debe conservarse al remover solo el botón de WhatsApp.
-- Al quitar un control de fila o de cabecera hay que actualizar TODOS los tests que hacen clic en su ocid; el patrón correcto es reemplazarlos por queryByTestId(...).toBeNull() para fijar la ausencia sin romper la suite.
+- El diálogo de recordatorios se monta en Layout.tsx (shell autenticado) y usa sessionStorage 'hr-reminders-dismissed' para no reaparecer tras cerrarlo; el listener de visibilitychange se registra dentro del efecto y se limpia en su return.
+- getRemindersSummary(token) agrega pendientes reutilizando ReceivablesLib.listReceivables y PurchasingLib.listPayables; el gating por módulo se resuelve sección a sección con UsersLib.canAccessModule y las secciones no autorizadas se devuelven como null.
+- El momento de finalización de una orden #ready se toma de la última transición a #ready en statusHistory y, si no existe, de updatedAt; los días transcurridos se calculan con Time.now() en nanosegundos dividido entre 24h.
+- En un literal Text de Motoko que contiene Markdown, toda comilla doble interna debe escaparse como \" o el literal termina antes de tiempo y produce M0097/M0057 en el mixin.
+- Una constante de módulo como 24 * 60 * 60 * 1_000_000_000 se infiere Nat y la multiplicación no es estática, lo que falla con M0014; hay que escribir el valor como literal Int (86_400_000_000_000).
+- Los selectores tipo búsqueda (ServicePicker, AddPartDialog, QuoteDetailPage, PosPage) pasan enabled: term.length > 0 a useServices/useParts, de modo que el catálogo nunca se lista por defecto; useParts se usa solo en esos selectores, mientras useServices se comparte con páginas paginadas y necesita un flag enabled opt-in.
+- El tipo generado RemindersSummary exige generatedAt y usa finishedOrders/daysInWorkshop, ReminderOrder.id y ReminderQuote.id.
+- Las filas de citas y cotizaciones del diálogo de recordatorios muestran el estado crudo en inglés (scheduled/confirmed/draft/sent); conviene mapearlo a etiquetas en español como el resto de la app.
+- El encabezado de documentos se comparte en tres rutas de PDF: drawHeader (comisiones), drawContactHeader rama A4 y rama tirilla; cualquier dato nuevo de empresa debe agregarse a las tres, además de PdfCompany/pdfCompanyFromProfile.
+- ContactDocumentPreview arma su propia línea de contacto en lugar de reutilizar companyContactLine, por lo que cada campo nuevo de empresa debe agregarse también allí.
+- En drawContactHeader el avance del cursor debe ser lineHeight × splitTextToSize(...).length por bloque; un incremento fijo subestima el texto que hace wrap y apila el bloque siguiente encima.
+- En la tirilla 80mm el encabezado de pantalla necesita w-full + min-w-0 en el bloque de identidad y gap explícito; sin w-full el texto largo desborda los 74mm y se encima con el bloque de título.
+- WarrantyDocument.tsx duplica el markup del encabezado de DocumentPreview, así que cualquier corrección de layout del encabezado debe aplicarse en ambos archivos.
+- Existen 170 fallos de prueba preexistentes no relacionados (drift de firma de actor: argumento null inicial extra en llamadas de listado) en 47 archivos de páginas ajenas al encabezado; el subconjunto de encabezado/documentos está verde.
+- Text.toLower() de Motoko NO convierte vocales acentuadas mayúsculas (Á, É, Í, Ó, Ú, Ü, Ñ); la normalización compartida en src/backend/lib/search.mo debe plegar tildes sobre el texto crudo (reconociendo mayúscula y minúscula) y aplicar toLower() al final, o esos caracteres sobreviven y rompen la búsqueda insensible a tildes.
+- En React Query v5, isLoading es false durante el refetch de una query key nueva cuando ya hay datos en caché; para no mostrar resultados obsoletos ni un 'sin resultados' prematuro hay que gatear con isFetching y con la comparación término vivo vs término debounced.
+- invalidateQueries({queryKey:['parts']}) hace prefix-match con ['parts','picker',term], así que el buscador del POS ya se refresca tras una venta o un cambio de inventario sin cambiar la clave.
+- El prompt de término vacío del POS debe usar el valor vivo de search (no el debounced) para que al borrar el campo aparezca de inmediato sin esperar los 250ms.
+- pnpm fix (biome check --write src) reformatea también archivos de prueba; si un dispatch prohíbe editar tests, hay que revertir ese churn con git checkout para no dejar cambios no autorizados.
+- En el POS, el buscador de clientes debe seguir listando todo el directorio cuando el término está vacío (contrato protegido por PosPage.customer.test.tsx); a diferencia de productos/servicios, NO se gatea la consulta por término no vacío. El defecto real es mostrar resultados obsoletos o 'sin resultados' prematuro durante el debounce/refetch, corregido con un guard isCustomerSearchPending análogo a isPartSearchPending.
+- El estado vacío del buscador de clientes del POS debe comparar contra el término debounced (no el vivo) para ser consistente con la consulta que realmente se ejecuta.
+- PosPage.customer.test.tsx tiene mocks con firma desviada: listCustomersMock.mockImplementation((search) => ...) recibe el token como primer argumento, por lo que sus aserciones de búsqueda y de estado vacío no reflejan el contrato real (token, search).
+- En PosPage.tsx el buscador de clientes importa useCustomers desde @/hooks/use-customers (firma correcta (token, search)); la copia duplicada en use-orders.ts no la usa el POS.
+- El defecto del buscador de clientes del POS era el gating de render: el guard de carga y el estado vacío comparaban contra customerSearch (término vivo) mientras la consulta corre sobre debouncedCustomerSearch; ahora el estado vacío compara contra el término debounced y se suprime cuando customersQuery.isError.
+- El backend de búsqueda de clientes ya era correcto: listCustomers normaliza el término una vez y matchesSearch compara nombre/teléfono/documento con Search.contains (normaliza ambos lados) y placas pre-normalizadas en platesByCustomer.

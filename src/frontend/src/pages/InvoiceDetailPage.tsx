@@ -1,5 +1,17 @@
+import { BarcodeScanner } from "@/components/BarcodeScanner";
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { NotifyCustomerDialog } from "@/components/NotifyCustomerDialog";
 import { WhatsAppNotifyButton } from "@/components/WhatsAppNotifyButton";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,17 +31,21 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { useCompanyProfile, useIvaSettings } from "@/hooks/use-company";
 import { useCustomerDetail } from "@/hooks/use-customers";
+import { useDailyHopeMessage } from "@/hooks/use-hope";
+import { useDeleteInvoice } from "@/hooks/use-invoices";
+import {
+  SERVICE_TERMS_DEFAULT_TEXT,
+  useServiceTermsSettings,
+} from "@/hooks/use-service-terms";
+import {
+  companyContactLine,
+  companyFiscalLines,
+  companyHeaderFromProfile,
+} from "@/lib/company-header";
 import { downloadFile } from "@/lib/download";
 import {
   formatDate,
@@ -39,13 +55,19 @@ import {
   formatTaxRate,
 } from "@/lib/format";
 import { loadPdfLibs, pdfCompanyFromProfile } from "@/lib/pdf";
+import { drawHopeMessage, hopeMessageContent } from "@/lib/pdf";
+import type { HopeMessageContent } from "@/lib/pdf";
 import type {
-  BusinessSettings,
   CompanyProfile,
   CustomerDetail,
+  DocumentFormat,
+  DocumentLine,
+  DocumentMeta,
+  DocumentTotals,
   InstallmentPlanView,
   InstallmentRow,
   Invoice,
+  PartView,
   PaymentCondition,
 } from "@/lib/types";
 import {
@@ -58,7 +80,7 @@ import {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useParams } from "@tanstack/react-router";
+import { Link, useNavigate, useParams } from "@tanstack/react-router";
 import type { jsPDF } from "jspdf";
 import {
   AlertTriangle,
@@ -66,10 +88,10 @@ import {
   BadgeCheck,
   CalendarClock,
   CheckCircle2,
-  Download,
   Mail,
-  Printer,
   Receipt,
+  ScanLine,
+  Trash2,
 } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -179,6 +201,7 @@ function MarkPaidDialog({
   invoice: Invoice;
 }) {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   const [method, setMethod] = useState<PaymentMethod>(invoice.paymentMethod);
   const [error, setError] = useState<string | null>(null);
@@ -186,7 +209,7 @@ function MarkPaidDialog({
   const mutation = useMutation({
     mutationFn: async (paymentMethod: PaymentMethod) => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.markInvoicePaid(invoice.id, paymentMethod);
+      return actor.markInvoicePaid(token, invoice.id, paymentMethod);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -196,8 +219,10 @@ function MarkPaidDialog({
       toast.success(`Factura ${invoice.number} marcada como pagada`);
       onOpenChange(false);
     },
-    onError: () => {
-      setError("No se pudo registrar el pago. Intenta de nuevo.");
+    onError: (error: Error) => {
+      setError(
+        error.message || "No se pudo registrar el pago. Intenta de nuevo.",
+      );
     },
   });
 
@@ -288,6 +313,7 @@ function InstallmentPlanPanel({
   plan: InstallmentPlanView;
 }) {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   const [error, setError] = useState<string | null>(null);
 
@@ -295,6 +321,7 @@ function InstallmentPlanPanel({
     mutationFn: async (installmentNumber: number) => {
       if (!actor) throw new Error("Backend no disponible");
       return actor.registerInstallmentPayment(
+        token,
         invoice.id,
         BigInt(installmentNumber),
       );
@@ -313,8 +340,11 @@ function InstallmentPlanPanel({
         toast.success(`Cuota ${installmentNumber} registrada`);
       }
     },
-    onError: () => {
-      setError("No se pudo registrar el pago de la cuota. Intenta de nuevo.");
+    onError: (error: Error) => {
+      setError(
+        error.message ||
+          "No se pudo registrar el pago de la cuota. Intenta de nuevo.",
+      );
     },
   });
 
@@ -461,119 +491,109 @@ function InstallmentPlanPanel({
   );
 }
 
-function FiscalBlock({
-  title,
-  lines,
-}: {
-  title: string;
-  lines: Array<{ label: string; value: string; rail?: boolean }>;
-}) {
-  return (
-    <div className="space-y-2">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-        {title}
-      </p>
-      <dl className="space-y-1">
-        {lines.map((line) => (
-          <div key={line.label} className="flex gap-2 text-sm">
-            <dt className="w-24 shrink-0 text-muted-foreground">
-              {line.label}
-            </dt>
-            <dd
-              className={cn(
-                "min-w-0 break-words font-medium",
-                line.rail && "data-rail",
-              )}
-            >
-              {line.value}
-            </dd>
-          </div>
-        ))}
-      </dl>
-    </div>
-  );
-}
-
 /**
- * Builds the invoice PDF with the same content the on-screen document shows.
- * The generated blob is handed to the shared mobile-safe `downloadFile` helper
- * so the file lands on the device on phone and tablet, not only on desktop.
+ * Builds the invoice PDF in the selected format (A4 sheet or 80 mm tirilla)
+ * with the same content the shared `DocumentPreview` shows on screen. The blob
+ * is handed to the shared mobile-safe `downloadFile` helper so the file lands
+ * on the device on phone and tablet, not only on desktop.
  */
 async function buildInvoicePdf(
-  invoice: Invoice,
-  companyProfile: CompanyProfile | null | undefined,
-  fiscalAddress: string,
-  showTax: boolean,
+  format: DocumentFormat,
+  number: string,
+  company: ReturnType<typeof pdfCompanyFromProfile>,
+  meta: DocumentMeta[],
+  lines: DocumentLine[],
+  totals: DocumentTotals[],
+  footer: string,
+  hope: HopeMessageContent | null,
 ): Promise<jsPDF> {
   const { jsPDF, autoTable } = await loadPdfLibs();
-  const company = pdfCompanyFromProfile(companyProfile);
-
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
-  const margin = 14;
-  const right = 196;
+  const narrow = format === "receipt80";
+  const margin = narrow ? 3 : 14;
+  const right = narrow ? 77 : 196;
+  const doc = new jsPDF({
+    unit: "mm",
+    format: narrow ? [80, 297] : "a4",
+  });
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(15);
+  doc.setFontSize(narrow ? 10 : 15);
   doc.setTextColor(30, 41, 59);
-  doc.text(company.name, margin, 18);
+  doc.text(company.name, margin, 14);
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(8.5);
+  doc.setFontSize(narrow ? 6.5 : 8.5);
   doc.setTextColor(100, 116, 139);
   const contact = [company.taxId, company.address, company.phone]
     .filter((value): value is string => !!value && value.trim() !== "")
-    .join("  ·  ");
-  if (contact !== "") doc.text(contact, margin, 23.5);
+    .join(narrow ? " · " : "  ·  ");
+  let cursor = 18.5;
+  if (contact !== "") {
+    const contactLines = doc.splitTextToSize(contact, right - margin);
+    doc.text(contactLines, margin, cursor);
+    cursor += contactLines.length * (narrow ? 3 : 4);
+  }
 
   doc.setFont("helvetica", "bold");
-  doc.setFontSize(11);
+  doc.setFontSize(narrow ? 8.5 : 11);
   doc.setTextColor(30, 41, 59);
-  doc.text("FACTURA", right, 18, { align: "right" });
+  doc.text("FACTURA", right, 14, { align: "right" });
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(9);
+  doc.setFontSize(narrow ? 6.5 : 9);
   doc.setTextColor(100, 116, 139);
-  doc.text(invoice.number, right, 23.5, { align: "right" });
+  doc.text(number, right, 18.5, { align: "right" });
 
   doc.setDrawColor(30, 41, 59);
   doc.setLineWidth(0.4);
-  doc.line(margin, 31, right, 31);
+  doc.line(margin, cursor + 1, right, cursor + 1);
+  cursor += 5;
+
+  if (narrow) {
+    for (const entry of meta) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(entry.label, margin, cursor);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      const value = doc.splitTextToSize(entry.value, right - margin);
+      doc.text(value, margin, cursor + 3);
+      cursor += 3 + value.length * 3 + 1.5;
+    }
+  } else {
+    autoTable(doc, {
+      startY: cursor,
+      body: meta.map((entry) => [entry.label, entry.value]),
+      theme: "plain",
+      styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.5 },
+      columnStyles: {
+        0: { cellWidth: 40, textColor: [100, 116, 139] },
+        1: { fontStyle: "bold", textColor: [30, 41, 59] },
+      },
+      margin: { left: margin, right: margin },
+    });
+    cursor =
+      ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
+        ?.finalY ?? cursor) + 4;
+  }
 
   autoTable(doc, {
-    startY: 37,
-    body: [
-      ["Cliente", invoice.customerName],
-      ["NIT/RUC", invoice.customerTaxId || "—"],
-      ["Dirección fiscal", fiscalAddress],
-      ["Emitida", formatDateTime(invoice.issuedAt)],
-      ["Método", PAYMENT_METHOD_LABELS[invoice.paymentMethod]],
-      ["Condición", CONDITION_LABELS[invoice.paymentCondition]],
-      ["Estado", PAYMENT_STATUS_LABELS[invoice.paymentStatus]],
-    ],
-    theme: "plain",
-    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.5 },
-    columnStyles: {
-      0: { cellWidth: 40, textColor: [100, 116, 139] },
-      1: { fontStyle: "bold", textColor: [30, 41, 59] },
-    },
-    margin: { left: margin, right: margin },
-  });
-
-  const afterMeta =
-    (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
-      ?.finalY ?? 37;
-
-  autoTable(doc, {
-    startY: afterMeta + 6,
-    head: [["Concepto", "Cantidad", "Precio unitario", "Importe"]],
-    body: invoice.lines.map((line) => [
+    startY: cursor,
+    head: [["Concepto", "Cant.", "P. unit.", "Importe"]],
+    body: lines.map((line) => [
       line.description,
       formatNumber(line.quantity),
-      formatMoney(line.unitPrice),
-      formatMoney(line.amount),
+      formatMoney(BigInt(Math.round(line.unitPrice * 100))),
+      formatMoney(BigInt(Math.round(line.amount * 100))),
     ]),
     theme: "striped",
-    styles: { font: "helvetica", fontSize: 8.5, cellPadding: 2 },
-    headStyles: { fillColor: [30, 41, 59], textColor: 255, fontStyle: "bold" },
+    styles: {
+      font: "helvetica",
+      fontSize: narrow ? 6.5 : 8.5,
+      cellPadding: narrow ? 1.2 : 2,
+      overflow: "linebreak",
+    },
+    headStyles: { fillColor: [71, 85, 105], textColor: 255 },
     columnStyles: {
       1: { halign: "right" },
       2: { halign: "right" },
@@ -584,238 +604,67 @@ async function buildInvoicePdf(
 
   const afterLines =
     (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
-      ?.finalY ?? afterMeta + 6;
-
-  const totalsBody: string[][] = [
-    ["Subtotal", formatMoney(invoice.subtotal)],
-    ...(showTax
-      ? [
-          [
-            `Impuesto (${formatTaxRate(invoice.taxRate)})`,
-            formatMoney(invoice.tax),
-          ],
-        ]
-      : []),
-    ["Total", formatMoney(invoice.total)],
-  ];
+      ?.finalY ?? cursor;
 
   autoTable(doc, {
-    startY: afterLines + 6,
-    body: totalsBody,
+    startY: afterLines + 4,
+    body: totals.map((entry) => [entry.label, entry.value]),
     theme: "plain",
-    styles: { font: "helvetica", fontSize: 9, cellPadding: 1.5 },
+    styles: {
+      font: "helvetica",
+      fontSize: narrow ? 7 : 9,
+      cellPadding: 1.5,
+    },
     columnStyles: {
-      0: { cellWidth: 45, halign: "right", textColor: [100, 116, 139] },
+      0: { halign: "right", textColor: [100, 116, 139] },
       1: { halign: "right", fontStyle: "bold", textColor: [30, 41, 59] },
     },
-    margin: { left: right - 90, right: margin },
+    margin: { left: narrow ? margin : right - 90, right: margin },
   });
 
   const afterTotals =
     (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
-      ?.finalY ?? afterLines + 6;
+      ?.finalY ?? afterLines + 4;
 
   doc.setFont("helvetica", "normal");
-  doc.setFontSize(7.5);
+  doc.setFontSize(narrow ? 6 : 7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(
-    "Documento fiscal generado por el sistema de taller. Conserve esta factura como comprobante de su servicio.",
-    margin,
-    afterTotals + 10,
-  );
+  const footerY = afterTotals + (narrow ? 6 : 10);
+  const footerLines = doc.splitTextToSize(footer, right - margin);
+  doc.text(footerLines, margin, footerY);
+  drawHopeMessage(doc, hope, {
+    x: margin,
+    right,
+    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    narrow,
+  });
 
   return doc;
-}
-
-function InvoiceDocument({
-  invoice,
-  business,
-  companyLogoUrl,
-  fiscalAddress,
-  showTax,
-}: {
-  invoice: Invoice;
-  business: BusinessSettings | null;
-  companyLogoUrl?: string;
-  fiscalAddress: string;
-  showTax: boolean;
-}) {
-  return (
-    <article
-      data-ocid="invoice_detail.document"
-      className="invoice-sheet rounded-lg border border-border bg-card p-6 shadow-subtle sm:p-8"
-    >
-      <header className="flex flex-wrap items-start justify-between gap-6 border-b border-border pb-6">
-        <div className="min-w-0 space-y-1">
-          <div className="flex items-center gap-2">
-            {companyLogoUrl ? (
-              <img
-                src={companyLogoUrl}
-                alt=""
-                data-ocid="invoice_detail.document.logo"
-                className="size-12 shrink-0 object-contain"
-              />
-            ) : (
-              <span className="flex size-8 items-center justify-center rounded-md bg-gradient-primary font-display text-sm font-bold text-primary-foreground">
-                HR
-              </span>
-            )}
-            <span className="font-display text-lg font-semibold tracking-tight">
-              {business?.name ?? "HR SOLUCIONES INTEGRALES"}
-            </span>
-          </div>
-          <div className="space-y-0.5 text-sm text-muted-foreground">
-            {business?.taxId ? (
-              <p className="data-rail">NIT/RUC: {business.taxId}</p>
-            ) : null}
-            {business?.address ? <p>{business.address}</p> : null}
-            {business?.phone ? (
-              <p className="data-rail">Tel: {business.phone}</p>
-            ) : null}
-          </div>
-        </div>
-
-        <div className="text-right">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
-            Factura
-          </p>
-          <p className="data-rail text-2xl font-semibold tracking-tight">
-            {invoice.number}
-          </p>
-          <p className="mt-1 text-sm text-muted-foreground">
-            Emitida el {formatDate(invoice.issuedAt)}
-          </p>
-          <div className="mt-2 flex justify-end">
-            <PaymentStatusBadge status={invoice.paymentStatus} />
-          </div>
-        </div>
-      </header>
-
-      <section className="grid gap-6 border-b border-border py-6 sm:grid-cols-2">
-        <FiscalBlock
-          title="Cliente"
-          lines={[
-            { label: "Nombre", value: invoice.customerName },
-            {
-              label: "NIT/RUC",
-              value: invoice.customerTaxId || "—",
-              rail: true,
-            },
-            { label: "Dirección fiscal", value: fiscalAddress },
-          ]}
-        />
-        <FiscalBlock
-          title="Emisión"
-          lines={[
-            {
-              label: "Fecha",
-              value: formatDateTime(invoice.issuedAt),
-            },
-            {
-              label: "Orden",
-              value: invoice.orderId ? `#${invoice.orderId.toString()}` : "—",
-              rail: true,
-            },
-            {
-              label: "Método",
-              value: PAYMENT_METHOD_LABELS[invoice.paymentMethod],
-            },
-            {
-              label: "Condición",
-              value: CONDITION_LABELS[invoice.paymentCondition],
-            },
-          ]}
-        />
-      </section>
-
-      <section className="py-6">
-        <Table>
-          <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                Concepto
-              </TableHead>
-              <TableHead className="text-right font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                Cantidad
-              </TableHead>
-              <TableHead className="text-right font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                Precio unitario
-              </TableHead>
-              <TableHead className="text-right font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
-                Importe
-              </TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {invoice.lines.map((line, index) => (
-              <TableRow
-                key={`${line.description}-${index}`}
-                data-ocid={`invoice_detail.line.${index + 1}`}
-              >
-                <TableCell className="max-w-[320px] whitespace-normal">
-                  {line.description}
-                </TableCell>
-                <TableCell className="data-rail text-right">
-                  {formatNumber(line.quantity)}
-                </TableCell>
-                <TableCell className="data-rail text-right text-muted-foreground">
-                  {formatMoney(line.unitPrice)}
-                </TableCell>
-                <TableCell className="data-rail text-right font-medium">
-                  {formatMoney(line.amount)}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </section>
-
-      <section className="flex justify-end border-t border-border pt-6">
-        <dl className="w-full max-w-xs space-y-2">
-          <div className="flex items-center justify-between gap-4 text-sm">
-            <dt className="text-muted-foreground">Subtotal</dt>
-            <dd className="data-rail font-medium">
-              {formatMoney(invoice.subtotal)}
-            </dd>
-          </div>
-          {showTax ? (
-            <div className="flex items-center justify-between gap-4 text-sm">
-              <dt className="text-muted-foreground">
-                Impuesto ({formatTaxRate(invoice.taxRate)})
-              </dt>
-              <dd className="data-rail font-medium">
-                {formatMoney(invoice.tax)}
-              </dd>
-            </div>
-          ) : null}
-          <div className="flex items-center justify-between gap-4 border-t border-border pt-2">
-            <dt className="font-display text-sm font-semibold">Total</dt>
-            <dd className="data-rail text-lg font-semibold text-primary">
-              {formatMoney(invoice.total)}
-            </dd>
-          </div>
-        </dl>
-      </section>
-
-      <footer className="mt-6 border-t border-border pt-4">
-        <p className="text-xs text-muted-foreground">
-          Documento fiscal generado por HR SOLUCIONES INTEGRALES. Conserve esta
-          factura como comprobante de su servicio.
-        </p>
-      </footer>
-    </article>
-  );
 }
 
 export function InvoiceDetailPage() {
   const { id } = useParams({ strict: false }) as { id: string };
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  const navigate = useNavigate();
   const [paidOpen, setPaidOpen] = useState(false);
   const [notifyOpen, setNotifyOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [printFormat, setPrintFormat] = useState<DocumentFormat>("a4");
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scannedPart, setScannedPart] = useState<{
+    part: PartView;
+    code: string;
+  } | null>(null);
   const { isIvaResponsible } = useIvaSettings();
   const companyQuery = useCompanyProfile();
+  const dailyHopeQuery = useDailyHopeMessage();
+  const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
+  const serviceTermsQuery = useServiceTermsSettings();
+  const deleteInvoice = useDeleteInvoice();
 
   const invoiceId = BigInt(id);
 
@@ -823,7 +672,7 @@ export function InvoiceDetailPage() {
     queryKey: ["invoice", id],
     queryFn: async () => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.getInvoice(invoiceId);
+      return actor.getInvoice(token, invoiceId);
     },
     enabled: !!actor && !isFetching,
   });
@@ -832,7 +681,7 @@ export function InvoiceDetailPage() {
     queryKey: ["business-settings"],
     queryFn: async () => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.getBusinessSettings();
+      return actor.getBusinessSettings(token);
     },
     enabled: !!actor && !isFetching,
     staleTime: 60_000,
@@ -885,15 +734,70 @@ export function InvoiceDetailPage() {
   const isCredit = invoice.paymentCondition === PaymentConditionEnum.credit;
   const plan = buildPlanView(invoice);
 
-  const handleDownloadPdf = async () => {
+  // A factura can only be deleted while it is pending and has no registered
+  // payments. A credit invoice with any settled installment already has a
+  // payment, so it is not deletable either.
+  const hasRegisteredPayments =
+    isPaid || (plan?.rows.some((row) => row.paid) ?? false);
+  const canDelete = !hasRegisteredPayments;
+
+  // Scanning is only offered while the factura can still be edited: pending and
+  // without any registered payment. A paid factura is a closed document.
+  const canScan = !hasRegisteredPayments;
+
+  const documentLines: DocumentLine[] = invoice.lines.map((line) => ({
+    description: line.description,
+    quantity: Number(line.quantity),
+    unitPrice: Number(line.unitPrice) / 100,
+    amount: Number(line.amount) / 100,
+  }));
+
+  const documentMeta: DocumentMeta[] = [
+    { label: "Cliente", value: invoice.customerName },
+    { label: "NIT/RUC", value: invoice.customerTaxId || "—", rail: true },
+    { label: "Dirección fiscal", value: fiscalAddress },
+    { label: "Emitida", value: formatDateTime(invoice.issuedAt) },
+    { label: "Método", value: PAYMENT_METHOD_LABELS[invoice.paymentMethod] },
+    { label: "Condición", value: CONDITION_LABELS[invoice.paymentCondition] },
+    { label: "Estado", value: PAYMENT_STATUS_LABELS[invoice.paymentStatus] },
+  ];
+
+  const documentTotals: DocumentTotals[] = [
+    { label: "Subtotal", value: formatMoney(invoice.subtotal) },
+    ...(isIvaResponsible
+      ? [
+          {
+            label: `Impuesto (${formatTaxRate(invoice.taxRate)})`,
+            value: formatMoney(invoice.tax),
+          },
+        ]
+      : []),
+    { label: "Total", value: formatMoney(invoice.total), emphasis: true },
+  ];
+
+  // Pie de página editable "Términos y condiciones del Servicio". Mientras la
+  // consulta carga o el guardado está vacío se usa el texto de recepción por
+  // defecto, de modo que la factura siempre muestra un pie completo.
+  const serviceTermsText =
+    serviceTermsQuery.data?.text?.trim() || SERVICE_TERMS_DEFAULT_TEXT;
+
+  // Complete company identity for the printed factura. Unconfigured fields are
+  // dropped by the shared helpers, so the header never shows an orphan label.
+  const companyHeader = companyHeaderFromProfile(companyQuery.data);
+
+  const handleDownloadPdf = async (format: DocumentFormat) => {
     setDownloadError(null);
     setIsDownloading(true);
     try {
       const doc = await buildInvoicePdf(
-        invoice,
-        companyQuery.data,
-        fiscalAddress,
-        isIvaResponsible,
+        format,
+        invoice.number,
+        pdfCompanyFromProfile(companyQuery.data),
+        documentMeta,
+        documentLines,
+        documentTotals,
+        serviceTermsText,
+        hopeMessage,
       );
       await downloadFile({
         filename: `Factura-${invoice.number}.pdf`,
@@ -907,6 +811,29 @@ export function InvoiceDetailPage() {
     } finally {
       setIsDownloading(false);
     }
+  };
+
+  const handlePartDetected = (part: PartView, code: string) => {
+    setScannedPart({ part, code });
+    toast.success(`${part.name} verificado en el catálogo`);
+  };
+
+  const clearScannedPart = () => setScannedPart(null);
+
+  const confirmDelete = () => {
+    setDeleteError(null);
+    deleteInvoice.mutate(invoice.id, {
+      onSuccess: () => {
+        toast.success(`Factura ${invoice.number} eliminada`);
+        setDeleteOpen(false);
+        void navigate({ to: "/facturas" });
+      },
+      onError: (error: Error) => {
+        setDeleteError(
+          error.message || "No se pudo eliminar la factura. Intenta de nuevo.",
+        );
+      },
+    });
   };
 
   return (
@@ -927,6 +854,7 @@ export function InvoiceDetailPage() {
         </Button>
 
         <div className="flex flex-wrap items-center gap-2">
+          <PaymentStatusBadge status={invoice.paymentStatus} />
           {isPaid ? (
             <Badge
               variant="outline"
@@ -966,6 +894,19 @@ export function InvoiceDetailPage() {
             <Mail className="size-4" aria-hidden="true" />
             Notificar al cliente
           </Button>
+          {canScan ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setScanOpen((current) => !current)}
+              aria-expanded={scanOpen}
+              data-ocid="invoice_detail.scan_button"
+              className="gap-2"
+            >
+              <ScanLine className="size-4" aria-hidden="true" />
+              {scanOpen ? "Cerrar escáner" : "Escanear repuesto"}
+            </Button>
+          ) : null}
           {invoice.customerId !== undefined ? (
             <WhatsAppNotifyButton
               contactKind={WhatsAppContactKind.customer}
@@ -978,26 +919,21 @@ export function InvoiceDetailPage() {
               ocid="invoice_detail.whatsapp_button"
             />
           ) : null}
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => window.print()}
-            data-ocid="invoice_detail.print_button"
-            className="gap-2"
-          >
-            <Printer className="size-4" aria-hidden="true" />
-            Imprimir / PDF
-          </Button>
-          <Button
-            type="button"
-            onClick={() => void handleDownloadPdf()}
-            disabled={isDownloading}
-            data-ocid="invoice_detail.download_button"
-            className="gap-2"
-          >
-            <Download className="size-4" aria-hidden="true" />
-            {isDownloading ? "Generando…" : "Descargar PDF"}
-          </Button>
+          {canDelete ? (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setDeleteError(null);
+                setDeleteOpen(true);
+              }}
+              data-ocid="invoice_detail.delete_button"
+              className="gap-2 text-destructive hover:text-destructive"
+            >
+              <Trash2 className="size-4" aria-hidden="true" />
+              Eliminar
+            </Button>
+          ) : null}
         </div>
       </div>
 
@@ -1017,7 +953,7 @@ export function InvoiceDetailPage() {
             type="button"
             variant="outline"
             size="sm"
-            onClick={() => void handleDownloadPdf()}
+            onClick={() => void handleDownloadPdf(printFormat)}
             data-ocid="invoice_detail.download_retry_button"
           >
             Reintentar
@@ -1028,11 +964,12 @@ export function InvoiceDetailPage() {
       <div className="flex items-center gap-2 print:hidden">
         <Receipt className="size-4 text-muted-foreground" aria-hidden="true" />
         <p className="text-sm text-muted-foreground">
-          Vista previa del documento fiscal. Usa{" "}
+          Vista previa del documento fiscal. Elige{" "}
+          <span className="font-medium text-foreground">A4</span> o{" "}
+          <span className="font-medium text-foreground">Tirilla 80 mm</span> y
+          usa <span className="font-medium text-foreground">Imprimir</span> o{" "}
           <span className="font-medium text-foreground">Descargar PDF</span>{" "}
-          para guardar el archivo en el dispositivo o{" "}
-          <span className="font-medium text-foreground">Imprimir / PDF</span>{" "}
-          para abrir el diálogo del sistema.
+          para guardar el archivo en el dispositivo.
         </p>
       </div>
 
@@ -1040,21 +977,148 @@ export function InvoiceDetailPage() {
         <InstallmentPlanPanel invoice={invoice} plan={plan} />
       ) : null}
 
-      <div className="scroll-slim overflow-x-auto">
-        <InvoiceDocument
-          invoice={invoice}
-          business={business}
-          companyLogoUrl={companyQuery.data?.logoUrl ?? undefined}
-          fiscalAddress={fiscalAddress}
-          showTax={isIvaResponsible}
-        />
-      </div>
+      {canScan && scanOpen ? (
+        <section
+          data-ocid="invoice_detail.scan_panel"
+          className="space-y-3 rounded-lg border border-border bg-card p-4 shadow-subtle print:hidden"
+        >
+          <div className="flex items-start gap-2">
+            <ScanLine
+              className="mt-0.5 size-4 shrink-0 text-primary"
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <h2 className="font-display text-sm font-semibold">
+                Verificar repuesto por código
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Escanea el código de barras o el SKU para consultar el repuesto
+                en el catálogo. La factura ya emitida no se modifica.
+              </p>
+            </div>
+          </div>
+
+          <BarcodeScanner
+            ocid="invoice_detail.scanner"
+            title="Escanear repuesto"
+            hint="Apunta la cámara al código del repuesto o ingrésalo manualmente."
+            onDetected={handlePartDetected}
+          />
+
+          {scannedPart ? (
+            <div
+              data-ocid="invoice_detail.scanned_part"
+              className="flex items-start justify-between gap-3 rounded-md border border-success/40 bg-success/10 px-3 py-2.5"
+            >
+              <div className="min-w-0">
+                <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-success">
+                  Repuesto encontrado
+                </p>
+                <p className="truncate text-sm font-medium">
+                  {scannedPart.part.name}
+                </p>
+                <p className="data-rail truncate text-xs text-muted-foreground">
+                  {scannedPart.part.sku} ·{" "}
+                  {formatMoney(scannedPart.part.salePrice)} · código{" "}
+                  {scannedPart.code}
+                </p>
+              </div>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={clearScannedPart}
+                data-ocid="invoice_detail.clear_scanned_part_button"
+                className="shrink-0 text-muted-foreground"
+              >
+                Limpiar
+              </Button>
+            </div>
+          ) : null}
+        </section>
+      ) : null}
+
+      <DocumentPreview
+        title="Factura"
+        number={invoice.number}
+        companyName={
+          companyHeader?.legalName ??
+          business?.name ??
+          "HR SOLUCIONES INTEGRALES"
+        }
+        companyLogoUrl={companyHeader?.logoUrl ?? undefined}
+        companyContact={companyContactLine(companyHeader)}
+        companyFiscal={companyFiscalLines(companyHeader)}
+        meta={documentMeta}
+        lines={documentLines}
+        totals={documentTotals}
+        footer={serviceTermsText}
+        hopeMessage={hopeMessage}
+        format={printFormat}
+        ocid="invoice_detail.document"
+        onFormatChange={setPrintFormat}
+        onDownloadPdf={handleDownloadPdf}
+        isDownloading={isDownloading}
+      />
 
       <MarkPaidDialog
         open={paidOpen}
         onOpenChange={setPaidOpen}
         invoice={invoice}
       />
+
+      <AlertDialog
+        open={deleteOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setDeleteOpen(false);
+            setDeleteError(null);
+          }
+        }}
+      >
+        <AlertDialogContent data-ocid="invoice_detail.delete_dialog">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="font-display">
+              ¿Eliminar la factura {invoice.number}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Solo se pueden eliminar facturas pendientes de pago y sin abonos
+              registrados. Al eliminarla, la orden o venta de origen queda
+              disponible para facturarse de nuevo. Esta acción no se puede
+              deshacer.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+
+          {deleteError ? (
+            <p
+              data-ocid="invoice_detail.delete_error"
+              className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
+              {deleteError}
+            </p>
+          ) : null}
+
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              data-ocid="invoice_detail.delete_cancel_button"
+              disabled={deleteInvoice.isPending}
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              data-ocid="invoice_detail.delete_confirm_button"
+              disabled={deleteInvoice.isPending}
+              onClick={(event) => {
+                event.preventDefault();
+                confirmDelete();
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {deleteInvoice.isPending ? "Eliminando…" : "Eliminar factura"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <NotifyCustomerDialog
         open={notifyOpen}

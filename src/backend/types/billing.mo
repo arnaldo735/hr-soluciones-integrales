@@ -104,5 +104,8 @@ module {
     #notFound : Id;
     #orderNotBillable : Id;
     #notAuthorized;
+    // La factura no se puede eliminar porque ya tiene pagos o abonos
+    // registrados, o porque ya está pagada.
+    #invoiceHasPayments;
   };
 };

@@ -15,6 +15,7 @@ import { PosPage } from "@/pages/PosPage";
 import { renderWithProviders } from "@/test/helpers";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { toast } from "sonner";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
@@ -32,6 +33,7 @@ const listCustomersMock = vi.fn();
 const getBusinessSettingsMock = vi.fn();
 const getCompanyProfileMock = vi.fn();
 const createPosSaleMock = vi.fn();
+const findPartByCodeMock = vi.fn();
 
 vi.mock("@/hooks/use-backend", () => ({
   useBackend: () => ({
@@ -41,6 +43,7 @@ vi.mock("@/hooks/use-backend", () => ({
       getBusinessSettings: getBusinessSettingsMock,
       getCompanyProfile: getCompanyProfileMock,
       createPosSale: createPosSaleMock,
+      findPartByCode: findPartByCodeMock,
     },
     isFetching: false,
   }),
@@ -60,6 +63,7 @@ function part(overrides: Partial<PartView> = {}): PartView {
     costPrice: 12000n,
     lowStockThreshold: 5n,
     totalStock: 12n,
+    barcode: "",
     lowStock: false,
     createdAt: 1_700_000_000_000_000_000n,
     ...overrides,
@@ -130,6 +134,16 @@ function sale(overrides: Partial<PosSale> = {}): PosSale {
   };
 }
 
+/**
+ * Types a term into the POS product search so the picker queries the catalog
+ * and renders its results. The picker no longer lists the catalog by default,
+ * so every product-selection journey starts by typing.
+ */
+async function searchProducts(term = "balata") {
+  await userEvent.type(screen.getByTestId("pos.search_input"), term);
+  await screen.findByTestId("pos.product_item.1");
+}
+
 describe("PosPage", () => {
   beforeEach(() => {
     listPartsMock.mockReset();
@@ -137,6 +151,8 @@ describe("PosPage", () => {
     getBusinessSettingsMock.mockReset();
     getCompanyProfileMock.mockReset();
     createPosSaleMock.mockReset();
+    findPartByCodeMock.mockReset();
+    vi.mocked(toast.error).mockReset();
     listPartsMock.mockResolvedValue({
       items: [part()],
       total: 1n,
@@ -151,6 +167,7 @@ describe("PosPage", () => {
   it("adds a product to the cart and computes the taxed total", async () => {
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
 
     const cart = screen.getByTestId("pos.cart_list");
@@ -163,7 +180,7 @@ describe("PosPage", () => {
   it("blocks charging when the cart is empty", async () => {
     renderWithProviders(<PosPage />);
 
-    await screen.findByTestId("pos.product_item.1");
+    await screen.findByTestId("pos.search_prompt_state");
     expect(screen.getByTestId("pos.charge_button")).toBeDisabled();
     expect(screen.getByTestId("pos.cart_empty_state")).toBeInTheDocument();
   });
@@ -177,6 +194,7 @@ describe("PosPage", () => {
     });
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.click(screen.getByTestId("pos.quantity_increase.1"));
 
@@ -187,6 +205,7 @@ describe("PosPage", () => {
   it("warns and blocks charging when cash received does not cover the total", async () => {
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.type(screen.getByTestId("pos.amount_received_input"), "1");
 
@@ -198,6 +217,7 @@ describe("PosPage", () => {
     createPosSaleMock.mockResolvedValue(sale());
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.type(
       screen.getByTestId("pos.amount_received_input"),
@@ -206,7 +226,9 @@ describe("PosPage", () => {
     await userEvent.click(screen.getByTestId("pos.charge_button"));
 
     await waitFor(() => expect(createPosSaleMock).toHaveBeenCalledTimes(1));
-    expect(createPosSaleMock.mock.calls[0][0]).toEqual({
+    // The backend call is (token, input); the token is null without a session.
+    expect(createPosSaleMock.mock.calls[0][0]).toBeNull();
+    expect(createPosSaleMock.mock.calls[0][1]).toEqual({
       lines: [{ partId: 1n, quantity: 1n, discount: 0n }],
       paymentMethod: PaymentMethod.cash,
       paymentCondition: PaymentCondition.cash,
@@ -220,6 +242,7 @@ describe("PosPage", () => {
     createPosSaleMock.mockResolvedValue(sale());
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.type(
       screen.getByTestId("pos.amount_received_input"),
@@ -241,6 +264,7 @@ describe("PosPage", () => {
     createPosSaleMock.mockRejectedValue(new Error("insufficientStock"));
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.type(
       screen.getByTestId("pos.amount_received_input"),
@@ -264,6 +288,7 @@ describe("PosPage", () => {
   it("applies a line discount to the taxable base before tax", async () => {
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     // 1 × 250.00 = 250.00 gross; a 50.00 discount leaves a 200.00 base.
     await userEvent.clear(screen.getByTestId("pos.discount_input.1"));
@@ -280,6 +305,7 @@ describe("PosPage", () => {
     createPosSaleMock.mockResolvedValue(sale());
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.clear(screen.getByTestId("pos.discount_input.1"));
     await userEvent.type(screen.getByTestId("pos.discount_input.1"), "50");
@@ -291,7 +317,9 @@ describe("PosPage", () => {
 
     await waitFor(() => expect(createPosSaleMock).toHaveBeenCalledTimes(1));
     // The discount is carried in cents, matching the backend's money unit.
-    expect(createPosSaleMock.mock.calls[0][0]).toMatchObject({
+    // The backend call is (token, input); the token is null without a session.
+    expect(createPosSaleMock.mock.calls[0][0]).toBeNull();
+    expect(createPosSaleMock.mock.calls[0][1]).toMatchObject({
       lines: [{ partId: 1n, quantity: 1n, discount: 5000n }],
       paymentMethod: PaymentMethod.cash,
     });
@@ -312,6 +340,7 @@ describe("PosPage", () => {
     );
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
 
     // 1 × 250.00 with no tax: the total is the plain subtotal.
@@ -325,6 +354,7 @@ describe("PosPage", () => {
     );
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.clear(screen.getByTestId("pos.discount_input.1"));
     await userEvent.type(screen.getByTestId("pos.discount_input.1"), "50");
@@ -338,8 +368,8 @@ describe("PosPage", () => {
   //
   // The picker page intentionally shrank to 50 rows, so a scanned SKU that is
   // not in that first page must still resolve. The scan path queries the
-  // backend directly with the scanned code and matches the SKU exactly, so the
-  // cart gains the scanned product even though the picker never listed it.
+  // backend directly through `findPartByCode` (barcode or SKU), so the cart
+  // gains the scanned product even though the picker never listed it.
 
   it("adds a scanned SKU that is not in the first picker page to the cart", async () => {
     // The picker page (a plain listParts call) returns an unrelated product;
@@ -351,18 +381,12 @@ describe("PosPage", () => {
       salePrice: 80000n,
       totalStock: 4n,
     });
-    listPartsMock.mockImplementation(
-      (filter: { search?: string } | undefined) =>
-        Promise.resolve(
-          filter?.search === "REP-9999"
-            ? { items: [scanned], total: 1n, offset: 0n, limit: 50n }
-            : { items: [part()], total: 1n, offset: 0n, limit: 50n },
-        ),
-    );
+    findPartByCodeMock.mockResolvedValue({ __kind__: "found", found: scanned });
     renderWithProviders(<PosPage />);
 
-    // The picker only ever shows the unrelated first-page product.
-    await screen.findByTestId("pos.product_item.1");
+    // The picker shows nothing until a term is typed; the scan path is
+    // independent of the picker page.
+    await screen.findByTestId("pos.search_prompt_state");
     expect(screen.queryByTestId("pos.product_item.99")).not.toBeInTheDocument();
 
     await userEvent.type(screen.getByTestId("pos.barcode_input"), "REP-9999");
@@ -371,55 +395,44 @@ describe("PosPage", () => {
     const cart = await screen.findByTestId("pos.cart_list");
     expect(within(cart).getByText("Cadena de transmisión")).toBeInTheDocument();
     // The scan queried the backend with the scanned code, not the picker term.
-    expect(listPartsMock).toHaveBeenCalledWith(
-      { search: "REP-9999" },
-      expect.anything(),
-      0n,
-      50n,
-    );
+    // The token is null because the test renders without an auth session.
+    expect(findPartByCodeMock).toHaveBeenCalledWith(null, "REP-9999");
   });
 
-  it("matches the scanned SKU case-insensitively", async () => {
+  it("forwards the scanned code verbatim so the backend matches case-insensitively", async () => {
     const scanned = part({
       id: 77n,
       sku: "REP-7777",
       name: "Kit de arrastre",
       totalStock: 3n,
     });
-    listPartsMock.mockImplementation(
-      (filter: { search?: string } | undefined) =>
-        Promise.resolve(
-          filter?.search === "rep-7777"
-            ? { items: [scanned], total: 1n, offset: 0n, limit: 50n }
-            : { items: [part()], total: 1n, offset: 0n, limit: 50n },
-        ),
-    );
+    findPartByCodeMock.mockResolvedValue({ __kind__: "found", found: scanned });
     renderWithProviders(<PosPage />);
 
-    await screen.findByTestId("pos.product_item.1");
+    await screen.findByTestId("pos.search_prompt_state");
     await userEvent.type(screen.getByTestId("pos.barcode_input"), "rep-7777");
     await userEvent.keyboard("{Enter}");
 
     const cart = await screen.findByTestId("pos.cart_list");
     expect(within(cart).getByText("Kit de arrastre")).toBeInTheDocument();
+    // The frontend does not normalize the code; the backend owns the match.
+    expect(findPartByCodeMock).toHaveBeenCalledWith(null, "rep-7777");
   });
 
   it("reports an unknown scanned code without adding a cart line", async () => {
-    listPartsMock.mockResolvedValue({
-      items: [part()],
-      total: 1n,
-      offset: 0n,
-      limit: 50n,
-    });
+    findPartByCodeMock.mockResolvedValue({ __kind__: "notFound" });
     renderWithProviders(<PosPage />);
 
-    await screen.findByTestId("pos.product_item.1");
+    await screen.findByTestId("pos.search_prompt_state");
     await userEvent.type(screen.getByTestId("pos.barcode_input"), "NO-EXISTE");
     await userEvent.keyboard("{Enter}");
 
     await waitFor(() =>
-      expect(screen.getByTestId("pos.cart_empty_state")).toBeInTheDocument(),
+      expect(toast.error).toHaveBeenCalledWith(
+        "Producto no encontrado para el código NO-EXISTE",
+      ),
     );
+    expect(screen.getByTestId("pos.cart_empty_state")).toBeInTheDocument();
     expect(screen.queryByTestId("pos.cart_list")).not.toBeInTheDocument();
   });
 
@@ -432,6 +445,7 @@ describe("PosPage", () => {
     );
     renderWithProviders(<PosPage />);
 
+    await searchProducts();
     await userEvent.click(await screen.findByTestId("pos.product_item.1"));
     await userEvent.type(
       screen.getByTestId("pos.amount_received_input"),

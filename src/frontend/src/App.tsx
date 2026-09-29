@@ -167,6 +167,15 @@ const AccountingPage = lazyPage(() =>
 const SettingsPage = lazyPage(() =>
   import("@/pages/SettingsPage").then((m) => ({ default: m.SettingsPage })),
 );
+const ProfilePage = lazyPage(() =>
+  import("@/pages/ProfilePage").then((m) => ({ default: m.ProfilePage })),
+);
+const UsersPage = lazyPage(() =>
+  import("@/pages/UsersPage").then((m) => ({ default: m.UsersPage })),
+);
+const RolesPage = lazyPage(() =>
+  import("@/pages/RolesPage").then((m) => ({ default: m.RolesPage })),
+);
 const CuentasPorCobrarPage = lazyPage(() =>
   import("@/pages/CuentasPorCobrarPage").then((m) => ({
     default: m.CuentasPorCobrarPage,
@@ -175,6 +184,11 @@ const CuentasPorCobrarPage = lazyPage(() =>
 const CuentasPorPagarPage = lazyPage(() =>
   import("@/pages/CuentasPorPagarPage").then((m) => ({
     default: m.CuentasPorPagarPage,
+  })),
+);
+const CajaBancosPage = lazyPage(() =>
+  import("@/pages/CajaBancosPage").then((m) => ({
+    default: m.CajaBancosPage,
   })),
 );
 
@@ -499,6 +513,25 @@ const settingsRoute = createRoute({
   component: adminOnly(SettingsPage),
 });
 
+// Perfil propio: accesible para todos los roles, sin guarda de administrador.
+const profileRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/perfil",
+  component: ProfilePage,
+});
+
+const usersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/configuracion/usuarios",
+  component: adminOnly(UsersPage),
+});
+
+const rolesRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/configuracion/roles",
+  component: adminOnly(RolesPage),
+});
+
 const driveCallbackRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/connect/drive",
@@ -515,6 +548,12 @@ const payablesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/cuentas-por-pagar",
   component: adminOnly(CuentasPorPagarPage),
+});
+
+const cajaRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/caja",
+  component: adminOnly(CajaBancosPage),
 });
 
 const routeTree = rootRoute.addChildren([
@@ -547,9 +586,13 @@ const routeTree = rootRoute.addChildren([
   commissionsRoute,
   accountingRoute,
   settingsRoute,
+  profileRoute,
+  usersRoute,
+  rolesRoute,
   driveCallbackRoute,
   receivablesRoute,
   payablesRoute,
+  cajaRoute,
 ]);
 
 const router = createRouter({ routeTree });

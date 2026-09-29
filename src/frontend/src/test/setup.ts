@@ -1,10 +1,29 @@
 import "@testing-library/jest-dom/vitest";
 import { configure } from "@testing-library/react";
 import { cleanup } from "@testing-library/react";
-import { afterEach } from "vitest";
+import { afterEach, vi } from "vitest";
 
 // Generated components use `data-ocid` as their stable test hook.
 configure({ testIdAttribute: "data-ocid" });
+
+// Default core-infrastructure mock. `AuthProvider` (rendered by
+// `renderWithProviders`) reads `useActor` and `useInternetIdentity`, and the
+// real `useInternetIdentity` throws when no `InternetIdentityProvider` is
+// mounted. This default keeps the provider renderable with no session and no
+// actor; a test that needs a specific actor or identity still declares its own
+// `vi.mock("@caffeineai/core-infrastructure", …)`, which takes precedence for
+// that file.
+vi.mock("@caffeineai/core-infrastructure", () => ({
+  useActor: () => ({ actor: null, isFetching: false }),
+  useInternetIdentity: () => ({
+    isAuthenticated: false,
+    isInitializing: false,
+    isLoggingIn: false,
+    login: vi.fn(),
+    clear: vi.fn(),
+    identity: undefined,
+  }),
+}));
 
 // jsdom does not implement ResizeObserver, which Radix primitives (Switch,
 // Select, …) observe on mount. A no-op stub keeps those components renderable

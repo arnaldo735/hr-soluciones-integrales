@@ -2,10 +2,10 @@ import { ExitSessionDialog } from "@/components/ExitSessionDialog";
 import { GlobalSearch } from "@/components/GlobalSearch";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/hooks/use-auth";
 import { useDriveConnection } from "@/hooks/use-backup";
 import { useFullscreen } from "@/hooks/use-fullscreen";
 import { useRole } from "@/hooks/use-role";
-import { useInternetIdentity } from "@caffeineai/core-infrastructure";
 import { Link } from "@tanstack/react-router";
 import {
   LogIn,
@@ -22,22 +22,22 @@ interface AppHeaderProps {
 }
 
 export function AppHeader({ onOpenSidebar }: AppHeaderProps) {
-  const { isAuthenticated, login, clear } = useInternetIdentity();
-  const { isAdmin, isLoading } = useRole();
+  const { isAuthenticated, logout } = useAuth();
+  const { isAdmin, isLoading, roleName } = useRole();
   const [isExitDialogOpen, setIsExitDialogOpen] = useState(false);
   // The Drive status is shared by every page through this header, so it is
   // resolved once per session instead of on each module change.
   const drive = useDriveConnection(isAdmin);
   const fullscreen = useFullscreen();
 
-  const roleLabel = isLoading ? "…" : isAdmin ? "Administrador" : "Mecánico";
+  const roleLabel = isLoading ? "…" : roleName;
 
   function handleLogout() {
     if (isAdmin) {
       setIsExitDialogOpen(true);
       return;
     }
-    clear();
+    logout();
   }
 
   return (
@@ -108,6 +108,18 @@ export function AppHeader({ onOpenSidebar }: AppHeaderProps) {
               {roleLabel}
             </Badge>
             <Button
+              asChild
+              variant="ghost"
+              size="sm"
+              className="gap-1.5"
+              data-ocid="header.profile_link"
+            >
+              <Link to="/perfil">
+                <UserRound className="size-4" aria-hidden="true" />
+                <span className="hidden sm:inline">Mi perfil</span>
+              </Link>
+            </Button>
+            <Button
               type="button"
               variant="ghost"
               size="sm"
@@ -123,7 +135,7 @@ export function AppHeader({ onOpenSidebar }: AppHeaderProps) {
           <Button
             type="button"
             size="sm"
-            onClick={() => login()}
+            onClick={() => logout()}
             data-ocid="header.login_button"
             className="gap-1.5"
           >
@@ -138,7 +150,7 @@ export function AppHeader({ onOpenSidebar }: AppHeaderProps) {
         onOpenChange={setIsExitDialogOpen}
         isDriveConfigured={drive.isDriveConfigured}
         isDriveLoading={drive.isLoading}
-        onLogout={clear}
+        onLogout={logout}
       />
     </header>
   );

@@ -1,5 +1,16 @@
+import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { ContactDocumentPreview } from "@/components/ContactDocumentPreview";
 import { SupplierOrderDialog } from "@/components/SupplierOrderDialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -30,7 +41,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { useDeletePurchase } from "@/hooks/use-purchase-invoices";
 import { useSupplierOrders } from "@/hooks/use-supplier-orders";
 import { supplierContactDocument } from "@/hooks/use-whatsapp";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
@@ -59,6 +72,7 @@ import {
   Phone,
   Plus,
   Receipt,
+  ScanLine,
   Search,
   Trash2,
   Wallet,
@@ -66,7 +80,12 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
-const PART_SEARCH_LIMIT = 20n;
+/**
+ * The purchase-line part picker shows every match in a scrollable panel, so it
+ * requests a page large enough to cover the whole catalog instead of a small
+ * fixed cap that would hide valid repuestos.
+ */
+const PART_SEARCH_LIMIT = 1000n;
 
 const PAYMENT_METHOD_LABELS: Record<PaymentMethod, string> = {
   [PaymentMethod.cash]: "Efectivo",
@@ -84,11 +103,12 @@ const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = [
 
 function useSupplier(id: bigint) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: ["supplier", id.toString()],
     queryFn: async (): Promise<Supplier | null> => {
       if (!actor) return null;
-      return actor.getSupplier(id);
+      return actor.getSupplier(token, id);
     },
     enabled: !!actor && !isFetching,
   });
@@ -96,11 +116,12 @@ function useSupplier(id: bigint) {
 
 function usePayable(id: bigint) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: ["payable", id.toString()],
     queryFn: async (): Promise<Payable | null> => {
       if (!actor) return null;
-      return actor.getPayable(id);
+      return actor.getPayable(token, id);
     },
     enabled: !!actor && !isFetching,
   });
@@ -108,11 +129,12 @@ function usePayable(id: bigint) {
 
 function usePurchases(id: bigint) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: ["purchases", id.toString()],
     queryFn: async (): Promise<Purchase[]> => {
       if (!actor) return [];
-      return actor.listPurchases(id);
+      return actor.listPurchases(token, id);
     },
     enabled: !!actor && !isFetching,
   });
@@ -120,11 +142,12 @@ function usePurchases(id: bigint) {
 
 function usePayments(id: bigint) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: ["payments", id.toString()],
     queryFn: async (): Promise<Payment[]> => {
       if (!actor) return [];
-      return actor.listPayments(id);
+      return actor.listPayments(token, id);
     },
     enabled: !!actor && !isFetching,
   });
@@ -132,11 +155,12 @@ function usePayments(id: bigint) {
 
 function useCreatePurchase() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: PurchaseInput): Promise<Purchase> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createPurchase(input);
+      return actor.createPurchase(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["purchases"] });
@@ -160,12 +184,14 @@ function useDebouncedValue(value: string, delay: number): string {
 /** Searches the parts catalog by name/SKU so purchase lines pick a real repuesto. */
 function usePartSearch(term: string) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const trimmed = term.trim();
   return useQuery({
     queryKey: ["parts", "purchase-search", trimmed],
     queryFn: async (): Promise<PartView[]> => {
       if (!actor) return [];
       const page = await actor.listParts(
+        token,
         { search: trimmed === "" ? undefined : trimmed },
         PartSort.name,
         0n,
@@ -180,11 +206,12 @@ function usePartSearch(term: string) {
 
 function useRegisterPayment() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: PaymentInput): Promise<Payment> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.registerPayment(input);
+      return actor.registerPayment(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["payments"] });
@@ -374,12 +401,14 @@ function PurchaseDialog({
     newItemDraft("item-1"),
   ]);
   const [error, setError] = useState<string | null>(null);
+  const [scanItemKey, setScanItemKey] = useState<string | null>(null);
   const createPurchase = useCreatePurchase();
 
   function handleOpenChange(next: boolean) {
     if (next) {
       setItems([newItemDraft("item-1")]);
       setError(null);
+      setScanItemKey(null);
     }
     onOpenChange(next);
   }
@@ -395,6 +424,21 @@ function PurchaseDialog({
       part,
       unitCost: part === null ? "" : centsToInput(part.costPrice),
     });
+  }
+
+  /**
+   * Assigns a scanned or manually typed code to the partida the scanner was
+   * opened for. The scanner already resolved the code through the backend
+   * `findPartByCode` (barcode or SKU), so the resolved part is applied directly
+   * without a second backend lookup; an unknown code shows the "producto no
+   * encontrado" notice and adds nothing.
+   */
+  function handleScanCode(part: PartView): void {
+    const key = scanItemKey;
+    if (key === null) return;
+    selectPart(key, part);
+    toast.success(`${part.name} asignado a la partida`);
+    setScanItemKey(null);
   }
 
   function addItem() {
@@ -500,9 +544,22 @@ function PurchaseDialog({
                 </div>
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div className="space-y-1.5 sm:col-span-2">
-                    <Label htmlFor={`part-search-${item.key}`}>
-                      Repuesto (ID o SKU)
-                    </Label>
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor={`part-search-${item.key}`}>
+                        Repuesto (ID o SKU)
+                      </Label>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setScanItemKey(item.key)}
+                        data-ocid={`supplier_detail.scan_part_button.${index + 1}`}
+                        className="gap-1.5"
+                      >
+                        <ScanLine className="size-3.5" aria-hidden="true" />
+                        Escanear
+                      </Button>
+                    </div>
                     <PartPicker
                       index={index + 1}
                       selected={item.part}
@@ -612,6 +669,38 @@ function PurchaseDialog({
           </DialogFooter>
         </form>
       </DialogContent>
+
+      <Dialog
+        open={scanItemKey !== null}
+        onOpenChange={(open) => {
+          if (!open) setScanItemKey(null);
+        }}
+      >
+        <DialogContent
+          data-ocid="supplier_detail.scan_part_dialog"
+          className="max-h-[90vh] overflow-y-auto sm:max-w-lg"
+        >
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2 font-display">
+              <ScanLine className="size-4 text-primary" aria-hidden="true" />
+              Escanear repuesto
+            </DialogTitle>
+            <DialogDescription>
+              Lee el código de barras del repuesto o ingrésalo manualmente para
+              asignarlo a la partida seleccionada.
+            </DialogDescription>
+          </DialogHeader>
+          <BarcodeScanner
+            ocid="supplier_detail.scan_part"
+            title="Lector de códigos"
+            hint="Apunta la cámara al código del repuesto o ingrésalo manualmente."
+            onDetected={(part) => handleScanCode(part)}
+            onNotFound={(code) => {
+              toast.error(`Producto no encontrado para el código ${code}`);
+            }}
+          />
+        </DialogContent>
+      </Dialog>
     </Dialog>
   );
 }
@@ -810,6 +899,95 @@ function PaymentDialog({
   );
 }
 
+interface DeletePurchaseDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  purchase: Purchase | null;
+}
+
+/**
+ * Confirma la eliminación de una compra no aceptada. El backend rechaza la
+ * operación si la compra ya fue aceptada, tiene pagos o ya afectó inventario;
+ * en ese caso el mensaje en español se muestra dentro del diálogo y la fila
+ * permanece en la lista.
+ */
+function DeletePurchaseDialog({
+  open,
+  onOpenChange,
+  purchase,
+}: DeletePurchaseDialogProps) {
+  const [error, setError] = useState<string | null>(null);
+  const deletePurchase = useDeletePurchase();
+
+  function handleOpenChange(next: boolean) {
+    if (next) setError(null);
+    onOpenChange(next);
+  }
+
+  function confirmDelete() {
+    if (!purchase) return;
+    setError(null);
+    deletePurchase.mutate(purchase.id, {
+      onSuccess: () => {
+        toast.success(`Compra #${purchase.id.toString()} eliminada`);
+        onOpenChange(false);
+      },
+      onError: (mutationError: Error) => {
+        setError(
+          mutationError.message ||
+            "No se pudo eliminar la compra. Inténtalo de nuevo.",
+        );
+      },
+    });
+  }
+
+  return (
+    <AlertDialog open={open} onOpenChange={handleOpenChange}>
+      <AlertDialogContent data-ocid="supplier_detail.delete_purchase_dialog">
+        <AlertDialogHeader>
+          <AlertDialogTitle className="font-display">
+            ¿Eliminar la compra #{purchase?.id.toString() ?? ""}?
+          </AlertDialogTitle>
+          <AlertDialogDescription>
+            Solo se pueden eliminar compras que aún no han sido aceptadas ni
+            confirmadas. Al eliminarla se revierten sus lotes y movimientos de
+            inventario asociados. Esta acción no se puede deshacer.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+
+        {error ? (
+          <p
+            data-ocid="supplier_detail.delete_purchase_error"
+            className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+          >
+            {error}
+          </p>
+        ) : null}
+
+        <AlertDialogFooter>
+          <AlertDialogCancel
+            data-ocid="supplier_detail.delete_purchase_cancel_button"
+            disabled={deletePurchase.isPending}
+          >
+            Cancelar
+          </AlertDialogCancel>
+          <AlertDialogAction
+            data-ocid="supplier_detail.delete_purchase_confirm_button"
+            disabled={deletePurchase.isPending}
+            onClick={(event) => {
+              event.preventDefault();
+              confirmDelete();
+            }}
+            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+          >
+            {deletePurchase.isPending ? "Eliminando…" : "Eliminar compra"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+  );
+}
+
 function DetailSkeleton() {
   const rows = Array.from({ length: 4 }, (_, index) => `detail-row-${index}`);
   return (
@@ -870,6 +1048,7 @@ export function SupplierDetailPage() {
   const [purchaseOpen, setPurchaseOpen] = useState(false);
   const [paymentOpen, setPaymentOpen] = useState(false);
   const [supplierOrderOpen, setSupplierOrderOpen] = useState(false);
+  const [deleteTarget, setDeleteTarget] = useState<Purchase | null>(null);
 
   const supplier = supplierQuery.data ?? null;
   const payable = payableQuery.data ?? null;
@@ -1211,7 +1390,10 @@ export function SupplierDetailPage() {
                     <TableHead>Fecha</TableHead>
                     <TableHead>Repuestos</TableHead>
                     <TableHead className="text-right">Total</TableHead>
-                    <TableHead className="pr-4 text-right">Pagado</TableHead>
+                    <TableHead className="text-right">Pagado</TableHead>
+                    <TableHead className="pr-4 text-right">
+                      <span className="sr-only">Acciones</span>
+                    </TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1247,8 +1429,31 @@ export function SupplierDetailPage() {
                       <TableCell className="data-rail text-right font-semibold">
                         {formatMoney(purchase.total)}
                       </TableCell>
-                      <TableCell className="data-rail pr-4 text-right text-muted-foreground">
+                      <TableCell className="data-rail text-right text-muted-foreground">
                         {formatMoney(purchase.paidAmount)}
+                      </TableCell>
+                      <TableCell className="pr-4 text-right">
+                        {purchase.accepted ? (
+                          <Badge
+                            variant="outline"
+                            data-ocid={`supplier_detail.purchase_accepted_badge.${index + 1}`}
+                            className="border-success/40 bg-success/10 font-mono text-[10px] uppercase tracking-wider text-success"
+                          >
+                            Aceptada
+                          </Badge>
+                        ) : (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() => setDeleteTarget(purchase)}
+                            aria-label={`Eliminar la compra #${purchase.id.toString()}`}
+                            data-ocid={`supplier_detail.delete_purchase_button.${index + 1}`}
+                            className="size-8 text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 className="size-4" aria-hidden="true" />
+                          </Button>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
@@ -1453,6 +1658,13 @@ export function SupplierDetailPage() {
             open={supplierOrderOpen}
             onOpenChange={setSupplierOrderOpen}
             supplierId={supplierId}
+          />
+          <DeletePurchaseDialog
+            open={deleteTarget !== null}
+            onOpenChange={(open) => {
+              if (!open) setDeleteTarget(null);
+            }}
+            purchase={deleteTarget}
           />
         </>
       )}

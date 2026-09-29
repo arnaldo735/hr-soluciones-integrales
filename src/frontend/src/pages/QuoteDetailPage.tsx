@@ -1,3 +1,4 @@
+import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { NotifyCustomerDialog } from "@/components/NotifyCustomerDialog";
 import { PageHeader } from "@/components/PageHeader";
@@ -34,6 +35,7 @@ import {
   useIvaSettings,
 } from "@/hooks/use-company";
 import { useCustomers } from "@/hooks/use-customers";
+import { useDailyHopeMessage } from "@/hooks/use-hope";
 import { errorMessage, useMotorcycles, useParts } from "@/hooks/use-orders";
 import {
   QUOTE_STATUS_LABELS,
@@ -45,7 +47,16 @@ import {
   useUpdateQuote,
   useUpdateQuoteStatus,
 } from "@/hooks/use-quotes";
+import {
+  SERVICE_TERMS_DEFAULT_TEXT,
+  useServiceTermsSettings,
+} from "@/hooks/use-service-terms";
 import { useServices } from "@/hooks/use-services";
+import {
+  companyContactLine,
+  companyFiscalLines,
+  companyHeaderFromProfile,
+} from "@/lib/company-header";
 import { downloadFile } from "@/lib/download";
 import {
   formatDate,
@@ -54,7 +65,13 @@ import {
   formatNumber,
   formatTaxRate,
 } from "@/lib/format";
-import { loadPdfLibs, pdfCompanyFromProfile } from "@/lib/pdf";
+import {
+  drawHopeMessage,
+  hopeMessageContent,
+  loadPdfLibs,
+  pdfCompanyFromProfile,
+} from "@/lib/pdf";
+import type { HopeMessageContent } from "@/lib/pdf";
 import type {
   DocumentFormat,
   DocumentLine,
@@ -94,6 +111,7 @@ import {
   Printer,
   Receipt,
   Save,
+  ScanLine,
   Search,
   Trash2,
   UserRound,
@@ -132,6 +150,12 @@ const PAYMENT_METHOD_OPTIONS: PaymentMethod[] = [
   PaymentMethodEnum.transfer,
   PaymentMethodEnum.mixed,
 ];
+
+/**
+ * The quote service picker shows every match in a scrollable panel instead of
+ * a small fixed page, so a valid service is never cut off.
+ */
+const SERVICE_PICKER_PAGE_SIZE = 1000;
 
 /** A part line being edited in the form. */
 interface PartDraft {
@@ -241,12 +265,16 @@ function PickerPrompt({ ocid, children }: { ocid: string; children: string }) {
 function PartLinesEditor({
   lines,
   onChange,
+  onScanPart,
 }: {
   lines: PartDraft[];
   onChange: (lines: PartDraft[]) => void;
+  onScanPart: (part: PartView) => void;
 }) {
   const [search, setSearch] = useState("");
   const [activePartKey, setActivePartKey] = useState<string | null>(null);
+  const [scanOpen, setScanOpen] = useState(false);
+  const [scanNotFound, setScanNotFound] = useState<string | null>(null);
   const debouncedSearch = useDebouncedValue(search, 250);
   const term = debouncedSearch.trim();
   const partsQuery = useParts(debouncedSearch);
@@ -294,19 +322,59 @@ function PartLinesEditor({
           <Package className="size-4 text-primary" aria-hidden="true" />
           Repuestos
         </CardTitle>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={addLine}
-          data-ocid="quote_detail.add_part_button"
-          className="gap-1.5"
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          Agregar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            size="sm"
+            variant={scanOpen ? "default" : "outline"}
+            onClick={() => setScanOpen((open) => !open)}
+            aria-expanded={scanOpen}
+            data-ocid="quote_detail.scan_button"
+            className="gap-1.5"
+          >
+            <ScanLine className="size-4" aria-hidden="true" />
+            {scanOpen ? "Cerrar escáner" : "Escanear"}
+          </Button>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={addLine}
+            data-ocid="quote_detail.add_part_button"
+            className="gap-1.5"
+          >
+            <Plus className="size-4" aria-hidden="true" />
+            Agregar
+          </Button>
+        </div>
       </CardHeader>
       <CardContent className="space-y-3 px-5 py-5">
+        {scanOpen ? (
+          <BarcodeScanner
+            ocid="quote_detail.scanner"
+            title="Escanear repuesto"
+            hint="Apunta la cámara al código del repuesto o ingrésalo manualmente. Se agrega como una nueva línea."
+            onDetected={(part) => {
+              setScanNotFound(null);
+              onScanPart(part);
+            }}
+            onNotFound={(code) => setScanNotFound(code)}
+            className="rounded-md border border-border bg-muted/20 p-3"
+          />
+        ) : null}
+        {scanNotFound ? (
+          <p
+            data-ocid="quote_detail.scan_not_found_state"
+            className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive"
+          >
+            <AlertTriangle
+              className="mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
+            Producto no encontrado para el código{" "}
+            <span className="data-rail">{scanNotFound}</span>.
+          </p>
+        ) : null}
         <PickerSearch
           value={search}
           onChange={setSearch}
@@ -526,7 +594,8 @@ function ServiceLinesEditor({
     activeOnly: true,
     sort: ServiceSort.name,
     page: 1,
-    pageSize: 100,
+    pageSize: SERVICE_PICKER_PAGE_SIZE,
+    enabled: term.length > 0,
   });
   const services = term.length > 0 ? (servicesQuery.data?.items ?? []) : [];
 
@@ -805,6 +874,7 @@ async function buildQuotePdf(
   lines: DocumentLine[],
   totals: DocumentTotals[],
   footer: string,
+  hope: HopeMessageContent | null,
 ): Promise<jsPDF> {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const narrow = format === "receipt80";
@@ -928,11 +998,15 @@ async function buildQuotePdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(narrow ? 6 : 7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(
-    doc.splitTextToSize(footer, right - margin),
-    margin,
-    afterTotals + (narrow ? 6 : 10),
-  );
+  const footerY = afterTotals + (narrow ? 6 : 10);
+  const footerLines = doc.splitTextToSize(footer, right - margin);
+  doc.text(footerLines, margin, footerY);
+  drawHopeMessage(doc, hope, {
+    x: margin,
+    right,
+    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    narrow,
+  });
 
   return doc;
 }
@@ -946,6 +1020,9 @@ export function QuoteDetailPage() {
   const quoteQuery = useQuote(quoteId);
   const businessQuery = useBusinessSettings();
   const companyQuery = useCompanyProfile();
+  const dailyHopeQuery = useDailyHopeMessage();
+  const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
+  const serviceTermsQuery = useServiceTermsSettings();
   const { isIvaResponsible, taxRate: effectiveTaxRate } = useIvaSettings();
 
   const [customerId, setCustomerId] = useState<Id | null>(null);
@@ -986,6 +1063,10 @@ export function QuoteDetailPage() {
   const quote = view?.quote ?? null;
   const business = businessQuery.data ?? null;
   const companyLogoUrl = companyQuery.data?.logoUrl ?? undefined;
+  // Complete company identity for the printed quote: logo, razón social, NIT
+  // con dígito de verificación, régimen, responsabilidad, dirección, ciudad,
+  // teléfono, correo y web. Unconfigured fields are omitted cleanly.
+  const companyHeader = companyHeaderFromProfile(companyQuery.data);
 
   // One-time initialization of the draft from the loaded record.
   useEffect(() => {
@@ -1156,6 +1237,26 @@ export function QuoteDetailPage() {
     setFormError(null);
   }
 
+  /**
+   * Adds a scanned part as a new quote part line. The scanner already resolved
+   * the code through `findPartByCode`, so the part is appended with its sale
+   * price and a quantity of one; an unknown code never reaches this handler.
+   */
+  function handleScanPart(part: PartView) {
+    setFormError(null);
+    setPartLines((current) => [
+      ...current,
+      {
+        key: nextKey("part"),
+        partId: part.id,
+        description: part.name,
+        quantity: "1",
+        unitPrice: centsToInput(part.salePrice),
+      },
+    ]);
+    toast.success(`${part.name} agregado a la cotización`);
+  }
+
   function handleStatusChange(status: QuoteStatus) {
     if (quoteId === null) return;
     setFormError(null);
@@ -1312,8 +1413,12 @@ export function QuoteDetailPage() {
     },
   ];
 
+  // Pie de página editable "Términos y condiciones del Servicio". Mientras la
+  // configuración carga, o cuando el administrador la dejó vacía, se usa el
+  // texto de recepción por defecto para que el documento nunca quede sin pie.
+  const serviceTermsText = serviceTermsQuery.data?.text?.trim() ?? "";
   const quoteFooter =
-    "Cotización sujeta a disponibilidad de refacciones. Precios válidos por 15 días.";
+    serviceTermsText !== "" ? serviceTermsText : SERVICE_TERMS_DEFAULT_TEXT;
 
   async function handleDownloadPdf(nextFormat: DocumentFormat) {
     setDownloadError(null);
@@ -1327,6 +1432,7 @@ export function QuoteDetailPage() {
         documentLines,
         documentTotals,
         quoteFooter,
+        hopeMessage,
       );
       await downloadFile({
         filename: `Cotizacion-${quote?.quoteNumber ?? "BORRADOR"}.pdf`,
@@ -1619,7 +1725,11 @@ export function QuoteDetailPage() {
             </CardContent>
           </Card>
 
-          <PartLinesEditor lines={partLines} onChange={setPartLines} />
+          <PartLinesEditor
+            lines={partLines}
+            onChange={setPartLines}
+            onScanPart={handleScanPart}
+          />
           <ServiceLinesEditor lines={serviceLines} onChange={setServiceLines} />
 
           <Card className="gap-0 rounded-lg py-0 shadow-none">
@@ -1881,19 +1991,19 @@ export function QuoteDetailPage() {
               <DocumentPreview
                 title="Cotización"
                 number={quote?.quoteNumber ?? "BORRADOR"}
-                companyName={business?.name ?? "HR SOLUCIONES INTEGRALES"}
-                companyLogoUrl={companyLogoUrl}
-                companyContact={
-                  business
-                    ? [business.address, business.phone]
-                        .filter((part) => part.trim() !== "")
-                        .join(" · ")
-                    : undefined
+                companyName={
+                  companyHeader?.legalName ??
+                  business?.name ??
+                  "HR SOLUCIONES INTEGRALES"
                 }
+                companyLogoUrl={companyHeader?.logoUrl ?? companyLogoUrl}
+                companyContact={companyContactLine(companyHeader)}
+                companyFiscal={companyFiscalLines(companyHeader)}
                 meta={documentMeta}
                 lines={documentLines}
                 totals={documentTotals}
                 footer={quoteFooter}
+                hopeMessage={hopeMessage}
                 format={printFormat}
                 ocid="quote_detail.document"
                 onFormatChange={setPrintFormat}

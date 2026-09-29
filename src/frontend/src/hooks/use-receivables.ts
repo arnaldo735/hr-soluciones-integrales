@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Receivable,
@@ -17,6 +18,7 @@ export interface ReceivableListParams {
 /** Cuentas por cobrar derivadas de las facturas a crédito. */
 export function useReceivables(params: ReceivableListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const search = params.search.trim();
 
   return useQuery({
@@ -27,7 +29,7 @@ export function useReceivables(params: ReceivableListParams) {
         status: params.status ?? undefined,
         search: search.length > 0 ? search : undefined,
       };
-      return actor.listReceivables(filter);
+      return actor.listReceivables(token, filter);
     },
     enabled: !!actor && !isFetching,
   });
@@ -36,12 +38,13 @@ export function useReceivables(params: ReceivableListParams) {
 /** Resumen de cartera: total por cobrar, total vencido y cuentas abiertas. */
 export function useReceivableSummary() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["receivable-summary"],
     queryFn: async (): Promise<ReceivableSummary | null> => {
       if (!actor) return null;
-      return actor.getReceivableSummary();
+      return actor.getReceivableSummary(token);
     },
     enabled: !!actor && !isFetching,
   });
@@ -50,6 +53,7 @@ export function useReceivableSummary() {
 /** Registra un abono sobre una cuenta por cobrar. */
 export function useRegisterReceivablePayment() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -57,7 +61,7 @@ export function useRegisterReceivablePayment() {
       input: ReceivablePaymentInput,
     ): Promise<ReceivablePayment> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.registerReceivablePayment(input);
+      return actor.registerReceivablePayment(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["receivables"] });

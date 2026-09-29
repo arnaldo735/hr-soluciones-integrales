@@ -74,6 +74,8 @@ function summary(
     totalIncome: 500000n,
     totalExpenses: 200000n,
     profit: 300000n,
+    totalCommissions: 0n,
+    netProfit: 0n,
     ...overrides,
   };
 }
@@ -130,6 +132,8 @@ function report(overrides: Partial<AccountingReport> = {}): AccountingReport {
         margin: 300000n,
         marginBps: 6000n,
       },
+      totalCommission: 0n,
+      netProfit: 0n,
       serviceLines: [
         {
           invoiceId: 1n,
@@ -382,7 +386,7 @@ describe("AccountingPage", () => {
     renderWithProviders(<AccountingPage />);
 
     await waitFor(() => expect(getAccountingReportMock).toHaveBeenCalled());
-    expect(getAccountingReportMock.mock.calls[0][0]).toEqual({
+    expect(getAccountingReportMock.mock.calls[0][1]).toEqual({
       from: undefined,
       to: undefined,
     });
@@ -403,7 +407,7 @@ describe("AccountingPage", () => {
     expect(fromInput.value).toMatch(/^\d{4}-\d{2}-\d{2}$/);
 
     await waitFor(() => {
-      const lastCall = getAccountingReportMock.mock.calls.at(-1)?.[0] as {
+      const lastCall = getAccountingReportMock.mock.calls.at(-1)?.[1] as {
         from?: bigint;
         to?: bigint;
       };
@@ -919,7 +923,8 @@ describe("AccountingPage", () => {
 
     await screen.findByTestId("accounting.valuation.row.1");
     expect(getInventoryValuationMock).toHaveBeenCalledTimes(1);
-    expect(getInventoryValuationMock.mock.calls[0]).toEqual([]);
+    // The session token is the only argument; the snapshot is never period-scoped.
+    expect(getInventoryValuationMock.mock.calls[0]).toEqual([null]);
   });
 
   it("renders the valuation money values in COP format from the backend payload", async () => {
@@ -1072,7 +1077,7 @@ describe("AccountingPage", () => {
 
     const document = await screen.findByTestId("accounting.valuation.document");
     const logo = within(document).getByTestId(
-      "accounting.valuation.document.logo",
+      "accounting.valuation.document.company.logo",
     );
     expect(logo).toHaveAttribute("src", "https://cdn.example.com/logo.png");
   });
@@ -1088,7 +1093,9 @@ describe("AccountingPage", () => {
 
     const document = await screen.findByTestId("accounting.valuation.document");
     expect(
-      within(document).queryByTestId("accounting.valuation.document.logo"),
+      within(document).queryByTestId(
+        "accounting.valuation.document.company.logo",
+      ),
     ).not.toBeInTheDocument();
     // The rest of the header is still present.
     expect(
@@ -1555,6 +1562,31 @@ describe("AccountingPage", () => {
     );
   });
 
+  it("discounts the period's technician commissions from the consolidated profit", async () => {
+    // The accepted rule: netProfit = margin − totalCommission. The fixture's
+    // consolidated margin is 300000 and the period pays 80000 in commissions,
+    // so the net utility is 220000.
+    const base = report();
+    const profit = {
+      ...base.profit,
+      totalCommission: 80000n,
+      netProfit: 220000n,
+    };
+    getAccountingReportMock.mockResolvedValue(report({ profit }));
+    renderWithProviders(<AccountingPage />);
+
+    const panel = await screen.findByTestId("accounting.profit");
+    const netSummary = within(panel).getByTestId(
+      "accounting.profit.net_summary",
+    );
+    expect(netSummary).toHaveTextContent("Comisiones de técnicos del periodo");
+    expect(netSummary).toHaveTextContent("−$ 800");
+    expect(netSummary).toHaveTextContent("Utilidad neta después de comisiones");
+    expect(netSummary).toHaveTextContent("$ 2.200");
+    // The net utility is the consolidated margin minus the commissions.
+    expect(profit.total.margin - profit.totalCommission).toBe(220000n);
+  });
+
   it("scopes the profit breakdown to the selected date range", async () => {
     getAccountingReportMock.mockResolvedValue(report());
     renderWithProviders(<AccountingPage />);
@@ -1570,7 +1602,7 @@ describe("AccountingPage", () => {
     );
 
     await waitFor(() => {
-      const lastCall = getAccountingReportMock.mock.calls.at(-1)?.[0] as {
+      const lastCall = getAccountingReportMock.mock.calls.at(-1)?.[1] as {
         from?: bigint;
         to?: bigint;
       };

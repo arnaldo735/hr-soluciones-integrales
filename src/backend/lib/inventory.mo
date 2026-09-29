@@ -1,4 +1,5 @@
 import List "mo:core/List";
+import Char "mo:core/Char";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Order "mo:core/Order";
@@ -8,6 +9,7 @@ import Set "mo:core/Set";
 import Text "mo:core/Text";
 import Time "mo:core/Time";
 import Types "../types/inventory";
+import Search "../lib/search";
 
 module {
   public type State = {
@@ -44,6 +46,7 @@ module {
     {
       id = part.id;
       sku = part.sku;
+      barcode = part.barcode;
       name = part.name;
       category = part.category;
       brand = part.brand;
@@ -62,7 +65,7 @@ module {
       case null { true };
       case (?n) {
         if (n == "") { true } else {
-          part.name.toLower().contains(#text n) or part.sku.toLower().contains(#text n);
+          Search.containsAny([part.name, part.sku, part.barcode], n);
         };
       };
     };
@@ -81,10 +84,31 @@ module {
     searchOk and categoryOk and brandOk and lowStockOk
   };
 
-  func compareViews(a : Types.PartView, b : Types.PartView, sort : Types.PartSort) : Order.Order {
-    switch (sort) {
-      case (#name) { Text.compare(a.name.toLower(), b.name.toLower()) };
-      case (#sku) { Text.compare(a.sku.toLower(), b.sku.toLower()) };
+  // Normaliza un código de barras para comparaciones: sin espacios externos.
+  // La cadena vacía significa «sin código» y nunca se considera duplicado.
+  func normalizeBarcode(barcode : Text) : Text {
+    barcode.trim(#predicate(Char.isWhitespace));
+  };
+
+  // Comprueba que ningún OTRO repuesto use el mismo código de barras. Un
+  // código vacío no participa en la comprobación.
+  func assertBarcodeAvailable(state : State, barcode : Text, excludeId : ?Types.Id) {
+    let normalized = normalizeBarcode(barcode);
+    if (normalized == "") { return };
+    for (part in state.parts.values()) {
+      let isOther = switch (excludeId) {
+        case (?id) { part.id != id };
+        case null { true };
+      };
+      if (isOther and normalizeBarcode(part.barcode) == normalized) {
+        Runtime.trap("duplicateBarcode: " # normalized);
+      };
+    };
+  };
+
+  func compareViews(a : Types.PartView, b : Types.PartView, sort : Types.PartSort) : Order.Order {    switch (sort) {
+      case (#name) { Text.compare(Search.sortKey(a.name), Search.sortKey(b.name)) };
+      case (#sku) { Text.compare(Search.sortKey(a.sku), Search.sortKey(b.sku)) };
       case (#stock) { Nat.compare(a.totalStock, b.totalStock) };
       case (#createdAt) { Int.compare(a.createdAt, b.createdAt) };
     }
@@ -102,7 +126,7 @@ module {
     let stock = stockByPart(state);
     let needle = switch (filter.search) {
       case null { null };
-      case (?term) { ?term.toLower() };
+      case (?term) { ?Search.normalize(term) };
     };
     let matched = List.empty<Types.PartView>();
     for (part in state.parts.values()) {
@@ -134,8 +158,8 @@ module {
       brands.add(part.brand);
     };
     {
-      categories = categories.toArray().sort(func (a, b) = Text.compare(a.toLower(), b.toLower()));
-      brands = brands.toArray().sort(func (a, b) = Text.compare(a.toLower(), b.toLower()));
+      categories = categories.toArray().sort(func (a, b) = Text.compare(Search.sortKey(a), Search.sortKey(b)));
+      brands = brands.toArray().sort(func (a, b) = Text.compare(Search.sortKey(a), Search.sortKey(b)));
     };
   };
 
@@ -146,17 +170,41 @@ module {
     };
   };
 
+  // Busca un repuesto por código de barras o por SKU. La comparación ignora
+  // mayúsculas y espacios externos. El código de barras tiene prioridad sobre
+  // el SKU cuando ambos coinciden con repuestos distintos. Devuelve `#notFound`
+  // cuando el código consultado está vacío o no coincide con ningún repuesto.
+  public func findPartByCode(state : State, code : Text, includeCost : Bool) : Types.PartLookupResult {
+    let needle = Search.normalize(code);
+    if (needle == "") { return #notFound };
+    var bySku : ?Types.Part = null;
+    for (part in state.parts.values()) {
+      if (Search.equals(normalizeBarcode(part.barcode), needle)) {
+        return #found(toView(part, totalStock(state, part.id), includeCost));
+      };
+      if (bySku == null and Search.equals(part.sku, needle)) {
+        bySku := ?part;
+      };
+    };
+    switch (bySku) {
+      case (?part) { #found(toView(part, totalStock(state, part.id), includeCost)) };
+      case null { #notFound };
+    };
+  };
+
   public func createPart(state : State, input : Types.PartInput) : Types.PartView {
     for (part in state.parts.values()) {
       if (part.sku == input.sku) {
         Runtime.trap("duplicateSku: " # input.sku);
       };
     };
+    assertBarcodeAvailable(state, input.barcode, null);
     let id = state.counters.nextPartId;
     state.counters.nextPartId := id + 1;
     let part : Types.Part = {
       id;
       sku = input.sku;
+      barcode = normalizeBarcode(input.barcode);
       name = input.name;
       category = input.category;
       brand = input.brand;
@@ -177,9 +225,11 @@ module {
         Runtime.trap("duplicateSku: " # input.sku);
       };
     };
+    assertBarcodeAvailable(state, input.barcode, ?id);
     let updated : Types.Part = {
       id = existing.id;
       sku = input.sku;
+      barcode = normalizeBarcode(input.barcode);
       name = input.name;
       category = input.category;
       brand = input.brand;
@@ -295,7 +345,7 @@ module {
         out.add(toView(part, partStock, includeCost));
       };
     };
-    out.toArray().sort(func (a, b) = Text.compare(a.name.toLower(), b.name.toLower()))
+    out.toArray().sort(func (a, b) = Text.compare(Search.sortKey(a.name), Search.sortKey(b.name)))
   };
 
   public func bulkCreateParts(state : State, inputs : [Types.PartInput]) : Types.BulkResult {
@@ -318,6 +368,7 @@ module {
         let part : Types.Part = {
           id;
           sku = input.sku;
+          barcode = normalizeBarcode(input.barcode);
           name = input.name;
           category = input.category;
           brand = input.brand;
@@ -360,6 +411,7 @@ module {
             let part : Types.Part = {
               id = existing.id;
               sku = input.sku;
+              barcode = normalizeBarcode(input.barcode);
               name = input.name;
               category = input.category;
               brand = input.brand;
@@ -385,6 +437,7 @@ module {
     for (part in state.parts.values()) {
       out.add({
         sku = part.sku;
+        barcode = part.barcode;
         name = part.name;
         category = part.category;
         brand = part.brand;
@@ -395,7 +448,7 @@ module {
         quantity = totalStock(state, part.id);
       });
     };
-    out.toArray().sort(func (a, b) = Text.compare(a.sku.toLower(), b.sku.toLower()))
+    out.toArray().sort(func (a, b) = Text.compare(Search.sortKey(a.sku), Search.sortKey(b.sku)))
   };
 
   // Fija la existencia de un repuesto al valor exacto indicado. La existencia
@@ -458,10 +511,10 @@ module {
           error = ?"El nombre es obligatorio";
         });
       } else {
-        let key = sku.toLower();
+        let key = Search.normalize(sku);
         var existing : ?Types.Part = null;
         for (part in state.parts.values()) {
-          if (part.sku.trim(#predicate(func (c : Char) : Bool = c == ' ')).toLower() == key) {
+          if (Search.equals(part.sku, key)) {
             existing := ?part;
           };
         };
@@ -471,6 +524,7 @@ module {
             let updatedPart : Types.Part = {
               id = part.id;
               sku;
+              barcode = normalizeBarcode(row.barcode);
               name;
               category = row.category;
               brand = row.brand;
@@ -497,6 +551,7 @@ module {
             let part : Types.Part = {
               id;
               sku;
+              barcode = normalizeBarcode(row.barcode);
               name;
               category = row.category;
               brand = row.brand;

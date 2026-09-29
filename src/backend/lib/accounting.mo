@@ -90,7 +90,47 @@ module {
   };
 
   func allEntries(state : State, period : Types.AccountingPeriod) : [Types.LedgerEntry] {
-    incomeEntries(state, period).concat(expenseEntries(state, period));
+    incomeEntries(state, period).concat(expenseEntries(state, period)).concat(commissionEntries(state, period));
+  };
+
+  // Asientos de comisión de técnicos del periodo. Se agrupan por factura: una
+  // entrada por factura pagada cuya comisión total sea mayor que cero, con el
+  // importe agregado de sus líneas de servicio. La comisión se muestra como un
+  // movimiento propio que reduce la utilidad del libro.
+  func commissionEntries(state : State, period : Types.AccountingPeriod) : [Types.LedgerEntry] {
+    let breakdown = getProfitBreakdown(state, period);
+    let totals = Map.empty<Common.Id, Nat>();
+    let order = List.empty<Common.Id>();
+    for (line in breakdown.serviceLines.values()) {
+      if (line.commission > 0) {
+        switch (totals.get(line.invoiceId)) {
+          case null {
+            totals.add(line.invoiceId, line.commission);
+            order.add(line.invoiceId);
+          };
+          case (?current) { totals.add(line.invoiceId, current + line.commission) };
+        };
+      };
+    };
+    let out = List.empty<Types.LedgerEntry>();
+    for (invoiceId in order.values()) {
+      let amount = totals.get(invoiceId) ?? 0;
+      let date = switch (state.invoices.get(invoiceId)) {
+        case (?invoice) { invoice.issuedAt };
+        case null { 0 };
+      };
+      out.add({
+        id = invoiceId;
+        kind = #commission;
+        date;
+        concept = "Comisión de técnicos";
+        category = "commission";
+        amount;
+        referenceId = ?invoiceId;
+        referenceType = ?"commission";
+      });
+    };
+    out.toArray();
   };
 
   // Los servicios de la categoría "Servicio de terceros" no generan comisión:
@@ -151,12 +191,16 @@ module {
         expenseCount += 1;
       };
     };
+    let totalCommissions = getProfitBreakdown(state, period).totalCommission;
+    let profit = totalIncome.toInt() - totalExpenses.toInt();
     {
       from = period.from;
       to = period.to;
       totalIncome;
       totalExpenses;
-      profit = totalIncome.toInt() - totalExpenses.toInt();
+      totalCommissions;
+      profit;
+      netProfit = profit - totalCommissions.toInt();
       invoiceCount;
       expenseCount;
     };
@@ -350,6 +394,8 @@ module {
         marginBps = marginBpsOf(totalIncome, totalMargin);
       };
       serviceLines = serviceLines.toArray();
+      totalCommission = servicesCost;
+      netProfit = totalMargin - servicesCost.toInt();
     };
   };
 

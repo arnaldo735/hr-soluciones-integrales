@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { useCustomers } from "@/hooks/use-customers";
 import { useRole } from "@/hooks/use-role";
@@ -726,6 +727,7 @@ function ZeroServicesDialog({
 
 export function ServicesPage() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const { isAdmin } = useRole();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -965,7 +967,7 @@ export function ServicesPage() {
 
     setIsImporting(true);
     try {
-      const created = await actor.bulkCreateServices(inputs);
+      const created = await actor.bulkCreateServices(token, inputs);
       // The bulk import bypasses the CRUD hooks, so refresh the catalog here
       // with the same queryKey the service hooks invalidate.
       await queryClient.invalidateQueries({ queryKey: ["services"] });

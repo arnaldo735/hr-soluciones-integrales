@@ -13,6 +13,7 @@ import List "mo:core/List";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Nat64 "mo:core/Nat64";
+import Order "mo:core/Order";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import Text "mo:core/Text";
@@ -454,15 +455,17 @@ module {
     case (#guest) { "guest" };
   };
 
+  func userProfileJson(principal : Principal, profile : UserTypes.UserProfile) : Candid = jObj([
+    ("principal", jPrincipal(principal)),
+    ("name", jText(profile.name)),
+    ("role", jText(userRoleText(profile.role))),
+    ("createdAt", jInt(profile.createdAt)),
+  ]);
+
   func userProfilesJson(m : Map.Map<Principal, UserTypes.UserProfile>) : [Candid] {
     let out = List.empty<Candid>();
     for ((principal, profile) in m.entries()) {
-      out.add(jObj([
-        ("principal", jPrincipal(principal)),
-        ("name", jText(profile.name)),
-        ("role", jText(userRoleText(profile.role))),
-        ("createdAt", jInt(profile.createdAt)),
-      ]));
+      out.add(userProfileJson(principal, profile));
     };
     out.toArray();
   };
@@ -667,7 +670,218 @@ module {
     ("updatedAt", jInt(p.updatedAt)),
   ]);
 
-  /// Serializa las colecciones del taller a un JSON.
+  // ── Secciones del respaldo (exportación paginada) ─────────────────────────
+  //
+  // El respaldo se divide en 23 secciones, una por clave raíz del JSON, en el
+  // mismo orden en que las producía `serializeBackup`. Cada sección se
+  // serializa en su propia llamada, de modo que ninguna consulta se acerca al
+  // límite de instrucciones por mensaje. Las secciones de colección se pueden
+  // paginar además por `offset`/`limit` para que una sola colección muy grande
+  // tampoco desborde el límite.
+
+  /// Claves raíz del JSON, en el orden exacto de `serializeBackup`.
+  public let SECTION_KEYS : [Text] = [
+    "parts",
+    "lots",
+    "movements",
+    "customers",
+    "motorcycles",
+    "orders",
+    "suppliers",
+    "purchases",
+    "payments",
+    "invoices",
+    "businessSettings",
+    "userProfiles",
+    "quotes",
+    "services",
+    "serviceCategories",
+    "technicians",
+    "appointments",
+    "expenses",
+    "expenseCategories",
+    "posSales",
+    "receivablePayments",
+    "supplierOrders",
+    "company",
+  ];
+
+  /// Tamaño máximo de página que acepta `getBackupSection`. Acota cuántos
+  /// elementos se serializan por llamada.
+  public let MAX_PAGE_SIZE : Nat = 200;
+
+  /// Serializa un valor Candid a JSON, con el mismo mensaje de error que usaba
+  /// `serializeBackup`.
+  func toJson(value : Candid) : Text {
+    switch (JSON.fromCandid(value)) {
+      case (#ok(text)) { text };
+      case (#err(message)) { Runtime.trap("No se pudo serializar el respaldo: " # message) };
+    };
+  };
+
+  // Serializa una página de una colección: toma los elementos
+  // `[offset, offset+limit)` del arreglo completo y los serializa como un
+  // arreglo JSON. Solo se serializa la página, nunca la colección entera.
+  // Devuelve el JSON y el total de elementos de la sección.
+  func pageJson<V>(items : [V], f : V -> Candid, offset : Nat, limit : Nat) : (Text, Nat) {
+    let total = items.size();
+    let start = if (offset > total) { total } else { offset };
+    let end = if (start + limit > total) { total } else { start + limit };
+    let page = List.empty<Candid>();
+    var i = start;
+    while (i < end) {
+      page.add(f(items[i]));
+      i += 1;
+    };
+    (toJson(jArr(page.toArray())), total);
+  };
+
+  // Valores de un mapa como arreglo, sin serializar. Es una copia barata que
+  // permite paginar por índice antes de serializar.
+  func mapValuesRaw<K, V>(m : Map.Map<K, V>) : [V] {
+    let out = List.empty<V>();
+    for ((_, v) in m.entries()) {
+      out.add(v);
+    };
+    out.toArray();
+  };
+
+  // Pares (clave, valor) de un mapa como arreglo, sin serializar. Se usa para
+  // los perfiles de usuario, cuya clave (el principal) forma parte del JSON.
+  func mapEntriesRaw<K, V>(m : Map.Map<K, V>) : [(K, V)] {
+    let out = List.empty<(K, V)>();
+    for (entry in m.entries()) {
+      out.add(entry);
+    };
+    out.toArray();
+  };
+
+  /// Manifiesto de la copia local paginada: nombre del archivo, momento de
+  /// generación y el plan ordenado de secciones. No serializa ningún dato, así
+  /// que la consulta siempre responde muy por debajo del límite de
+  /// instrucciones por mensaje.
+  public func localBackupManifest(now : Int) : Types.LocalBackupManifest {
+    {
+      fileName = localBackupFileName(now);
+      generatedAt = now;
+      sections = SECTION_KEYS;
+      totalSections = SECTION_KEYS.size();
+      maxPageSize = MAX_PAGE_SIZE;
+    };
+  };
+
+  /// Serializa una sección completa del respaldo como valor JSON. `offset` y
+  /// `limit` solo aplican a las secciones de colección; las secciones de un
+  /// único registro los ignoran. Devuelve el JSON de la página, el total de
+  /// elementos de la sección y si la página es la última.
+  public func sectionChunk(
+    state : State,
+    index : Nat,
+    offset : Nat,
+    limit : Nat,
+  ) : (Text, Nat, Bool) {
+    let bounded = if (limit == 0 or limit > MAX_PAGE_SIZE) { MAX_PAGE_SIZE } else { limit };
+    switch (index) {
+      case (0) {
+        let (json, total) = pageJson(mapValuesRaw(state.parts), partJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (1) {
+        let (json, total) = pageJson(mapValuesRaw(state.lots), lotJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (2) {
+        let (json, total) = pageJson(mapValuesRaw(state.movements), movementJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (3) {
+        let (json, total) = pageJson(mapValuesRaw(state.customers), customerJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (4) {
+        let (json, total) = pageJson(mapValuesRaw(state.motorcycles), motorcycleJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (5) {
+        let (json, total) = pageJson(mapValuesRaw(state.orders), orderJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (6) {
+        let (json, total) = pageJson(mapValuesRaw(state.suppliers), supplierJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (7) {
+        let (json, total) = pageJson(mapValuesRaw(state.purchases), purchaseJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (8) {
+        let (json, total) = pageJson(mapValuesRaw(state.payments), paymentJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (9) {
+        let (json, total) = pageJson(mapValuesRaw(state.invoices), invoiceJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (10) {
+        (toJson(businessSettingsJson(state.businessSettings.settings)), 0, true);
+      };
+      case (11) {
+        let (json, total) = pageJson(mapEntriesRaw(state.userProfiles), func (entry : (Principal, UserTypes.UserProfile)) : Candid = userProfileJson(entry.0, entry.1), offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (12) {
+        let (json, total) = pageJson(mapValuesRaw(state.quotes), quoteJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (13) {
+        let (json, total) = pageJson(mapValuesRaw(state.services), serviceJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (14) {
+        let (json, total) = pageJson(mapValuesRaw(state.serviceCategories), serviceCategoryJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (15) {
+        let (json, total) = pageJson(mapValuesRaw(state.technicians), technicianJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (16) {
+        let (json, total) = pageJson(mapValuesRaw(state.appointments), appointmentJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (17) {
+        let (json, total) = pageJson(mapValuesRaw(state.expenses), expenseJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (18) {
+        let (json, total) = pageJson(mapValuesRaw(state.expenseCategories), expenseCategoryJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (19) {
+        let (json, total) = pageJson(mapValuesRaw(state.posSales), posSaleJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (20) {
+        let (json, total) = pageJson(mapValuesRaw(state.receivablePayments), receivablePaymentJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (21) {
+        let (json, total) = pageJson(mapValuesRaw(state.supplierOrders), supplierOrderJson, offset, bounded);
+        (json, total, offset + bounded >= total);
+      };
+      case (22) {
+        (toJson(companyProfileJson(state.company.profile)), 0, true);
+      };
+      case (_) {
+        Runtime.trap("Sección de respaldo fuera de rango: " # index.toText());
+      };
+    };
+  };
+
+  /// Serializa las colecciones del taller a un JSON. Se conserva para el
+  /// respaldo a Google Drive, que sube el archivo en una sola llamada de
+  /// actualización (no de consulta) y por tanto no está sujeto al límite de
+  /// instrucciones de las consultas.
   public func serializeBackup(state : State) : Text {
     let root = jObj([
       ("generatedAt", jInt(Time.now())),
@@ -695,10 +909,7 @@ module {
       ("supplierOrders", jArr(mapValues(state.supplierOrders, supplierOrderJson))),
       ("company", companyProfileJson(state.company.profile)),
     ]);
-    switch (JSON.fromCandid(root)) {
-      case (#ok(text)) { text };
-      case (#err(message)) { Runtime.trap("No se pudo serializar el respaldo: " # message) };
-    };
+    toJson(root);
   };
 
   // ── OAuth ─────────────────────────────────────────────────────────────────
@@ -1012,5 +1223,951 @@ module {
       };
     };
     #ok(out.toArray());
+  };
+
+  // ── Restauración desde una copia local ────────────────────────────────────
+  //
+  // El archivo de copia es el JSON que produce `getLocalBackupManifest` +
+  // `getBackupSection`: un objeto raíz con `generatedAt`, `formatVersion` y
+  // una clave por sección. La restauración se hace en dos pasos para respetar
+  // el límite de instrucciones por mensaje:
+  //
+  //   1. `validateRestoreFile` parsea el archivo una vez y describe su fecha y
+  //      sus secciones, sin tocar el estado.
+  //   2. `restoreSection` parsea el archivo de nuevo y aplica **una** sección,
+  //      sobrescribiendo solo esa colección.
+  //
+  // Cada sección se deserializa con su propio lector; un registro con formato
+  // inválido hace fallar la sección completa sin escribir nada (la sección se
+  // construye primero en memoria y solo se vuelca al mapa al final).
+
+  // ── Lectura de valores JSON (Candid) ──────────────────────────────────────
+
+  func asRecord(v : Candid) : ?[(Text, Candid)] {
+    switch (v) {
+      case (#Record(entries)) { ?entries };
+      case (#Map(entries)) { ?entries };
+      case _ { null };
+    };
+  };
+
+  func field(v : Candid, name : Text) : ?Candid {
+    switch (asRecord(v)) {
+      case (?entries) {
+        var found : ?Candid = null;
+        for ((key, value) in entries.values()) {
+          if (key == name) { found := ?value };
+        };
+        found;
+      };
+      case null { null };
+    };
+  };
+
+  func asText(v : Candid) : ?Text {
+    switch (v) { case (#Text(t)) { ?t }; case _ { null } };
+  };
+
+  func asNat(v : Candid) : ?Nat {
+    switch (v) { case (#Nat(n)) { ?n }; case _ { null } };
+  };
+
+  func asInt(v : Candid) : ?Int {
+    switch (v) {
+      case (#Int(n)) { ?n };
+      case (#Nat(n)) { ?n.toInt() };
+      case _ { null };
+    };
+  };
+
+  func asBool(v : Candid) : ?Bool {
+    switch (v) { case (#Bool(b)) { ?b }; case _ { null } };
+  };
+
+  func asArray(v : Candid) : ?[Candid] {
+    switch (v) { case (#Array(items)) { ?items }; case _ { null } };
+  };
+
+  // Un valor opcional: `#Null` (o ausente) es `null`; cualquier otro valor es
+  // `?valor`.
+  func asOpt(v : ?Candid) : ?Candid {
+    switch (v) {
+      case null { null };
+      case (?inner) {
+        switch (inner) { case (#Null) { null }; case _ { ?inner } };
+      };
+    };
+  };
+
+  func asPrincipal(v : Candid) : ?Principal {
+    switch (v) {
+      case (#Principal(p)) { ?p };
+      case (#Text(t)) { ?Principal.fromText(t) };
+      case _ { null };
+    };
+  };
+
+  // ── Lectores por entidad ──────────────────────────────────────────────────
+  // Cada lector devuelve `null` si el registro no tiene la forma esperada; el
+  // llamador convierte ese `null` en un error de sección.
+
+  func readPart(v : Candid) : ?InventoryTypes.Part {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?sku = asText(field(v, "sku") ?? #Null) else return null;
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?category = asText(field(v, "category") ?? #Null) else return null;
+    let ?brand = asText(field(v, "brand") ?? #Null) else return null;
+    let ?unit = asText(field(v, "unit") ?? #Null) else return null;
+    let ?salePrice = asNat(field(v, "salePrice") ?? #Null) else return null;
+    let ?costPrice = asNat(field(v, "costPrice") ?? #Null) else return null;
+    let ?lowStockThreshold = asNat(field(v, "lowStockThreshold") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    // `barcode` es opcional en archivos anteriores a su incorporación.
+    let barcode = asText(field(v, "barcode") ?? #Null) ?? "";
+    ?{ id; sku; barcode; name; category; brand; unit; salePrice; costPrice; lowStockThreshold; createdAt };
+  };
+
+  func readLot(v : Candid) : ?InventoryTypes.Lot {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?partId = asNat(field(v, "partId") ?? #Null) else return null;
+    let ?lotNumber = asText(field(v, "lotNumber") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?unitCost = asNat(field(v, "unitCost") ?? #Null) else return null;
+    let ?receivedAt = asInt(field(v, "receivedAt") ?? #Null) else return null;
+    ?{
+      id; partId; lotNumber; quantity; unitCost;
+      supplierId = asOpt(field(v, "supplierId")).map(func (x) = asNat(x) ?? 0);
+      purchaseId = asOpt(field(v, "purchaseId")).map(func (x) = asNat(x) ?? 0);
+      receivedAt;
+    };
+  };
+
+  func readMovementKind(v : Candid) : ?InventoryTypes.MovementKind {
+    switch (asText(v)) {
+      case (?"sale") { ?#sale };
+      case (?"purchase") { ?#purchase };
+      case (?"adjustment") { ?#adjustment };
+      case _ { null };
+    };
+  };
+
+  func readMovement(v : Candid) : ?InventoryTypes.Movement {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?partId = asNat(field(v, "partId") ?? #Null) else return null;
+    let ?kind = readMovementKind(field(v, "kind") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?performedBy = asPrincipal(field(v, "performedBy") ?? #Null) else return null;
+    let ?at = asInt(field(v, "at") ?? #Null) else return null;
+    ?{
+      id; partId; kind; quantity; performedBy; at;
+      lotId = asOpt(field(v, "lotId")).map(func (x) = asNat(x) ?? 0);
+      unitCost = asOpt(field(v, "unitCost")).map(func (x) = asNat(x) ?? 0);
+      reason = asOpt(field(v, "reason")).map(func (x) = asText(x) ?? "");
+      referenceId = asOpt(field(v, "referenceId")).map(func (x) = asNat(x) ?? 0);
+    };
+  };
+
+  func readCustomer(v : Candid) : ?CustomerTypes.Customer {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?phone = asText(field(v, "phone") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{
+      id; name; phone; createdAt;
+      email = asOpt(field(v, "email")).map(func (x) = asText(x) ?? "");
+      document = asOpt(field(v, "document")).map(func (x) = asText(x) ?? "");
+      address = asOpt(field(v, "address")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  func readMotorcycle(v : Candid) : ?CustomerTypes.Motorcycle {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?customerId = asNat(field(v, "customerId") ?? #Null) else return null;
+    let ?plate = asText(field(v, "plate") ?? #Null) else return null;
+    let ?brand = asText(field(v, "brand") ?? #Null) else return null;
+    let ?model = asText(field(v, "model") ?? #Null) else return null;
+    let ?year = asNat(field(v, "year") ?? #Null) else return null;
+    let ?mileage = asNat(field(v, "mileage") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{ id; customerId; plate; brand; model; year; mileage; createdAt };
+  };
+
+  func readOrderStatus(v : Candid) : ?WorkshopTypes.OrderStatus {
+    switch (asText(v)) {
+      case (?"received") { ?#received };
+      case (?"inRepair") { ?#inRepair };
+      case (?"ready") { ?#ready };
+      case (?"delivered") { ?#delivered };
+      case (?"cancelled") { ?#cancelled };
+      case _ { null };
+    };
+  };
+
+  func readOrderPart(v : Candid) : ?WorkshopTypes.OrderPart {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?partId = asNat(field(v, "partId") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?unitPrice = asNat(field(v, "unitPrice") ?? #Null) else return null;
+    let ?unitCost = asNat(field(v, "unitCost") ?? #Null) else return null;
+    ?{
+      id; partId; description; quantity; unitPrice; unitCost;
+      lotId = asOpt(field(v, "lotId")).map(func (x) = asNat(x) ?? 0);
+    };
+  };
+
+  func readLaborItem(v : Candid) : ?WorkshopTypes.LaborItem {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?price = asNat(field(v, "price") ?? #Null) else return null;
+    ?{
+      id; description; price;
+      technicianId = asOpt(field(v, "technicianId")).map(func (x) = asNat(x) ?? 0);
+      serviceId = asOpt(field(v, "serviceId")).map(func (x) = asNat(x) ?? 0);
+    };
+  };
+
+  func readOrderPhoto(v : Candid) : ?WorkshopTypes.OrderPhoto {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?filename = asText(field(v, "filename") ?? #Null) else return null;
+    let ?mimeType = asText(field(v, "mimeType") ?? #Null) else return null;
+    let ?uploadedBy = asPrincipal(field(v, "uploadedBy") ?? #Null) else return null;
+    let ?uploadedAt = asInt(field(v, "uploadedAt") ?? #Null) else return null;
+    // Los bytes de la foto viven en el almacenamiento de la plataforma y no
+    // forman parte del respaldo; se restaura la referencia vacía.
+    ?{ id; blob = ([] : [Nat8]).toBlob(); filename; mimeType; uploadedBy; uploadedAt };
+  };
+
+  func readStatusChange(v : Candid) : ?WorkshopTypes.StatusChange {
+    let ?to = readOrderStatus(field(v, "to") ?? #Null) else return null;
+    let ?performedBy = asPrincipal(field(v, "performedBy") ?? #Null) else return null;
+    let ?at = asInt(field(v, "at") ?? #Null) else return null;
+    let from = switch (asOpt(field(v, "from"))) {
+      case null { null };
+      case (?inner) { readOrderStatus(inner) };
+    };
+    ?{ from; to; performedBy; at };
+  };
+
+  func readOrder(v : Candid) : ?WorkshopTypes.WorkshopOrder {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?orderNumber = asText(field(v, "orderNumber") ?? #Null) else return null;
+    let ?customerId = asNat(field(v, "customerId") ?? #Null) else return null;
+    let ?motorcycleId = asNat(field(v, "motorcycleId") ?? #Null) else return null;
+    let ?intakeMileage = asNat(field(v, "intakeMileage") ?? #Null) else return null;
+    let ?problem = asText(field(v, "problem") ?? #Null) else return null;
+    let ?status = readOrderStatus(field(v, "status") ?? #Null) else return null;
+    let ?parts = readList(field(v, "parts"), readOrderPart) else return null;
+    let ?labor = readList(field(v, "labor"), readLaborItem) else return null;
+    let ?photos = readList(field(v, "photos"), readOrderPhoto) else return null;
+    let ?technicianIds = readNatList(field(v, "technicianIds")) else return null;
+    let ?statusHistory = readList(field(v, "statusHistory"), readStatusChange) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    let ?updatedAt = asInt(field(v, "updatedAt") ?? #Null) else return null;
+    ?{
+      id; orderNumber; customerId; motorcycleId; intakeMileage; problem; status;
+      parts; labor; photos; technicianIds; statusHistory; createdAt; updatedAt;
+      cancelReason = asOpt(field(v, "cancelReason")).map(func (x) = asText(x) ?? "");
+      cancelledAt = asOpt(field(v, "cancelledAt")).map(func (x) = asInt(x) ?? 0);
+    };
+  };
+
+  func readSupplier(v : Candid) : ?PurchasingTypes.Supplier {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?phone = asText(field(v, "phone") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{
+      id; name; phone; createdAt;
+      contactName = asOpt(field(v, "contactName")).map(func (x) = asText(x) ?? "");
+      email = asOpt(field(v, "email")).map(func (x) = asText(x) ?? "");
+      taxId = asOpt(field(v, "taxId")).map(func (x) = asText(x) ?? "");
+      address = asOpt(field(v, "address")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  func readPurchaseItem(v : Candid) : ?PurchasingTypes.PurchaseItem {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?partId = asNat(field(v, "partId") ?? #Null) else return null;
+    let ?lotNumber = asText(field(v, "lotNumber") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?unitCost = asNat(field(v, "unitCost") ?? #Null) else return null;
+    ?{ id; partId; lotNumber; quantity; unitCost };
+  };
+
+  func readPurchase(v : Candid) : ?PurchasingTypes.Purchase {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?supplierId = asNat(field(v, "supplierId") ?? #Null) else return null;
+    let ?items = readList(field(v, "items"), readPurchaseItem) else return null;
+    let ?total = asNat(field(v, "total") ?? #Null) else return null;
+    let ?paidAmount = asNat(field(v, "paidAmount") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    // `accepted` es opcional en archivos anteriores; se asume aceptada para no
+    // habilitar el borrado de compras que ya afectaron el inventario.
+    let accepted = asBool(field(v, "accepted") ?? #Null) ?? true;
+    ?{ id; supplierId; items; total; paidAmount; accepted; createdAt };
+  };
+
+  func readPaymentMethod(v : Candid) : ?PurchasingTypes.PaymentMethod {
+    switch (asText(v)) {
+      case (?"cash") { ?#cash };
+      case (?"card") { ?#card };
+      case (?"transfer") { ?#transfer };
+      case (?"mixed") { ?#mixed };
+      case _ { null };
+    };
+  };
+
+  func readPayment(v : Candid) : ?PurchasingTypes.Payment {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?supplierId = asNat(field(v, "supplierId") ?? #Null) else return null;
+    let ?amount = asNat(field(v, "amount") ?? #Null) else return null;
+    let ?method = readPaymentMethod(field(v, "method") ?? #Null) else return null;
+    let ?performedBy = asPrincipal(field(v, "performedBy") ?? #Null) else return null;
+    let ?at = asInt(field(v, "at") ?? #Null) else return null;
+    ?{
+      id; supplierId; amount; method; performedBy; at;
+      purchaseId = asOpt(field(v, "purchaseId")).map(func (x) = asNat(x) ?? 0);
+      note = asOpt(field(v, "note")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  func readInvoiceLineKind(v : Candid) : ?BillingTypes.InvoiceLineKind {
+    switch (asText(v)) {
+      case (?"part") { ?#part };
+      case (?"service") { ?#service };
+      case _ { null };
+    };
+  };
+
+  func readInvoiceLine(v : Candid) : ?BillingTypes.InvoiceLine {
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?unitPrice = asNat(field(v, "unitPrice") ?? #Null) else return null;
+    let ?amount = asNat(field(v, "amount") ?? #Null) else return null;
+    let ?kind = readInvoiceLineKind(field(v, "kind") ?? #Null) else return null;
+    let ?unitCost = asNat(field(v, "unitCost") ?? #Null) else return null;
+    ?{ description; quantity; unitPrice; amount; kind; unitCost };
+  };
+
+  func readPaymentStatus(v : Candid) : ?BillingTypes.PaymentStatus {
+    switch (asText(v)) {
+      case (?"pending") { ?#pending };
+      case (?"paid") { ?#paid };
+      case _ { null };
+    };
+  };
+
+  func readPaymentCondition(v : Candid) : ?BillingTypes.PaymentCondition {
+    switch (asText(v)) {
+      case (?"cash") { ?#cash };
+      case (?"credit") { ?#credit };
+      case _ { null };
+    };
+  };
+
+  func readInstallment(v : Candid) : ?BillingTypes.Installment {
+    let ?number = asNat(field(v, "number") ?? #Null) else return null;
+    let ?amount = asNat(field(v, "amount") ?? #Null) else return null;
+    let ?dueDate = asInt(field(v, "dueDate") ?? #Null) else return null;
+    let ?paid = asBool(field(v, "paid") ?? #Null) else return null;
+    ?{
+      number; amount; dueDate; paid;
+      paidAt = asOpt(field(v, "paidAt")).map(func (x) = asInt(x) ?? 0);
+    };
+  };
+
+  func readInstallmentPlan(v : Candid) : ?BillingTypes.InstallmentPlan {
+    let ?installmentCount = asNat(field(v, "installmentCount") ?? #Null) else return null;
+    let ?firstDueDate = asInt(field(v, "firstDueDate") ?? #Null) else return null;
+    let ?installments = readList(field(v, "installments"), readInstallment) else return null;
+    ?{ installmentCount; firstDueDate; installments };
+  };
+
+  func readInvoiceOrigin(v : Candid) : ?BillingTypes.InvoiceOrigin {
+    switch (asText(v)) {
+      case (?"workshopOrder") { ?#workshopOrder };
+      case (?"pos") { ?#pos };
+      case (?"quote") { ?#quote };
+      case _ { null };
+    };
+  };
+
+  func readInvoice(v : Candid) : ?BillingTypes.Invoice {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?number = asText(field(v, "number") ?? #Null) else return null;
+    let ?origin = readInvoiceOrigin(field(v, "origin") ?? #Null) else return null;
+    let ?customerName = asText(field(v, "customerName") ?? #Null) else return null;
+    let ?lines = readList(field(v, "lines"), readInvoiceLine) else return null;
+    let ?subtotal = asNat(field(v, "subtotal") ?? #Null) else return null;
+    let ?discount = asNat(field(v, "discount") ?? #Null) else return null;
+    let ?taxRate = asNat(field(v, "taxRate") ?? #Null) else return null;
+    let ?tax = asNat(field(v, "tax") ?? #Null) else return null;
+    let ?total = asNat(field(v, "total") ?? #Null) else return null;
+    let ?paymentMethod = readPaymentMethod(field(v, "paymentMethod") ?? #Null) else return null;
+    let ?paymentCondition = readPaymentCondition(field(v, "paymentCondition") ?? #Null) else return null;
+    let ?paymentStatus = readPaymentStatus(field(v, "paymentStatus") ?? #Null) else return null;
+    let ?issuedAt = asInt(field(v, "issuedAt") ?? #Null) else return null;
+    ?{
+      id; number; origin; customerName; lines; subtotal; discount; taxRate; tax;
+      total; paymentMethod; paymentCondition; paymentStatus; issuedAt;
+      orderId = asOpt(field(v, "orderId")).map(func (x) = asNat(x) ?? 0);
+      posSaleId = asOpt(field(v, "posSaleId")).map(func (x) = asNat(x) ?? 0);
+      customerId = asOpt(field(v, "customerId")).map(func (x) = asNat(x) ?? 0);
+      customerTaxId = asOpt(field(v, "customerTaxId")).map(func (x) = asText(x) ?? "");
+      customerAddress = asOpt(field(v, "customerAddress")).map(func (x) = asText(x) ?? "");
+      installments = switch (asOpt(field(v, "installments"))) {
+        case null { null };
+        case (?inner) { readInstallmentPlan(inner) };
+      };
+    };
+  };
+
+  func readBusinessSettings(v : Candid) : ?BillingTypes.BusinessSettings {
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?taxId = asText(field(v, "taxId") ?? #Null) else return null;
+    let ?address = asText(field(v, "address") ?? #Null) else return null;
+    let ?phone = asText(field(v, "phone") ?? #Null) else return null;
+    let ?taxRate = asNat(field(v, "taxRate") ?? #Null) else return null;
+    ?{ name; taxId; address; phone; taxRate };
+  };
+
+  func readUserRole(v : Candid) : ?UserTypes.UserRole {
+    switch (asText(v)) {
+      case (?"admin") { ?#admin };
+      case (?"user") { ?#user };
+      case (?"guest") { ?#guest };
+      case _ { null };
+    };
+  };
+
+  func readUserProfile(v : Candid) : ?UserTypes.UserProfile {
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?role = readUserRole(field(v, "role") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{ name; role; createdAt };
+  };
+
+  func readQuoteStatus(v : Candid) : ?QuoteTypes.QuoteStatus {
+    switch (asText(v)) {
+      case (?"draft") { ?#draft };
+      case (?"sent") { ?#sent };
+      case (?"accepted") { ?#accepted };
+      case (?"rejected") { ?#rejected };
+      case (?"expired") { ?#expired };
+      case _ { null };
+    };
+  };
+
+  func readQuotePartLine(v : Candid) : ?QuoteTypes.QuotePartLine {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?partId = asNat(field(v, "partId") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?unitPrice = asNat(field(v, "unitPrice") ?? #Null) else return null;
+    ?{ id; partId; description; quantity; unitPrice };
+  };
+
+  func readQuoteServiceLine(v : Candid) : ?QuoteTypes.QuoteServiceLine {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?unitPrice = asNat(field(v, "unitPrice") ?? #Null) else return null;
+    ?{
+      id; description; quantity; unitPrice;
+      serviceId = asOpt(field(v, "serviceId")).map(func (x) = asNat(x) ?? 0);
+    };
+  };
+
+  func readQuote(v : Candid) : ?QuoteTypes.Quote {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?quoteNumber = asText(field(v, "quoteNumber") ?? #Null) else return null;
+    let ?customerId = asNat(field(v, "customerId") ?? #Null) else return null;
+    let ?motorcycleId = asNat(field(v, "motorcycleId") ?? #Null) else return null;
+    let ?status = readQuoteStatus(field(v, "status") ?? #Null) else return null;
+    let ?partLines = readList(field(v, "partLines"), readQuotePartLine) else return null;
+    let ?serviceLines = readList(field(v, "serviceLines"), readQuoteServiceLine) else return null;
+    let ?discount = asNat(field(v, "discount") ?? #Null) else return null;
+    let ?taxRate = asNat(field(v, "taxRate") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    let ?updatedAt = asInt(field(v, "updatedAt") ?? #Null) else return null;
+    ?{
+      id; quoteNumber; customerId; motorcycleId; status; partLines; serviceLines;
+      discount; taxRate; createdAt; updatedAt;
+      notes = asOpt(field(v, "notes")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  func readService(v : Candid) : ?ServiceTypes.Service {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?code = asText(field(v, "code") ?? #Null) else return null;
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?category = asText(field(v, "category") ?? #Null) else return null;
+    let ?laborRate = asNat(field(v, "laborRate") ?? #Null) else return null;
+    let ?estimatedMinutes = asNat(field(v, "estimatedMinutes") ?? #Null) else return null;
+    let ?active = asBool(field(v, "active") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{ id; code; name; description; category; laborRate; estimatedMinutes; active; createdAt };
+  };
+
+  func readServiceCategory(v : Candid) : ?ServiceCategoryTypes.ServiceCategory {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{ id; name; description; createdAt };
+  };
+
+  func readTechnician(v : Candid) : ?TechnicianTypes.Technician {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?code = asText(field(v, "code") ?? #Null) else return null;
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?phone = asText(field(v, "phone") ?? #Null) else return null;
+    let ?specialty = asText(field(v, "specialty") ?? #Null) else return null;
+    let ?hourlyRate = asNat(field(v, "hourlyRate") ?? #Null) else return null;
+    let ?commissionRate = asNat(field(v, "commissionRate") ?? #Null) else return null;
+    let ?active = asBool(field(v, "active") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{
+      id; code; name; phone; specialty; hourlyRate; commissionRate; active; createdAt;
+      email = asOpt(field(v, "email")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  func readAppointmentStatus(v : Candid) : ?AppointmentTypes.AppointmentStatus {
+    switch (asText(v)) {
+      case (?"scheduled") { ?#scheduled };
+      case (?"confirmed") { ?#confirmed };
+      case (?"attended") { ?#attended };
+      case (?"cancelled") { ?#cancelled };
+      case (?"noShow") { ?#noShow };
+      case _ { null };
+    };
+  };
+
+  func readAppointment(v : Candid) : ?AppointmentTypes.Appointment {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?customerId = asNat(field(v, "customerId") ?? #Null) else return null;
+    let ?motorcycleId = asNat(field(v, "motorcycleId") ?? #Null) else return null;
+    let ?scheduledAt = asInt(field(v, "scheduledAt") ?? #Null) else return null;
+    let ?durationMinutes = asNat(field(v, "durationMinutes") ?? #Null) else return null;
+    let ?reason = asText(field(v, "reason") ?? #Null) else return null;
+    let ?status = readAppointmentStatus(field(v, "status") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    let ?updatedAt = asInt(field(v, "updatedAt") ?? #Null) else return null;
+    ?{
+      id; customerId; motorcycleId; scheduledAt; durationMinutes; reason; status;
+      createdAt; updatedAt;
+      technicianId = asOpt(field(v, "technicianId")).map(func (x) = asNat(x) ?? 0);
+    };
+  };
+
+  func readExpense(v : Candid) : ?ExpenseTypes.Expense {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?date = asInt(field(v, "date") ?? #Null) else return null;
+    let ?concept = asText(field(v, "concept") ?? #Null) else return null;
+    let ?categoryId = asNat(field(v, "categoryId") ?? #Null) else return null;
+    let ?categoryName = asText(field(v, "categoryName") ?? #Null) else return null;
+    let ?amount = asNat(field(v, "amount") ?? #Null) else return null;
+    let ?tax = asNat(field(v, "tax") ?? #Null) else return null;
+    let ?paymentMethod = asText(field(v, "paymentMethod") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{
+      id; date; concept; categoryId; categoryName; amount; tax; paymentMethod; createdAt;
+      supplierId = asOpt(field(v, "supplierId")).map(func (x) = asNat(x) ?? 0);
+      supplierName = asOpt(field(v, "supplierName")).map(func (x) = asText(x) ?? "");
+      receiptUrl = asOpt(field(v, "receiptUrl")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  func readExpenseCategory(v : Candid) : ?ExpenseCategoryTypes.ExpenseCategory {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?name = asText(field(v, "name") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{ id; name; description; createdAt };
+  };
+
+  func readPosSaleLine(v : Candid) : ?PosTypes.PosSaleLine {
+    let ?partId = asNat(field(v, "partId") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?unitPrice = asNat(field(v, "unitPrice") ?? #Null) else return null;
+    let ?discount = asNat(field(v, "discount") ?? #Null) else return null;
+    let ?amount = asNat(field(v, "amount") ?? #Null) else return null;
+    ?{ partId; description; quantity; unitPrice; discount; amount };
+  };
+
+  func readPosSale(v : Candid) : ?PosTypes.PosSale {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?saleNumber = asText(field(v, "saleNumber") ?? #Null) else return null;
+    let ?lines = readList(field(v, "lines"), readPosSaleLine) else return null;
+    let ?subtotal = asNat(field(v, "subtotal") ?? #Null) else return null;
+    let ?discount = asNat(field(v, "discount") ?? #Null) else return null;
+    let ?taxRate = asNat(field(v, "taxRate") ?? #Null) else return null;
+    let ?tax = asNat(field(v, "tax") ?? #Null) else return null;
+    let ?total = asNat(field(v, "total") ?? #Null) else return null;
+    let ?paymentMethod = asText(field(v, "paymentMethod") ?? #Null) else return null;
+    let ?paymentCondition = readPaymentCondition(field(v, "paymentCondition") ?? #Null) else return null;
+    let ?amountReceived = asNat(field(v, "amountReceived") ?? #Null) else return null;
+    let ?change = asNat(field(v, "change") ?? #Null) else return null;
+    let ?invoiceId = asNat(field(v, "invoiceId") ?? #Null) else return null;
+    let ?soldBy = asPrincipal(field(v, "soldBy") ?? #Null) else return null;
+    let ?soldAt = asInt(field(v, "soldAt") ?? #Null) else return null;
+    ?{
+      id; saleNumber; lines; subtotal; discount; taxRate; tax; total; paymentMethod;
+      paymentCondition; amountReceived; change; invoiceId; soldBy; soldAt;
+      customerId = asOpt(field(v, "customerId")).map(func (x) = asNat(x) ?? 0);
+      customerName = asOpt(field(v, "customerName")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  func readReceivablePayment(v : Candid) : ?ReceivableTypes.ReceivablePayment {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?invoiceId = asNat(field(v, "invoiceId") ?? #Null) else return null;
+    let ?amount = asNat(field(v, "amount") ?? #Null) else return null;
+    let ?method = asText(field(v, "method") ?? #Null) else return null;
+    let ?performedBy = asPrincipal(field(v, "performedBy") ?? #Null) else return null;
+    let ?at = asInt(field(v, "at") ?? #Null) else return null;
+    ?{
+      id; invoiceId; amount; method; performedBy; at;
+      note = asOpt(field(v, "note")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  func readSupplierOrder(v : Candid) : ?SupplierOrderTypes.SupplierOrder {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?supplierId = asNat(field(v, "supplierId") ?? #Null) else return null;
+    let ?quantity = asNat(field(v, "quantity") ?? #Null) else return null;
+    let ?sku = asText(field(v, "sku") ?? #Null) else return null;
+    let ?description = asText(field(v, "description") ?? #Null) else return null;
+    let ?createdBy = asPrincipal(field(v, "createdBy") ?? #Null) else return null;
+    let ?createdAt = asInt(field(v, "createdAt") ?? #Null) else return null;
+    ?{ id; supplierId; quantity; sku; description; createdBy; createdAt };
+  };
+
+  func readDocumentType(v : Candid) : ?CompanyTypes.DocumentType {
+    switch (asText(v)) {
+      case (?"nit") { ?#nit };
+      case (?"cedulaCiudadania") { ?#cedulaCiudadania };
+      case (?"cedulaExtranjeria") { ?#cedulaExtranjeria };
+      case _ { null };
+    };
+  };
+
+  func readFiscalRegime(v : Candid) : ?CompanyTypes.FiscalRegime {
+    switch (asText(v)) {
+      case (?"responsableIva") { ?#responsableIva };
+      case (?"noResponsableIva") { ?#noResponsableIva };
+      case _ { null };
+    };
+  };
+
+  func readTaxResponsibility(v : Candid) : ?CompanyTypes.TaxResponsibility {
+    switch (asText(v)) {
+      case (?"granContribuyente") { ?#granContribuyente };
+      case (?"autorretenedor") { ?#autorretenedor };
+      case (?"agenteRetencionIva") { ?#agenteRetencionIva };
+      case (?"regimenSimple") { ?#regimenSimple };
+      case (?"noAplica") { ?#noAplica };
+      case _ { null };
+    };
+  };
+
+  func readCompanyProfile(v : Candid) : ?CompanyTypes.CompanyProfile {
+    let ?legalName = asText(field(v, "legalName") ?? #Null) else return null;
+    let ?documentType = readDocumentType(field(v, "documentType") ?? #Null) else return null;
+    let ?taxId = asText(field(v, "taxId") ?? #Null) else return null;
+    let ?fiscalRegime = readFiscalRegime(field(v, "fiscalRegime") ?? #Null) else return null;
+    let ?taxResponsibility = readTaxResponsibility(field(v, "taxResponsibility") ?? #Null) else return null;
+    let ?address = asText(field(v, "address") ?? #Null) else return null;
+    let ?city = asText(field(v, "city") ?? #Null) else return null;
+    let ?phone = asText(field(v, "phone") ?? #Null) else return null;
+    let ?taxRate = asNat(field(v, "taxRate") ?? #Null) else return null;
+    let ?updatedAt = asInt(field(v, "updatedAt") ?? #Null) else return null;
+    ?{
+      legalName; documentType; taxId; fiscalRegime; taxResponsibility; address;
+      city; phone; taxRate; updatedAt;
+      tradeName = asOpt(field(v, "tradeName")).map(func (x) = asText(x) ?? "");
+      checkDigit = asOpt(field(v, "checkDigit")).map(func (x) = asNat(x) ?? 0);
+      email = asOpt(field(v, "email")).map(func (x) = asText(x) ?? "");
+      website = asOpt(field(v, "website")).map(func (x) = asText(x) ?? "");
+      logoUrl = asOpt(field(v, "logoUrl")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
+  // ── Lectores de listas ────────────────────────────────────────────────────
+
+  // Lee un arreglo JSON aplicando un lector por elemento. Devuelve `null` si
+  // el valor no es un arreglo o si algún elemento no tiene el formato esperado.
+  func readList<T>(v : ?Candid, reader : Candid -> ?T) : ?[T] {
+    switch (v) {
+      case null { null };
+      case (?value) {
+        switch (asArray(value)) {
+          case null { null };
+          case (?items) {
+            let out = List.empty<T>();
+            for (item in items.values()) {
+              switch (reader(item)) {
+                case (?parsed) { out.add(parsed) };
+                case null { return null };
+              };
+            };
+            ?out.toArray();
+          };
+        };
+      };
+    };
+  };
+
+  func readNatList(v : ?Candid) : ?[Nat] {
+    readList(v, func (item : Candid) : ?Nat = asNat(item));
+  };
+
+  // ── Validación del archivo ────────────────────────────────────────────────
+
+  // Parsea el JSON raíz del archivo. Devuelve el valor Candid raíz o un error
+  // de formato.
+  func parseRoot(json : Text) : { #ok : Candid; #err : Text } {
+    switch (JSON.toCandid(json)) {
+      case (#ok(candid)) {
+        switch (asRecord(candid)) {
+          case (?_) { #ok(candid) };
+          case null { #err("El archivo no tiene un objeto JSON en la raíz") };
+        };
+      };
+      case (#err(message)) { #err("El archivo no es un JSON válido: " # message) };
+    };
+  };
+
+  // Índice de una sección por su clave, o `null` si la clave no es conocida.
+  func sectionIndex(key : Text) : ?Nat {
+    var index = 0;
+    for (known in SECTION_KEYS.values()) {
+      if (known == key) { return ?index };
+      index += 1;
+    };
+    null;
+  };
+
+  /// Valida un archivo de copia local y describe su fecha y sus secciones, sin
+  /// alterar ningún dato. Es el paso previo a la restauración: el frontend
+  /// muestra la vista previa y luego confirma sección por sección.
+  public func validateRestoreFile(json : Text) : Types.RestorePreviewOutcome {
+    let root = switch (parseRoot(json)) {
+      case (#ok(candid)) { candid };
+      case (#err(message)) { return #err(#invalidFormat(message)) };
+    };
+    // La versión es opcional en archivos antiguos; se asume la versión 1.
+    let formatVersion = asNat(field(root, "formatVersion") ?? #Null) ?? 1;
+    if (formatVersion > Types.RESTORE_FORMAT_VERSION) {
+      return #err(#incompatibleVersion(formatVersion));
+    };
+    let generatedAt = asInt(field(root, "generatedAt") ?? #Null) ?? 0;
+    let sections = List.empty<Types.RestoreSectionInfo>();
+    var index = 0;
+    for (key in SECTION_KEYS.values()) {
+      switch (field(root, key)) {
+        case (?value) {
+          let count = switch (asArray(value)) {
+            case (?items) { items.size() };
+            case null { 1 };
+          };
+          sections.add({ key; index; count });
+        };
+        case null {};
+      };
+      index += 1;
+    };
+    let found = sections.toArray();
+    if (found.size() == 0) {
+      return #err(#noKnownSections);
+    };
+    #ok({
+      generatedAt;
+      formatVersion;
+      sections = found;
+      totalSections = found.size();
+    });
+  };
+
+  // ── Aplicación de una sección ─────────────────────────────────────────────
+
+  // Reemplaza el contenido de un mapa con los registros leídos. La sección se
+  // construye primero en un mapa temporal; solo si todos los registros son
+  // válidos se vuelca al mapa real, de modo que un archivo inválido no deja la
+  // colección a medias.
+  func replaceMap<K, V>(
+    target : Map.Map<K, V>,
+    parsed : [V],
+    keyOf : V -> K,
+    compare : (K, K) -> Order.Order,
+  ) : Nat {
+    let staged = Map.empty<K, V>();
+    for (item in parsed.values()) {
+      staged.add(keyOf(item), item);
+    };
+    target.clear();
+    for ((key, value) in staged.entries()) {
+      target.add(key, value);
+    };
+    parsed.size();
+  };
+
+  // Igual que `replaceMap`, pero para mapas cuyos registros ya vienen como
+  // pares `(clave, valor)` (por ejemplo `userProfiles`, indexado por principal).
+  func replaceMapEntries<K, V>(
+    target : Map.Map<K, V>,
+    parsed : [(K, V)],
+    compare : (K, K) -> Order.Order,
+  ) : Nat {
+    let staged = Map.empty<K, V>();
+    for ((key, value) in parsed.values()) {
+      staged.add(key, value);
+    };
+    target.clear();
+    for ((key, value) in staged.entries()) {
+      target.add(key, value);
+    };
+    parsed.size();
+  };
+
+  // Aplica una sección del archivo al estado. `index` es la posición dentro de
+  // `SECTION_KEYS`. Devuelve el resultado de la sección o un error de formato.
+  public func restoreSection(
+    state : State,
+    json : Text,
+    index : Nat,
+  ) : Types.RestoreSectionOutcome {
+    if (index >= SECTION_KEYS.size()) {
+      return #err(#unknownSection(index.toText()));
+    };
+    let key = SECTION_KEYS[index];
+    let root = switch (parseRoot(json)) {
+      case (#ok(candid)) { candid };
+      case (#err(message)) { return #err(#invalidFormat(message)) };
+    };
+    let formatVersion = asNat(field(root, "formatVersion") ?? #Null) ?? 1;
+    if (formatVersion > Types.RESTORE_FORMAT_VERSION) {
+      return #err(#incompatibleVersion(formatVersion));
+    };
+    let section = switch (field(root, key)) {
+      case (?value) { value };
+      case null { return #err(#unknownSection(key)) };
+    };
+    let restored = switch (index) {
+      case (0) {
+        let ?parsed = readList(?section, readPart) else return #err(#invalidSection(key));
+        replaceMap(state.parts, parsed, func (p : InventoryTypes.Part) : Common.Id = p.id, Nat.compare);
+      };
+      case (1) {
+        let ?parsed = readList(?section, readLot) else return #err(#invalidSection(key));
+        replaceMap(state.lots, parsed, func (l : InventoryTypes.Lot) : Common.Id = l.id, Nat.compare);
+      };
+      case (2) {
+        let ?parsed = readList(?section, readMovement) else return #err(#invalidSection(key));
+        replaceMap(state.movements, parsed, func (m : InventoryTypes.Movement) : Common.Id = m.id, Nat.compare);
+      };
+      case (3) {
+        let ?parsed = readList(?section, readCustomer) else return #err(#invalidSection(key));
+        replaceMap(state.customers, parsed, func (c : CustomerTypes.Customer) : Common.Id = c.id, Nat.compare);
+      };
+      case (4) {
+        let ?parsed = readList(?section, readMotorcycle) else return #err(#invalidSection(key));
+        replaceMap(state.motorcycles, parsed, func (m : CustomerTypes.Motorcycle) : Common.Id = m.id, Nat.compare);
+      };
+      case (5) {
+        let ?parsed = readList(?section, readOrder) else return #err(#invalidSection(key));
+        replaceMap(state.orders, parsed, func (o : WorkshopTypes.WorkshopOrder) : Common.Id = o.id, Nat.compare);
+      };
+      case (6) {
+        let ?parsed = readList(?section, readSupplier) else return #err(#invalidSection(key));
+        replaceMap(state.suppliers, parsed, func (s : PurchasingTypes.Supplier) : Common.Id = s.id, Nat.compare);
+      };
+      case (7) {
+        let ?parsed = readList(?section, readPurchase) else return #err(#invalidSection(key));
+        replaceMap(state.purchases, parsed, func (p : PurchasingTypes.Purchase) : Common.Id = p.id, Nat.compare);
+      };
+      case (8) {
+        let ?parsed = readList(?section, readPayment) else return #err(#invalidSection(key));
+        replaceMap(state.payments, parsed, func (p : PurchasingTypes.Payment) : Common.Id = p.id, Nat.compare);
+      };
+      case (9) {
+        let ?parsed = readList(?section, readInvoice) else return #err(#invalidSection(key));
+        replaceMap(state.invoices, parsed, func (i : BillingTypes.Invoice) : Common.Id = i.id, Nat.compare);
+      };
+      case (10) {
+        let ?parsed = readBusinessSettings(section) else return #err(#invalidSection(key));
+        state.businessSettings.settings := parsed;
+        1;
+      };
+      case (11) {
+        let ?parsed = readList(?section, readUserProfileEntry) else return #err(#invalidSection(key));
+        replaceMapEntries(state.userProfiles, parsed, Principal.compare);
+      };
+      case (12) {
+        let ?parsed = readList(?section, readQuote) else return #err(#invalidSection(key));
+        replaceMap(state.quotes, parsed, func (q : QuoteTypes.Quote) : Common.Id = q.id, Nat.compare);
+      };
+      case (13) {
+        let ?parsed = readList(?section, readService) else return #err(#invalidSection(key));
+        replaceMap(state.services, parsed, func (s : ServiceTypes.Service) : Common.Id = s.id, Nat.compare);
+      };
+      case (14) {
+        let ?parsed = readList(?section, readServiceCategory) else return #err(#invalidSection(key));
+        replaceMap(state.serviceCategories, parsed, func (c : ServiceCategoryTypes.ServiceCategory) : Common.Id = c.id, Nat.compare);
+      };
+      case (15) {
+        let ?parsed = readList(?section, readTechnician) else return #err(#invalidSection(key));
+        replaceMap(state.technicians, parsed, func (t : TechnicianTypes.Technician) : Common.Id = t.id, Nat.compare);
+      };
+      case (16) {
+        let ?parsed = readList(?section, readAppointment) else return #err(#invalidSection(key));
+        replaceMap(state.appointments, parsed, func (a : AppointmentTypes.Appointment) : Common.Id = a.id, Nat.compare);
+      };
+      case (17) {
+        let ?parsed = readList(?section, readExpense) else return #err(#invalidSection(key));
+        replaceMap(state.expenses, parsed, func (e : ExpenseTypes.Expense) : Common.Id = e.id, Nat.compare);
+      };
+      case (18) {
+        let ?parsed = readList(?section, readExpenseCategory) else return #err(#invalidSection(key));
+        replaceMap(state.expenseCategories, parsed, func (c : ExpenseCategoryTypes.ExpenseCategory) : Common.Id = c.id, Nat.compare);
+      };
+      case (19) {
+        let ?parsed = readList(?section, readPosSale) else return #err(#invalidSection(key));
+        replaceMap(state.posSales, parsed, func (s : PosTypes.PosSale) : Common.Id = s.id, Nat.compare);
+      };
+      case (20) {
+        let ?parsed = readList(?section, readReceivablePayment) else return #err(#invalidSection(key));
+        replaceMap(state.receivablePayments, parsed, func (p : ReceivableTypes.ReceivablePayment) : Common.Id = p.id, Nat.compare);
+      };
+      case (21) {
+        let ?parsed = readList(?section, readSupplierOrder) else return #err(#invalidSection(key));
+        replaceMap(state.supplierOrders, parsed, func (o : SupplierOrderTypes.SupplierOrder) : Common.Id = o.id, Nat.compare);
+      };
+      case (22) {
+        let ?parsed = readCompanyProfile(section) else return #err(#invalidSection(key));
+        state.company.profile := parsed;
+        1;
+      };
+      case (_) {
+        return #err(#unknownSection(key));
+      };
+    };
+    #ok({
+      key;
+      index;
+      status = #restored;
+      restored;
+    });
+  };
+
+  // Lee una entrada de perfil de usuario: `{ principal, name, role, createdAt }`.
+  func readUserProfileEntry(v : Candid) : ?(Principal, UserTypes.UserProfile) {
+    let ?principal = asPrincipal(field(v, "principal") ?? #Null) else return null;
+    let ?profile = readUserProfile(v) else return null;
+    ?(principal, profile);
   };
 };

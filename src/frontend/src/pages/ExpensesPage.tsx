@@ -22,6 +22,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import {
   useCreateExpense,
@@ -104,11 +105,12 @@ function isImageFile(filename: string): boolean {
 
 function useSuppliers() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: ["suppliers", "expense-form"],
     queryFn: async (): Promise<Supplier[]> => {
       if (!actor) return [];
-      return actor.listSuppliers(null);
+      return actor.listSuppliers(token, null);
     },
     enabled: !!actor && !isFetching,
   });

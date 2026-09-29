@@ -5,6 +5,7 @@ import type {
   Invoice,
   InvoicePage,
   OrderView,
+  Receivable,
   WhatsAppMessageResult,
 } from "@/lib/types";
 import {
@@ -17,6 +18,7 @@ import {
   PaymentCondition,
   PaymentMethod,
   PaymentStatus,
+  ReceivableStatus,
   TaxResponsibility,
   WhatsAppContactKind,
   WhatsAppContext,
@@ -33,6 +35,8 @@ const listOrdersMock = vi.fn();
 const getCustomerMock = vi.fn();
 const notifyCustomerMock = vi.fn();
 const prepareWhatsAppMessageMock = vi.fn();
+const deleteInvoiceMock = vi.fn();
+const listReceivablesMock = vi.fn();
 const navigateMock = vi.fn();
 
 vi.mock("@/hooks/use-backend", () => ({
@@ -44,6 +48,8 @@ vi.mock("@/hooks/use-backend", () => ({
       getCustomer: getCustomerMock,
       notifyCustomer: notifyCustomerMock,
       prepareWhatsAppMessage: prepareWhatsAppMessageMock,
+      deleteInvoice: deleteInvoiceMock,
+      listReceivables: listReceivablesMock,
     },
     isFetching: false,
   }),
@@ -200,6 +206,22 @@ function preparedWhatsApp(
   };
 }
 
+function receivable(overrides: Partial<Receivable> = {}): Receivable {
+  return {
+    invoiceId: 1n,
+    invoiceNumber: "FAC-0001",
+    customerId: 1n,
+    customerName: "Ada Lovelace",
+    total: 58000n,
+    paidAmount: 0n,
+    balance: 58000n,
+    dueDate: 1_700_000_000_000_000_000n,
+    issuedAt: 1_700_000_000_000_000_000n,
+    status: ReceivableStatus.pending,
+    ...overrides,
+  };
+}
+
 describe("InvoicesPage", () => {
   beforeEach(() => {
     listInvoicesMock.mockReset();
@@ -208,6 +230,8 @@ describe("InvoicesPage", () => {
     getCustomerMock.mockReset();
     notifyCustomerMock.mockReset();
     prepareWhatsAppMessageMock.mockReset();
+    deleteInvoiceMock.mockReset();
+    listReceivablesMock.mockReset();
     navigateMock.mockReset();
     getCompanyProfileMock.mockResolvedValue(companyProfile());
     getCustomerMock.mockResolvedValue(customer());
@@ -217,6 +241,7 @@ describe("InvoicesPage", () => {
       offset: 0n,
       limit: 100n,
     });
+    listReceivablesMock.mockResolvedValue([]);
   });
 
   it("lists invoices with totals, method and payment status", async () => {
@@ -480,5 +505,81 @@ describe("InvoicesPage", () => {
       await within(dialog).findByTestId("whatsapp.no_phone_state"),
     ).toHaveTextContent("no tiene un teléfono registrado");
     expect(within(dialog).getByTestId("whatsapp.send_button")).toBeDisabled();
+  });
+
+  // --- Accepted behavior: deleting a pending invoice ------------------------
+  //
+  // The accepted change lets a pending invoice with no registered payments be
+  // deleted. The page mirrors the backend guard: the delete action is offered
+  // only while the invoice is pending and has no abono, and the backend's
+  // Spanish rejection is surfaced inside the dialog.
+
+  it("deletes a pending invoice through the backend", async () => {
+    listInvoicesMock.mockResolvedValue(page([invoice()]));
+    deleteInvoiceMock.mockResolvedValue(true);
+    renderWithProviders(<InvoicesPage />);
+
+    await screen.findByText("FAC-0001");
+    await userEvent.click(screen.getByTestId("invoices.delete_button.1"));
+
+    const dialog = await screen.findByTestId("invoices.delete_dialog");
+    await userEvent.click(
+      within(dialog).getByTestId("invoices.delete_confirm_button"),
+    );
+
+    await waitFor(() => expect(deleteInvoiceMock).toHaveBeenCalledTimes(1));
+    expect(deleteInvoiceMock).toHaveBeenCalledWith(null, 1n);
+  });
+
+  it("hides the delete action for a paid invoice", async () => {
+    listInvoicesMock.mockResolvedValue(
+      page([invoice({ paymentStatus: PaymentStatus.paid })]),
+    );
+    renderWithProviders(<InvoicesPage />);
+
+    await screen.findByText("FAC-0001");
+    expect(
+      screen.queryByTestId("invoices.delete_button.1"),
+    ).not.toBeInTheDocument();
+  });
+
+  it("hides the delete action for a pending invoice with an abono", async () => {
+    listInvoicesMock.mockResolvedValue(page([invoice()]));
+    // The receivables list reports a registered abono for this invoice, so the
+    // backend would reject the deletion and the page must not offer it.
+    listReceivablesMock.mockResolvedValue([
+      receivable({ invoiceId: 1n, paidAmount: 10000n }),
+    ]);
+    renderWithProviders(<InvoicesPage />);
+
+    await screen.findByText("FAC-0001");
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("invoices.delete_button.1"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("surfaces the backend rejection when the deletion fails", async () => {
+    listInvoicesMock.mockResolvedValue(page([invoice()]));
+    deleteInvoiceMock.mockRejectedValue(
+      new Error(
+        "No se puede eliminar la factura porque ya tiene pagos o abonos registrados",
+      ),
+    );
+    renderWithProviders(<InvoicesPage />);
+
+    await screen.findByText("FAC-0001");
+    await userEvent.click(screen.getByTestId("invoices.delete_button.1"));
+    const dialog = await screen.findByTestId("invoices.delete_dialog");
+    await userEvent.click(
+      within(dialog).getByTestId("invoices.delete_confirm_button"),
+    );
+
+    expect(
+      await within(dialog).findByTestId("invoices.delete_error"),
+    ).toHaveTextContent(
+      "No se puede eliminar la factura porque ya tiene pagos o abonos registrados",
+    );
   });
 });

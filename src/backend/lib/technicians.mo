@@ -8,6 +8,7 @@ import Time "mo:core/Time";
 import Common "../types/common";
 import Types "../types/technicians";
 import WorkshopTypes "../types/workshop";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -27,7 +28,7 @@ module {
       case null { true };
       case (?n) {
         if (n == "") { true } else {
-          technician.name.toLower().contains(#text n) or technician.code.toLower().contains(#text n);
+          Search.containsAny([technician.name, technician.code], n);
         };
       };
     };
@@ -86,7 +87,7 @@ module {
   };
 
   func normalizeCode(code : Text) : Text {
-    code.trim(#predicate(func (c : Char) : Bool = c == ' ')).toLower();
+    Search.normalize(code);
   };
 
   func codeTaken(state : State, code : Text, exceptId : ?Types.Id) : Bool {
@@ -121,13 +122,13 @@ module {
   public func listTechnicians(state : State, filter : Types.TechnicianFilter) : [Types.Technician] {
     let needle = switch (filter.search) {
       case null { null };
-      case (?term) { ?term.toLower() };
+      case (?term) { ?Search.normalize(term) };
     };
     let out = List.empty<Types.Technician>();
     for (technician in state.technicians.values()) {
       if (matches(technician, filter, needle)) { out.add(technician) };
     };
-    out.toArray().sort(func (a, b) = Text.compare(a.name.toLower(), b.name.toLower()));
+    out.toArray().sort(func (a, b) = Text.compare(Search.sortKey(a.name), Search.sortKey(b.name)));
   };
 
   public func getTechnician(state : State, id : Types.Id) : ?Types.Technician {
@@ -199,7 +200,7 @@ module {
     for (technician in state.technicians.values()) {
       out.add(workloadFrom(technician, byTechnician.get(technician.id) ?? List.empty()));
     };
-    out.toArray().sort(func (a, b) = Text.compare(a.technician.name.toLower(), b.technician.name.toLower()));
+    out.toArray().sort(func (a, b) = Text.compare(Search.sortKey(a.technician.name), Search.sortKey(b.technician.name)));
   };
 
   public func getWorkload(state : State, technicianId : Types.Id) : ?Types.TechnicianWorkload {

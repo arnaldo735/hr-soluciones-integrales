@@ -187,6 +187,7 @@ export const PartInput = IDL.Record({
   'lowStockThreshold' : IDL.Nat,
   'name' : IDL.Text,
   'unit' : IDL.Text,
+  'barcode' : IDL.Text,
   'category' : IDL.Text,
   'salePrice' : Money,
   'brand' : IDL.Text,
@@ -211,6 +212,32 @@ export const Service = IDL.Record({
   'category' : IDL.Text,
   'laborRate' : Money,
   'estimatedMinutes' : IDL.Nat,
+});
+export const CloseShiftInput = IDL.Record({
+  'notes' : IDL.Opt(IDL.Text),
+  'declaredClosingBank' : Money,
+  'declaredClosingCash' : Money,
+});
+export const ShiftStatus = IDL.Variant({
+  'closed' : IDL.Null,
+  'open' : IDL.Null,
+});
+export const Shift = IDL.Record({
+  'id' : Id,
+  'status' : ShiftStatus,
+  'openingBank' : Money,
+  'openingCash' : Money,
+  'differenceBank' : IDL.Int,
+  'differenceCash' : IDL.Int,
+  'closedAt' : IDL.Opt(Timestamp),
+  'closedBy' : IDL.Opt(IDL.Principal),
+  'notes' : IDL.Opt(IDL.Text),
+  'declaredClosingBank' : IDL.Opt(Money),
+  'declaredClosingCash' : IDL.Opt(Money),
+  'computedClosingBank' : Money,
+  'computedClosingCash' : Money,
+  'openedAt' : Timestamp,
+  'openedBy' : IDL.Principal,
 });
 export const DriveAuthResult = IDL.Record({
   'connected' : IDL.Bool,
@@ -433,6 +460,7 @@ export const PartView = IDL.Record({
   'createdAt' : Timestamp,
   'unit' : IDL.Text,
   'totalStock' : IDL.Nat,
+  'barcode' : IDL.Text,
   'category' : IDL.Text,
   'salePrice' : Money,
   'brand' : IDL.Text,
@@ -501,6 +529,7 @@ export const Purchase = IDL.Record({
   'total' : Money,
   'createdAt' : Timestamp,
   'items' : IDL.Vec(PurchaseItem),
+  'accepted' : IDL.Bool,
   'paidAmount' : Money,
   'supplierId' : Id,
 });
@@ -641,6 +670,22 @@ export const QuoteView = IDL.Record({
   'quote' : Quote,
   'totals' : QuoteTotals,
 });
+export const ModuleKey = IDL.Text;
+export const RoleInput = IDL.Record({
+  'name' : IDL.Text,
+  'modules' : IDL.Vec(ModuleKey),
+});
+export const RoleKind = IDL.Variant({
+  'custom' : IDL.Null,
+  'builtin' : IDL.Null,
+});
+export const Role = IDL.Record({
+  'id' : Id,
+  'kind' : RoleKind,
+  'name' : IDL.Text,
+  'createdAt' : Timestamp,
+  'modules' : IDL.Vec(ModuleKey),
+});
 export const ServiceCategoryInput = IDL.Record({
   'name' : IDL.Text,
   'description' : IDL.Text,
@@ -723,10 +768,14 @@ export const TechnicianLoan = IDL.Record({
   'technicianId' : Id,
   'amount' : Money,
 });
-export const LocalBackup = IDL.Record({
-  'generatedAt' : IDL.Int,
-  'json' : IDL.Text,
-  'fileName' : IDL.Text,
+export const UserListItem = IDL.Record({
+  'id' : Id,
+  'roleName' : IDL.Text,
+  'active' : IDL.Bool,
+  'username' : IDL.Text,
+  'name' : IDL.Text,
+  'createdAt' : Timestamp,
+  'roleId' : Id,
 });
 export const Value = IDL.Variant({
   'int' : IDL.Int,
@@ -750,11 +799,16 @@ export const InventoryCsvRow = IDL.Record({
   'lowStockThreshold' : IDL.Nat,
   'name' : IDL.Text,
   'unit' : IDL.Text,
+  'barcode' : IDL.Text,
   'quantity' : IDL.Nat,
   'category' : IDL.Text,
   'salePrice' : Money,
   'brand' : IDL.Text,
   'costPrice' : Money,
+});
+export const PartLookupResult = IDL.Variant({
+  'found' : PartView,
+  'notFound' : IDL.Null,
 });
 export const AccountingPeriod = IDL.Record({
   'to' : IDL.Opt(Timestamp),
@@ -766,6 +820,7 @@ export const PaymentMethodBreakdown = IDL.Record({
 });
 export const LedgerEntryKind = IDL.Variant({
   'expense' : IDL.Null,
+  'commission' : IDL.Null,
   'income' : IDL.Null,
 });
 export const LedgerEntry = IDL.Record({
@@ -780,12 +835,14 @@ export const LedgerEntry = IDL.Record({
 });
 export const AccountingSummary = IDL.Record({
   'to' : IDL.Opt(Timestamp),
+  'totalCommissions' : Money,
   'expenseCount' : IDL.Nat,
   'invoiceCount' : IDL.Nat,
   'from' : IDL.Opt(Timestamp),
   'totalIncome' : Money,
   'totalExpenses' : Money,
   'profit' : IDL.Int,
+  'netProfit' : IDL.Int,
 });
 export const CategoryBreakdown = IDL.Record({
   'total' : Money,
@@ -813,9 +870,11 @@ export const ServiceProfitLine = IDL.Record({
 });
 export const ProfitBreakdown = IDL.Record({
   'total' : ProfitBlock,
+  'totalCommission' : Money,
   'serviceLines' : IDL.Vec(ServiceProfitLine),
   'parts' : ProfitBlock,
   'services' : ProfitBlock,
+  'netProfit' : IDL.Int,
 });
 export const AccountingReport = IDL.Record({
   'byPaymentMethod' : IDL.Vec(PaymentMethodBreakdown),
@@ -823,6 +882,15 @@ export const AccountingReport = IDL.Record({
   'summary' : AccountingSummary,
   'byExpenseCategory' : IDL.Vec(CategoryBreakdown),
   'profit' : ProfitBreakdown,
+});
+export const BackupSectionChunk = IDL.Record({
+  'key' : IDL.Text,
+  'total' : IDL.Nat,
+  'done' : IDL.Bool,
+  'json' : IDL.Text,
+  'offset' : IDL.Nat,
+  'limit' : IDL.Nat,
+  'index' : IDL.Nat,
 });
 export const BusinessSettings = IDL.Record({
   'taxId' : IDL.Text,
@@ -947,6 +1015,60 @@ export const CustomerDetail = IDL.Record({
   'orders' : IDL.Vec(CustomerOrderSummary),
   'motorcycles' : IDL.Vec(Motorcycle),
 });
+export const HopeMode = IDL.Variant({ 'auto' : IDL.Null, 'manual' : IDL.Null });
+export const HopeMessage = IDL.Record({
+  'mode' : HopeMode,
+  'text' : IDL.Text,
+  'enabled' : IDL.Bool,
+  'referenceDate' : IDL.Text,
+  'citation' : IDL.Text,
+});
+export const CashMovementSource = IDL.Variant({
+  'pos' : IDL.Null,
+  'expense' : IDL.Null,
+  'other' : IDL.Null,
+  'invoice' : IDL.Null,
+  'commission' : IDL.Null,
+  'receivable' : IDL.Null,
+  'manual' : IDL.Null,
+  'purchase' : IDL.Null,
+});
+export const CashMovementKind = IDL.Variant({
+  'expense' : IDL.Null,
+  'income' : IDL.Null,
+});
+export const CashAccount = IDL.Variant({
+  'bank' : IDL.Null,
+  'cash' : IDL.Null,
+});
+export const CashMovement = IDL.Record({
+  'id' : Id,
+  'paymentMethod' : PaymentMethod,
+  'source' : CashMovementSource,
+  'kind' : CashMovementKind,
+  'reference' : IDL.Opt(IDL.Text),
+  'description' : IDL.Text,
+  'account' : CashAccount,
+  'timestamp' : Timestamp,
+  'amount' : Money,
+  'shiftId' : Id,
+});
+export const PaymentMethodTotal = IDL.Record({
+  'method' : PaymentMethod,
+  'expense' : Money,
+  'income' : Money,
+});
+export const DailyShiftReport = IDL.Record({
+  'movements' : IDL.Vec(CashMovement),
+  'bankIncome' : Money,
+  'totalIncome' : Money,
+  'byPaymentMethod' : IDL.Vec(PaymentMethodTotal),
+  'shift' : Shift,
+  'cashExpense' : Money,
+  'cashIncome' : Money,
+  'bankExpense' : Money,
+  'totalExpense' : Money,
+});
 export const OrderStatusCount = IDL.Record({
   'status' : IDL.Text,
   'count' : IDL.Nat,
@@ -991,6 +1113,13 @@ export const ExpenseSummary = IDL.Record({
   'count' : IDL.Nat,
   'byCategory' : IDL.Vec(ExpenseCategoryTotal),
 });
+export const HopeSettings = IDL.Record({
+  'mode' : HopeMode,
+  'enabled' : IDL.Bool,
+  'updatedAt' : Timestamp,
+  'manualText' : IDL.Text,
+  'manualCitation' : IDL.Text,
+});
 export const InventoryValuationRow = IDL.Record({
   'sku' : IDL.Text,
   'saleValue' : Money,
@@ -1024,6 +1153,13 @@ export const InventoryValuation = IDL.Record({
   'totals' : InventoryValuationTotals,
   'byCategory' : IDL.Vec(InventoryValuationCategory),
 });
+export const LocalBackupManifest = IDL.Record({
+  'generatedAt' : IDL.Int,
+  'fileName' : IDL.Text,
+  'sections' : IDL.Vec(IDL.Text),
+  'maxPageSize' : IDL.Nat,
+  'totalSections' : IDL.Nat,
+});
 export const PayableStatus = IDL.Variant({
   'pending' : IDL.Null,
   'paid' : IDL.Null,
@@ -1043,16 +1179,108 @@ export const ReceivableSummary = IDL.Record({
   'totalOutstanding' : Money,
   'openCount' : IDL.Nat,
 });
+export const ReminderPayable = IDL.Record({
+  'status' : IDL.Text,
+  'balance' : Money,
+  'supplierName' : IDL.Text,
+  'dueDate' : Timestamp,
+  'supplierId' : Id,
+});
+export const ReminderSection_2 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderPayable),
+});
+export const ReminderOrder = IDL.Record({
+  'id' : Id,
+  'customerName' : IDL.Text,
+  'plate' : IDL.Text,
+  'orderNumber' : IDL.Text,
+});
+export const ReminderSection_5 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderOrder),
+});
+export const ReminderAppointment = IDL.Record({
+  'id' : Id,
+  'customerName' : IDL.Text,
+  'status' : IDL.Text,
+  'customerId' : Id,
+  'scheduledAt' : Timestamp,
+});
+export const ReminderSection = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderAppointment),
+});
+export const ReminderFinishedOrder = IDL.Record({
+  'id' : Id,
+  'customerName' : IDL.Text,
+  'plate' : IDL.Text,
+  'orderNumber' : IDL.Text,
+  'daysInWorkshop' : IDL.Nat,
+});
+export const ReminderSection_1 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderFinishedOrder),
+});
+export const ReminderReceivable = IDL.Record({
+  'customerName' : IDL.Text,
+  'status' : IDL.Text,
+  'balance' : Money,
+  'dueDate' : Timestamp,
+  'invoiceId' : Id,
+  'invoiceNumber' : IDL.Text,
+});
+export const ReminderSection_4 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderReceivable),
+});
+export const ReminderQuote = IDL.Record({
+  'id' : Id,
+  'customerName' : IDL.Text,
+  'status' : IDL.Text,
+  'createdAt' : Timestamp,
+  'quoteNumber' : IDL.Text,
+});
+export const ReminderSection_3 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderQuote),
+});
+export const RemindersSummary = IDL.Record({
+  'payables' : IDL.Opt(ReminderSection_2),
+  'generatedAt' : Timestamp,
+  'unapprovedOrders' : IDL.Opt(ReminderSection_5),
+  'appointments' : IDL.Opt(ReminderSection),
+  'finishedOrders' : IDL.Opt(ReminderSection_1),
+  'receivables' : IDL.Opt(ReminderSection_4),
+  'pendingQuotes' : IDL.Opt(ReminderSection_3),
+});
+export const ServiceTermsSettings = IDL.Record({
+  'text' : IDL.Text,
+  'updatedAt' : Timestamp,
+});
+export const SessionInfo = IDL.Record({
+  'roleName' : IDL.Text,
+  'username' : IDL.Text,
+  'userId' : Id,
+  'name' : IDL.Text,
+  'roleId' : Id,
+  'modules' : IDL.Vec(ModuleKey),
+});
 export const TechnicianWorkload = IDL.Record({
   'technician' : Technician,
   'activeOrders' : IDL.Nat,
   'orderIds' : IDL.Vec(Id),
+});
+export const WarrantyTermsSettings = IDL.Record({
+  'text' : IDL.Text,
+  'updatedAt' : Timestamp,
 });
 export const InventoryImportRow = IDL.Record({
   'sku' : IDL.Text,
   'lowStockThreshold' : IDL.Nat,
   'name' : IDL.Text,
   'unit' : IDL.Text,
+  'barcode' : IDL.Text,
   'quantity' : IDL.Nat,
   'category' : IDL.Text,
   'salePrice' : Money,
@@ -1094,6 +1322,20 @@ export const BackupFile = IDL.Record({
 export const BackupListOutcome = IDL.Variant({
   'ok' : IDL.Vec(BackupFile),
   'err' : BackupError,
+});
+export const CashMovementFilter = IDL.Record({
+  'to' : IDL.Opt(Timestamp),
+  'paymentMethod' : IDL.Opt(PaymentMethod),
+  'from' : IDL.Opt(Timestamp),
+  'kind' : IDL.Opt(CashMovementKind),
+  'account' : IDL.Opt(CashAccount),
+  'shiftId' : IDL.Opt(Id),
+});
+export const CashMovementPage = IDL.Record({
+  'total' : IDL.Nat,
+  'offset' : IDL.Nat,
+  'limit' : IDL.Nat,
+  'items' : IDL.Vec(CashMovement),
 });
 export const CommissionPaymentFilter = IDL.Record({
   'to' : IDL.Opt(Timestamp),
@@ -1319,6 +1561,17 @@ export const ServicePage = IDL.Record({
   'limit' : IDL.Nat,
   'items' : IDL.Vec(Service),
 });
+export const ShiftFilter = IDL.Record({
+  'to' : IDL.Opt(Timestamp),
+  'status' : IDL.Opt(ShiftStatus),
+  'from' : IDL.Opt(Timestamp),
+});
+export const ShiftPage = IDL.Record({
+  'total' : IDL.Nat,
+  'offset' : IDL.Nat,
+  'limit' : IDL.Nat,
+  'items' : IDL.Vec(Shift),
+});
 export const SupplierOrderFilter = IDL.Record({
   'search' : IDL.Opt(IDL.Text),
   'supplierId' : IDL.Opt(Id),
@@ -1332,12 +1585,16 @@ export const TechnicianFilter = IDL.Record({
   'specialty' : IDL.Opt(IDL.Text),
   'activeOnly' : IDL.Opt(IDL.Bool),
 });
-export const Principal = IDL.Principal;
-export const UserView = IDL.Record({
-  'principal' : Principal,
-  'name' : IDL.Text,
-  'createdAt' : Timestamp,
-  'role' : UserRole,
+export const UserPage = IDL.Record({
+  'total' : IDL.Nat,
+  'offset' : IDL.Nat,
+  'limit' : IDL.Nat,
+  'items' : IDL.Vec(UserListItem),
+});
+export const LoginResult = IDL.Record({
+  'token' : IDL.Text,
+  'expiresAt' : Timestamp,
+  'user' : SessionInfo,
 });
 export const NotificationSource = IDL.Variant({
   'pos' : IDL.Null,
@@ -1357,6 +1614,11 @@ export const CustomerNotificationResult = IDL.Record({
   'sent' : IDL.Bool,
   'email' : IDL.Text,
   'customerId' : Id,
+});
+export const OpenShiftInput = IDL.Record({
+  'openingBank' : Money,
+  'openingCash' : Money,
+  'notes' : IDL.Opt(IDL.Text),
 });
 export const CommissionPaymentInput = IDL.Record({
   'period' : CommissionPeriod,
@@ -1388,6 +1650,15 @@ export const WhatsAppMessageResult = IDL.Record({
   'contactId' : Id,
   'phone' : IDL.Opt(IDL.Text),
 });
+export const CashMovementInput = IDL.Record({
+  'paymentMethod' : PaymentMethod,
+  'source' : CashMovementSource,
+  'kind' : CashMovementKind,
+  'reference' : IDL.Opt(IDL.Text),
+  'description' : IDL.Text,
+  'account' : CashAccount,
+  'amount' : Money,
+});
 export const PaymentInput = IDL.Record({
   'method' : PaymentMethod,
   'note' : IDL.Opt(IDL.Text),
@@ -1409,6 +1680,33 @@ export const ReceivablePayment = IDL.Record({
   'invoiceId' : Id,
   'performedBy' : IDL.Principal,
   'amount' : Money,
+});
+export const ResetPasswordResult = IDL.Record({
+  'userId' : Id,
+  'temporaryPassword' : IDL.Text,
+});
+export const RestoreSectionStatus = IDL.Variant({
+  'skipped' : IDL.Null,
+  'error' : IDL.Text,
+  'restored' : IDL.Null,
+});
+export const RestoreSectionResult = IDL.Record({
+  'key' : IDL.Text,
+  'status' : RestoreSectionStatus,
+  'index' : IDL.Nat,
+  'restored' : IDL.Nat,
+});
+export const RestoreError = IDL.Variant({
+  'invalidFormat' : IDL.Text,
+  'invalidSection' : IDL.Text,
+  'incompatibleVersion' : IDL.Nat,
+  'notAuthorized' : IDL.Null,
+  'noKnownSections' : IDL.Null,
+  'unknownSection' : IDL.Text,
+});
+export const RestoreSectionOutcome = IDL.Variant({
+  'ok' : RestoreSectionResult,
+  'err' : RestoreError,
 });
 export const DriveAuthStart = IDL.Record({
   'authorizationUrl' : IDL.Text,
@@ -1445,6 +1743,12 @@ export const CompanyProfileRawInput = IDL.Record({
   'checkDigit' : IDL.Opt(IDL.Nat),
   'taxRate' : TaxRate,
 });
+export const HopeSettingsRawInput = IDL.Record({
+  'mode' : IDL.Text,
+  'enabled' : IDL.Bool,
+  'manualText' : IDL.Text,
+  'manualCitation' : IDL.Text,
+});
 export const InvoiceLineInput = IDL.Record({
   'id' : IDL.Opt(Id),
   'total' : Money,
@@ -1467,6 +1771,23 @@ export const InvoiceHeaderInput = IDL.Record({
 export const InvoiceReviewInput = IDL.Record({
   'lines' : IDL.Vec(InvoiceLineInput),
   'header' : InvoiceHeaderInput,
+});
+export const ServiceTermsSettingsRawInput = IDL.Record({ 'text' : IDL.Text });
+export const WarrantyTermsSettingsRawInput = IDL.Record({ 'text' : IDL.Text });
+export const RestoreSectionInfo = IDL.Record({
+  'key' : IDL.Text,
+  'count' : IDL.Nat,
+  'index' : IDL.Nat,
+});
+export const RestorePreview = IDL.Record({
+  'generatedAt' : IDL.Int,
+  'formatVersion' : IDL.Nat,
+  'sections' : IDL.Vec(RestoreSectionInfo),
+  'totalSections' : IDL.Nat,
+});
+export const RestorePreviewOutcome = IDL.Variant({
+  'ok' : RestorePreview,
+  'err' : RestoreError,
 });
 export const ZeroInventoryResult = IDL.Record({ 'affected' : IDL.Nat });
 export const ZeroServicesResult = IDL.Record({ 'deleted' : IDL.Nat });
@@ -1501,60 +1822,117 @@ export const idlService = IDL.Service({
   '_initialize_access_control' : IDL.Func([], [], []),
   '_internet_identity_sign_in_finish' : IDL.Func([], [Result__1], []),
   '_internet_identity_sign_in_start' : IDL.Func([], [IDL.Vec(IDL.Nat8)], []),
-  'addLabor' : IDL.Func([Id, LaborInput], [OrderView], []),
-  'addOrderPart' : IDL.Func([Id, OrderPartInput], [OrderView], []),
-  'addOrderPhoto' : IDL.Func([Id, OrderPhotoInput], [OrderView], []),
-  'adjustStock' : IDL.Func([AdjustmentInput], [Movement], []),
+  'addLabor' : IDL.Func([IDL.Opt(IDL.Text), Id, LaborInput], [OrderView], []),
+  'addOrderPart' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, OrderPartInput],
+      [OrderView],
+      [],
+    ),
+  'addOrderPhoto' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, OrderPhotoInput],
+      [OrderView],
+      [],
+    ),
+  'adjustStock' : IDL.Func(
+      [IDL.Opt(IDL.Text), AdjustmentInput],
+      [Movement],
+      [],
+    ),
   'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-  'assignTechnician' : IDL.Func([Id, Id], [OrderView], []),
-  'bulkCreateCustomers' : IDL.Func([IDL.Vec(CustomerInput)], [BulkResult], []),
-  'bulkCreateParts' : IDL.Func([IDL.Vec(PartInput)], [BulkResult], []),
+  'assignTechnician' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
+  'bulkCreateCustomers' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Vec(CustomerInput)],
+      [BulkResult],
+      [],
+    ),
+  'bulkCreateParts' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Vec(PartInput)],
+      [BulkResult],
+      [],
+    ),
   'bulkCreateServices' : IDL.Func(
-      [IDL.Vec(ServiceInput)],
+      [IDL.Opt(IDL.Text), IDL.Vec(ServiceInput)],
       [IDL.Vec(Service)],
       [],
     ),
   'bulkUpdateCustomers' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(Id, CustomerInput))],
+      [IDL.Opt(IDL.Text), IDL.Vec(IDL.Tuple(Id, CustomerInput))],
       [BulkResult],
       [],
     ),
   'bulkUpdateParts' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(Id, PartInput))],
+      [IDL.Opt(IDL.Text), IDL.Vec(IDL.Tuple(Id, PartInput))],
       [BulkResult],
       [],
     ),
   'bulkUpdateServices' : IDL.Func(
-      [IDL.Vec(IDL.Tuple(Id, ServiceInput))],
+      [IDL.Opt(IDL.Text), IDL.Vec(IDL.Tuple(Id, ServiceInput))],
       [IDL.Vec(Service)],
       [],
     ),
-  'cancelOrder' : IDL.Func([Id, IDL.Text], [OrderView], []),
+  'cancelOrder' : IDL.Func([IDL.Opt(IDL.Text), Id, IDL.Text], [OrderView], []),
+  'changeOwnPassword' : IDL.Func(
+      [IDL.Text, IDL.Text, IDL.Text],
+      [IDL.Bool],
+      [],
+    ),
+  'closeShift' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, CloseShiftInput],
+      [Shift],
+      [],
+    ),
   'completeDriveAuthorization' : IDL.Func(
-      [IDL.Text, IDL.Text],
+      [IDL.Opt(IDL.Text), IDL.Text, IDL.Text],
       [DriveAuthResult],
       [],
     ),
-  'confirmPurchaseInvoice' : IDL.Func([Id], [InvoiceApplyResult], []),
-  'convertAppointmentToOrder' : IDL.Func([Id], [OrderView], []),
-  'convertQuoteToInvoice' : IDL.Func([Id, PaymentMethod], [Invoice], []),
-  'convertQuoteToOrder' : IDL.Func([Id], [OrderView], []),
-  'createAppointment' : IDL.Func([AppointmentInput], [Appointment], []),
-  'createBackup' : IDL.Func([], [BackupOutcome], []),
-  'createCustomer' : IDL.Func([CustomerInput], [Customer], []),
-  'createExpense' : IDL.Func([ExpenseInput], [Expense], []),
+  'confirmPurchaseInvoice' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [InvoiceApplyResult],
+      [],
+    ),
+  'convertAppointmentToOrder' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [OrderView],
+      [],
+    ),
+  'convertQuoteToInvoice' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, PaymentMethod],
+      [Invoice],
+      [],
+    ),
+  'convertQuoteToOrder' : IDL.Func([IDL.Opt(IDL.Text), Id], [OrderView], []),
+  'createAppointment' : IDL.Func(
+      [IDL.Opt(IDL.Text), AppointmentInput],
+      [Appointment],
+      [],
+    ),
+  'createBackup' : IDL.Func([IDL.Opt(IDL.Text)], [BackupOutcome], []),
+  'createCustomer' : IDL.Func(
+      [IDL.Opt(IDL.Text), CustomerInput],
+      [Customer],
+      [],
+    ),
+  'createExpense' : IDL.Func([IDL.Opt(IDL.Text), ExpenseInput], [Expense], []),
   'createExpenseCategory' : IDL.Func(
-      [ExpenseCategoryInput],
+      [IDL.Opt(IDL.Text), ExpenseCategoryInput],
       [ExpenseCategory],
       [],
     ),
   'createInvoiceFromOrder' : IDL.Func(
-      [Id, PaymentMethod, PaymentCondition, IDL.Opt(CreditPlanInput)],
+      [
+        IDL.Opt(IDL.Text),
+        Id,
+        PaymentMethod,
+        PaymentCondition,
+        IDL.Opt(CreditPlanInput),
+      ],
       [Invoice],
       [],
     ),
   'createInvoiceFromPosSale' : IDL.Func(
       [
+        IDL.Opt(IDL.Text),
         Id,
         IDL.Opt(Id),
         IDL.Opt(IDL.Text),
@@ -1569,6 +1947,7 @@ export const idlService = IDL.Service({
     ),
   'createInvoiceFromQuote' : IDL.Func(
       [
+        IDL.Opt(IDL.Text),
         Id,
         Id,
         IDL.Vec(InvoiceLine),
@@ -1580,270 +1959,491 @@ export const idlService = IDL.Service({
       [Invoice],
       [],
     ),
-  'createMotorcycle' : IDL.Func([MotorcycleInput], [Motorcycle], []),
-  'createOrder' : IDL.Func([OrderInput], [OrderView], []),
-  'createPart' : IDL.Func([PartInput], [PartView], []),
-  'createPosSale' : IDL.Func([PosSaleInput], [PosSale], []),
-  'createPurchase' : IDL.Func([PurchaseInput], [Purchase], []),
+  'createMotorcycle' : IDL.Func(
+      [IDL.Opt(IDL.Text), MotorcycleInput],
+      [Motorcycle],
+      [],
+    ),
+  'createOrder' : IDL.Func([IDL.Opt(IDL.Text), OrderInput], [OrderView], []),
+  'createPart' : IDL.Func([IDL.Opt(IDL.Text), PartInput], [PartView], []),
+  'createPosSale' : IDL.Func([IDL.Opt(IDL.Text), PosSaleInput], [PosSale], []),
+  'createPurchase' : IDL.Func(
+      [IDL.Opt(IDL.Text), PurchaseInput],
+      [Purchase],
+      [],
+    ),
   'createPurchaseInvoiceDraft' : IDL.Func(
-      [CreateInvoiceInput],
+      [IDL.Opt(IDL.Text), CreateInvoiceInput],
       [PurchaseInvoice],
       [],
     ),
-  'createQuote' : IDL.Func([QuoteInput], [QuoteView], []),
-  'createService' : IDL.Func([ServiceInput], [Service], []),
+  'createQuote' : IDL.Func([IDL.Opt(IDL.Text), QuoteInput], [QuoteView], []),
+  'createRole' : IDL.Func([IDL.Opt(IDL.Text), RoleInput], [Role], []),
+  'createService' : IDL.Func([IDL.Opt(IDL.Text), ServiceInput], [Service], []),
   'createServiceCategory' : IDL.Func(
-      [ServiceCategoryInput],
+      [IDL.Opt(IDL.Text), ServiceCategoryInput],
       [ServiceCategory],
       [],
     ),
-  'createSupplier' : IDL.Func([SupplierInput], [Supplier], []),
-  'createSupplierOrder' : IDL.Func([SupplierOrderInput], [SupplierOrder], []),
-  'createTechnician' : IDL.Func([TechnicianInput], [Technician], []),
+  'createSupplier' : IDL.Func(
+      [IDL.Opt(IDL.Text), SupplierInput],
+      [Supplier],
+      [],
+    ),
+  'createSupplierOrder' : IDL.Func(
+      [IDL.Opt(IDL.Text), SupplierOrderInput],
+      [SupplierOrder],
+      [],
+    ),
+  'createTechnician' : IDL.Func(
+      [IDL.Opt(IDL.Text), TechnicianInput],
+      [Technician],
+      [],
+    ),
   'createTechnicianLoan' : IDL.Func(
-      [TechnicianLoanInput],
+      [IDL.Opt(IDL.Text), TechnicianLoanInput],
       [TechnicianLoan],
       [],
     ),
-  'deleteAppointment' : IDL.Func([Id], [IDL.Bool], []),
-  'deleteExpense' : IDL.Func([Id], [IDL.Bool], []),
-  'deleteExpenseCategory' : IDL.Func([Id], [IDL.Bool], []),
-  'deleteOrder' : IDL.Func([Id], [IDL.Bool], []),
-  'deleteQuote' : IDL.Func([Id], [IDL.Bool], []),
-  'deleteService' : IDL.Func([Id], [IDL.Bool], []),
-  'deleteServiceCategory' : IDL.Func([Id], [IDL.Bool], []),
-  'deleteTechnician' : IDL.Func([Id], [IDL.Bool], []),
-  'deleteTechnicianLoan' : IDL.Func([Id], [IDL.Bool], []),
-  'disconnectDrive' : IDL.Func([], [], []),
-  'downloadLocalBackup' : IDL.Func([], [LocalBackup], ['query']),
+  'createUser' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Text, IDL.Text, Id, IDL.Text],
+      [UserListItem],
+      [],
+    ),
+  'deleteAppointment' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteExpense' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteExpenseCategory' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteInvoice' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteOrder' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deletePurchase' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteQuote' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteRole' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteService' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteServiceCategory' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteTechnician' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteTechnicianLoan' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteUser' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'disconnectDrive' : IDL.Func([IDL.Opt(IDL.Text)], [], []),
   'execute' : IDL.Func([IDL.Text], [Result], ['query']),
   'exportCustomersAggregated' : IDL.Func(
-      [],
+      [IDL.Opt(IDL.Text)],
       [IDL.Vec(CustomerExportRow)],
       ['query'],
     ),
-  'exportInventoryCsv' : IDL.Func([], [IDL.Vec(InventoryCsvRow)], ['query']),
+  'exportInventoryCsv' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [IDL.Vec(InventoryCsvRow)],
+      ['query'],
+    ),
+  'findPartByCode' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Text],
+      [PartLookupResult],
+      ['query'],
+    ),
   'findTechnicianByCode' : IDL.Func(
-      [IDL.Text],
+      [IDL.Opt(IDL.Text), IDL.Text],
       [IDL.Opt(Technician)],
       ['query'],
     ),
   'getAccountingReport' : IDL.Func(
-      [AccountingPeriod],
+      [IDL.Opt(IDL.Text), AccountingPeriod],
       [AccountingReport],
       ['query'],
     ),
   'getAccountingSummary' : IDL.Func(
-      [AccountingPeriod],
+      [IDL.Opt(IDL.Text), AccountingPeriod],
       [AccountingSummary],
       ['query'],
     ),
   'getApiDoc' : IDL.Func([], [IDL.Text], ['query']),
-  'getAppointment' : IDL.Func([Id], [IDL.Opt(Appointment)], ['query']),
-  'getBusinessSettings' : IDL.Func([], [BusinessSettings], ['query']),
+  'getAppointment' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Appointment)],
+      ['query'],
+    ),
+  'getBackupSection' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Nat, IDL.Nat, IDL.Nat],
+      [BackupSectionChunk],
+      ['query'],
+    ),
+  'getBusinessSettings' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [BusinessSettings],
+      ['query'],
+    ),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
   'getCommissionPayment' : IDL.Func(
-      [Id],
+      [IDL.Opt(IDL.Text), Id],
       [IDL.Opt(CommissionPayment)],
       ['query'],
     ),
   'getCommissionReport' : IDL.Func(
-      [CommissionPeriod],
+      [IDL.Opt(IDL.Text), CommissionPeriod],
       [CommissionReport],
       ['query'],
     ),
-  'getCompanyProfile' : IDL.Func([], [CompanyProfile], ['query']),
-  'getCustomer' : IDL.Func([Id], [IDL.Opt(Customer)], ['query']),
-  'getCustomerDetail' : IDL.Func([Id], [IDL.Opt(CustomerDetail)], ['query']),
-  'getDashboardSummary' : IDL.Func([], [DashboardSummary], ['query']),
-  'getDriveConnectionStatus' : IDL.Func([], [DriveConnectionStatus], []),
-  'getExpense' : IDL.Func([Id], [IDL.Opt(Expense)], ['query']),
-  'getExpenseCategory' : IDL.Func([Id], [IDL.Opt(ExpenseCategory)], ['query']),
-  'getExpenseSummary' : IDL.Func([ExpenseFilter], [ExpenseSummary], ['query']),
-  'getInventoryValuation' : IDL.Func([], [InventoryValuation], ['query']),
-  'getInvoice' : IDL.Func([Id], [IDL.Opt(Invoice)], ['query']),
-  'getOrder' : IDL.Func([Id], [IDL.Opt(OrderView)], ['query']),
-  'getPart' : IDL.Func([Id], [IDL.Opt(PartView)], ['query']),
-  'getPayable' : IDL.Func([Id], [IDL.Opt(Payable)], ['query']),
-  'getPosSale' : IDL.Func([Id], [IDL.Opt(PosSale)], ['query']),
-  'getPurchaseInvoice' : IDL.Func([Id], [IDL.Opt(PurchaseInvoice)], ['query']),
-  'getQuote' : IDL.Func([Id], [IDL.Opt(QuoteView)], ['query']),
-  'getReceivableSummary' : IDL.Func([], [ReceivableSummary], ['query']),
-  'getService' : IDL.Func([Id], [IDL.Opt(Service)], ['query']),
-  'getServiceCategory' : IDL.Func([Id], [IDL.Opt(ServiceCategory)], ['query']),
-  'getSupplier' : IDL.Func([Id], [IDL.Opt(Supplier)], ['query']),
-  'getTechnician' : IDL.Func([Id], [IDL.Opt(Technician)], ['query']),
+  'getCompanyProfile' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [CompanyProfile],
+      ['query'],
+    ),
+  'getCustomer' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Customer)],
+      ['query'],
+    ),
+  'getCustomerDetail' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(CustomerDetail)],
+      ['query'],
+    ),
+  'getDailyHopeMessage' : IDL.Func([], [HopeMessage], ['query']),
+  'getDailyShiftReport' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [DailyShiftReport],
+      ['query'],
+    ),
+  'getDashboardSummary' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [DashboardSummary],
+      ['query'],
+    ),
+  'getDriveConnectionStatus' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [DriveConnectionStatus],
+      [],
+    ),
+  'getExpense' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Expense)],
+      ['query'],
+    ),
+  'getExpenseCategory' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(ExpenseCategory)],
+      ['query'],
+    ),
+  'getExpenseSummary' : IDL.Func(
+      [IDL.Opt(IDL.Text), ExpenseFilter],
+      [ExpenseSummary],
+      ['query'],
+    ),
+  'getHopeSettings' : IDL.Func([IDL.Opt(IDL.Text)], [HopeSettings], ['query']),
+  'getInventoryValuation' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [InventoryValuation],
+      ['query'],
+    ),
+  'getInvoice' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Invoice)],
+      ['query'],
+    ),
+  'getLocalBackupManifest' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [LocalBackupManifest],
+      ['query'],
+    ),
+  'getOpenShift' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Opt(Shift)], ['query']),
+  'getOrder' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(OrderView)],
+      ['query'],
+    ),
+  'getPart' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Opt(PartView)], ['query']),
+  'getPayable' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Payable)],
+      ['query'],
+    ),
+  'getPosSale' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(PosSale)],
+      ['query'],
+    ),
+  'getPurchaseInvoice' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(PurchaseInvoice)],
+      ['query'],
+    ),
+  'getQuote' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(QuoteView)],
+      ['query'],
+    ),
+  'getReceivableSummary' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [ReceivableSummary],
+      ['query'],
+    ),
+  'getRemindersSummary' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [RemindersSummary],
+      ['query'],
+    ),
+  'getService' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Service)],
+      ['query'],
+    ),
+  'getServiceCategory' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(ServiceCategory)],
+      ['query'],
+    ),
+  'getServiceTermsSettings' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [ServiceTermsSettings],
+      ['query'],
+    ),
+  'getSession' : IDL.Func([IDL.Text], [IDL.Opt(SessionInfo)], ['query']),
+  'getShift' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Opt(Shift)], ['query']),
+  'getSupplier' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Supplier)],
+      ['query'],
+    ),
+  'getTechnician' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Technician)],
+      ['query'],
+    ),
   'getTechnicianCommissionSummary' : IDL.Func(
-      [Id, CommissionPeriod],
+      [IDL.Opt(IDL.Text), Id, CommissionPeriod],
       [IDL.Opt(TechnicianCommissionSummary)],
       ['query'],
     ),
-  'getTechnicianLoan' : IDL.Func([Id], [IDL.Opt(TechnicianLoan)], ['query']),
+  'getTechnicianLoan' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(TechnicianLoan)],
+      ['query'],
+    ),
   'getTechnicianWorkload' : IDL.Func(
-      [Id],
+      [IDL.Opt(IDL.Text), Id],
       [IDL.Opt(TechnicianWorkload)],
       ['query'],
     ),
+  'getWarrantyTermsSettings' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [WarrantyTermsSettings],
+      ['query'],
+    ),
   'importInventoryCsv' : IDL.Func(
-      [IDL.Vec(InventoryImportRow)],
+      [IDL.Opt(IDL.Text), IDL.Vec(InventoryImportRow)],
       [InventoryImportResult],
       [],
     ),
   'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
   'listAppointments' : IDL.Func(
-      [AppointmentFilter],
+      [IDL.Opt(IDL.Text), AppointmentFilter],
       [IDL.Vec(Appointment)],
       ['query'],
     ),
-  'listBackups' : IDL.Func([], [BackupListOutcome], []),
+  'listBackups' : IDL.Func([IDL.Opt(IDL.Text)], [BackupListOutcome], []),
+  'listCashMovements' : IDL.Func(
+      [IDL.Opt(IDL.Text), CashMovementFilter, IDL.Nat, IDL.Nat],
+      [CashMovementPage],
+      ['query'],
+    ),
   'listCommissionLines' : IDL.Func(
-      [IDL.Opt(Id), CommissionPeriod],
+      [IDL.Opt(IDL.Text), IDL.Opt(Id), CommissionPeriod],
       [IDL.Vec(CommissionLine)],
       ['query'],
     ),
   'listCommissionPayments' : IDL.Func(
-      [CommissionPaymentFilter],
+      [IDL.Opt(IDL.Text), CommissionPaymentFilter],
       [IDL.Vec(CommissionPayment)],
       ['query'],
     ),
   'listCustomers' : IDL.Func(
-      [IDL.Opt(IDL.Text)],
+      [IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
       [IDL.Vec(Customer)],
       ['query'],
     ),
   'listCustomersPage' : IDL.Func(
-      [CustomerFilter, CustomerSort, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), CustomerFilter, CustomerSort, IDL.Nat, IDL.Nat],
       [CustomerPage],
       ['query'],
     ),
   'listCustomersPageDir' : IDL.Func(
-      [CustomerFilter, CustomerSort, IDL.Bool, IDL.Nat, IDL.Nat],
+      [
+        IDL.Opt(IDL.Text),
+        CustomerFilter,
+        CustomerSort,
+        IDL.Bool,
+        IDL.Nat,
+        IDL.Nat,
+      ],
       [CustomerPage],
       ['query'],
     ),
   'listExpenseCategories' : IDL.Func(
-      [ExpenseCategoryFilter],
+      [IDL.Opt(IDL.Text), ExpenseCategoryFilter],
       [IDL.Vec(ExpenseCategoryUsage)],
       ['query'],
     ),
   'listExpenses' : IDL.Func(
-      [ExpenseFilter, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), ExpenseFilter, IDL.Nat, IDL.Nat],
       [ExpensePage],
       ['query'],
     ),
   'listInvoices' : IDL.Func(
-      [InvoiceFilter__1, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), InvoiceFilter__1, IDL.Nat, IDL.Nat],
       [InvoicePage__1],
       ['query'],
     ),
   'listLedgerEntries' : IDL.Func(
-      [AccountingPeriod],
+      [IDL.Opt(IDL.Text), AccountingPeriod],
       [IDL.Vec(LedgerEntry)],
       ['query'],
     ),
-  'listLots' : IDL.Func([Id], [IDL.Vec(Lot)], ['query']),
+  'listLots' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Vec(Lot)], ['query']),
   'listMotorcycleCountsByCustomers' : IDL.Func(
-      [IDL.Vec(Id)],
+      [IDL.Opt(IDL.Text), IDL.Vec(Id)],
       [IDL.Vec(IDL.Tuple(Id, IDL.Nat))],
       ['query'],
     ),
-  'listMotorcycles' : IDL.Func([Id], [IDL.Vec(Motorcycle)], ['query']),
+  'listMotorcycles' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Vec(Motorcycle)],
+      ['query'],
+    ),
   'listMotorcyclesPage' : IDL.Func(
-      [MotorcycleFilter, MotorcycleSort, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), MotorcycleFilter, MotorcycleSort, IDL.Nat, IDL.Nat],
       [MotorcyclePage],
       ['query'],
     ),
   'listMotorcyclesPageDir' : IDL.Func(
-      [MotorcycleFilter, MotorcycleSort, IDL.Bool, IDL.Nat, IDL.Nat],
+      [
+        IDL.Opt(IDL.Text),
+        MotorcycleFilter,
+        MotorcycleSort,
+        IDL.Bool,
+        IDL.Nat,
+        IDL.Nat,
+      ],
       [MotorcyclePage],
       ['query'],
     ),
-  'listMovements' : IDL.Func([Id], [IDL.Vec(Movement)], ['query']),
+  'listMovements' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Vec(Movement)],
+      ['query'],
+    ),
   'listOrders' : IDL.Func(
-      [OrderFilter, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), OrderFilter, IDL.Nat, IDL.Nat],
       [OrderPage],
       ['query'],
     ),
-  'listPartFacets' : IDL.Func([], [PartFacets], ['query']),
+  'listPartFacets' : IDL.Func([IDL.Opt(IDL.Text)], [PartFacets], ['query']),
   'listParts' : IDL.Func(
-      [PartFilter, PartSort, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), PartFilter, PartSort, IDL.Nat, IDL.Nat],
       [PartPage],
       ['query'],
     ),
   'listPartsDir' : IDL.Func(
-      [PartFilter, PartSort, IDL.Bool, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), PartFilter, PartSort, IDL.Bool, IDL.Nat, IDL.Nat],
       [PartPage],
       ['query'],
     ),
-  'listPayables' : IDL.Func([], [IDL.Vec(Payable)], ['query']),
-  'listPayments' : IDL.Func([IDL.Opt(Id)], [IDL.Vec(Payment)], ['query']),
+  'listPayables' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Vec(Payable)], ['query']),
+  'listPayments' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Opt(Id)],
+      [IDL.Vec(Payment)],
+      ['query'],
+    ),
   'listPosSales' : IDL.Func(
-      [PosSaleFilter, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), PosSaleFilter, IDL.Nat, IDL.Nat],
       [PosSalePage],
       ['query'],
     ),
   'listPurchaseInvoices' : IDL.Func(
-      [InvoiceFilter, InvoiceSort, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), InvoiceFilter, InvoiceSort, IDL.Nat, IDL.Nat],
       [InvoicePage],
       ['query'],
     ),
-  'listPurchases' : IDL.Func([IDL.Opt(Id)], [IDL.Vec(Purchase)], ['query']),
+  'listPurchases' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Opt(Id)],
+      [IDL.Vec(Purchase)],
+      ['query'],
+    ),
   'listQuotes' : IDL.Func(
-      [QuoteFilter, QuoteSort, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), QuoteFilter, QuoteSort, IDL.Nat, IDL.Nat],
       [QuotePage],
       ['query'],
     ),
   'listReceivables' : IDL.Func(
-      [ReceivableFilter],
+      [IDL.Opt(IDL.Text), ReceivableFilter],
       [IDL.Vec(Receivable)],
       ['query'],
     ),
+  'listRoles' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Vec(Role)], ['query']),
   'listServiceCategories' : IDL.Func(
-      [ServiceCategoryFilter],
+      [IDL.Opt(IDL.Text), ServiceCategoryFilter],
       [IDL.Vec(ServiceCategoryUsage)],
       ['query'],
     ),
   'listServices' : IDL.Func(
-      [ServiceFilter, ServiceSort, IDL.Nat, IDL.Nat],
+      [IDL.Opt(IDL.Text), ServiceFilter, ServiceSort, IDL.Nat, IDL.Nat],
       [ServicePage],
       ['query'],
     ),
+  'listShifts' : IDL.Func(
+      [IDL.Opt(IDL.Text), ShiftFilter, IDL.Nat, IDL.Nat],
+      [ShiftPage],
+      ['query'],
+    ),
   'listSupplierOrders' : IDL.Func(
-      [SupplierOrderFilter],
+      [IDL.Opt(IDL.Text), SupplierOrderFilter],
       [IDL.Vec(SupplierOrder)],
       ['query'],
     ),
   'listSuppliers' : IDL.Func(
-      [IDL.Opt(IDL.Text)],
+      [IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
       [IDL.Vec(Supplier)],
       ['query'],
     ),
   'listTechnicianLoans' : IDL.Func(
-      [TechnicianLoanFilter],
+      [IDL.Opt(IDL.Text), TechnicianLoanFilter],
       [IDL.Vec(TechnicianLoan)],
       ['query'],
     ),
   'listTechnicianWorkload' : IDL.Func(
-      [],
+      [IDL.Opt(IDL.Text)],
       [IDL.Vec(TechnicianWorkload)],
       ['query'],
     ),
   'listTechnicians' : IDL.Func(
-      [TechnicianFilter],
+      [IDL.Opt(IDL.Text), TechnicianFilter],
       [IDL.Vec(Technician)],
       ['query'],
     ),
-  'listUsers' : IDL.Func([], [IDL.Vec(UserView)], ['query']),
-  'lowStockParts' : IDL.Func([], [IDL.Vec(PartView)], ['query']),
-  'markInvoicePaid' : IDL.Func([Id, PaymentMethod], [Invoice], []),
+  'listUsersPage' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Opt(IDL.Text), IDL.Nat, IDL.Nat],
+      [UserPage],
+      ['query'],
+    ),
+  'login' : IDL.Func([IDL.Text, IDL.Text], [LoginResult], []),
+  'logout' : IDL.Func([IDL.Text], [IDL.Bool], []),
+  'lowStockParts' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [IDL.Vec(PartView)],
+      ['query'],
+    ),
+  'markInvoicePaid' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, PaymentMethod],
+      [Invoice],
+      [],
+    ),
   'notifyCustomer' : IDL.Func(
       [CustomerNotificationInput],
       [CustomerNotificationResult],
       [],
     ),
+  'openShift' : IDL.Func([IDL.Opt(IDL.Text), OpenShiftInput], [Shift], []),
   'payTechnicianCommission' : IDL.Func(
-      [CommissionPaymentInput],
+      [IDL.Opt(IDL.Text), CommissionPaymentInput],
       [CommissionPayment],
       [],
     ),
@@ -1852,71 +2452,173 @@ export const idlService = IDL.Service({
       [WhatsAppMessageResult],
       ['query'],
     ),
-  'registerInstallmentPayment' : IDL.Func([Id, IDL.Nat], [Invoice], []),
-  'registerPayment' : IDL.Func([PaymentInput], [Payment], []),
+  'registerCashMovement' : IDL.Func(
+      [IDL.Opt(IDL.Text), CashMovementInput],
+      [CashMovement],
+      [],
+    ),
+  'registerInstallmentPayment' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, IDL.Nat],
+      [Invoice],
+      [],
+    ),
+  'registerPayment' : IDL.Func(
+      [IDL.Opt(IDL.Text), PaymentInput],
+      [Payment],
+      [],
+    ),
   'registerReceivablePayment' : IDL.Func(
-      [ReceivablePaymentInput],
+      [IDL.Opt(IDL.Text), ReceivablePaymentInput],
       [ReceivablePayment],
       [],
     ),
-  'removeLabor' : IDL.Func([Id, Id], [OrderView], []),
-  'removeOrderPart' : IDL.Func([Id, Id], [OrderView], []),
-  'removeOrderPhoto' : IDL.Func([Id, Id], [OrderView], []),
-  'runPurchaseInvoiceExtraction' : IDL.Func([Id], [PurchaseInvoice], []),
+  'removeLabor' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
+  'removeOrderPart' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
+  'removeOrderPhoto' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
+  'resetUserPassword' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [ResetPasswordResult],
+      [],
+    ),
+  'restoreSection' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Text, IDL.Nat],
+      [RestoreSectionOutcome],
+      [],
+    ),
+  'runPurchaseInvoiceExtraction' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [PurchaseInvoice],
+      [],
+    ),
   'saveCallerUserProfile' : IDL.Func([IDL.Text], [UserProfile], []),
   'schema' : IDL.Func([], [IDL.Text], ['query']),
-  'setUserRole' : IDL.Func([IDL.Principal, UserRole], [UserView], []),
-  'startDriveAuthorization' : IDL.Func([], [DriveAuthStart], []),
+  'setUserActive' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, IDL.Bool],
+      [UserListItem],
+      [],
+    ),
+  'startDriveAuthorization' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [DriveAuthStart],
+      [],
+    ),
   'transform' : IDL.Func(
       [TransformationInput],
       [TransformationOutput],
       ['query'],
     ),
-  'unassignTechnician' : IDL.Func([Id, Id], [OrderView], []),
-  'updateAppointment' : IDL.Func([Id, AppointmentInput], [Appointment], []),
+  'unassignTechnician' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
+  'updateAppointment' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, AppointmentInput],
+      [Appointment],
+      [],
+    ),
   'updateAppointmentStatus' : IDL.Func(
-      [Id, AppointmentStatus],
+      [IDL.Opt(IDL.Text), Id, AppointmentStatus],
       [Appointment],
       [],
     ),
   'updateBusinessSettings' : IDL.Func(
-      [BusinessSettings],
+      [IDL.Opt(IDL.Text), BusinessSettings],
       [BusinessSettings],
       [],
     ),
+  'updateCallerName' : IDL.Func([IDL.Text, IDL.Text], [SessionInfo], []),
   'updateCompanyProfile' : IDL.Func(
-      [CompanyProfileRawInput],
+      [IDL.Opt(IDL.Text), CompanyProfileRawInput],
       [CompanyProfile],
       [],
     ),
-  'updateCustomer' : IDL.Func([Id, CustomerInput], [Customer], []),
-  'updateExpense' : IDL.Func([Id, ExpenseInput], [Expense], []),
+  'updateCustomer' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, CustomerInput],
+      [Customer],
+      [],
+    ),
+  'updateExpense' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, ExpenseInput],
+      [Expense],
+      [],
+    ),
   'updateExpenseCategory' : IDL.Func(
-      [Id, ExpenseCategoryInput],
+      [IDL.Opt(IDL.Text), Id, ExpenseCategoryInput],
       [ExpenseCategory],
       [],
     ),
-  'updateLaborTechnician' : IDL.Func([Id, Id, IDL.Opt(Id)], [OrderView], []),
-  'updateMotorcycle' : IDL.Func([Id, MotorcycleInput], [Motorcycle], []),
-  'updateOrderStatus' : IDL.Func([Id, OrderStatus], [OrderView], []),
-  'updatePart' : IDL.Func([Id, PartInput], [PartView], []),
+  'updateHopeSettings' : IDL.Func(
+      [IDL.Opt(IDL.Text), HopeSettingsRawInput],
+      [HopeSettings],
+      [],
+    ),
+  'updateLaborTechnician' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, Id, IDL.Opt(Id)],
+      [OrderView],
+      [],
+    ),
+  'updateMotorcycle' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, MotorcycleInput],
+      [Motorcycle],
+      [],
+    ),
+  'updateOrderStatus' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, OrderStatus],
+      [OrderView],
+      [],
+    ),
+  'updatePart' : IDL.Func([IDL.Opt(IDL.Text), Id, PartInput], [PartView], []),
   'updatePurchaseInvoiceReview' : IDL.Func(
-      [Id, InvoiceReviewInput],
+      [IDL.Opt(IDL.Text), Id, InvoiceReviewInput],
       [PurchaseInvoice],
       [],
     ),
-  'updateQuote' : IDL.Func([Id, QuoteInput], [QuoteView], []),
-  'updateQuoteStatus' : IDL.Func([Id, QuoteStatus], [QuoteView], []),
-  'updateService' : IDL.Func([Id, ServiceInput], [Service], []),
+  'updateQuote' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, QuoteInput],
+      [QuoteView],
+      [],
+    ),
+  'updateQuoteStatus' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, QuoteStatus],
+      [QuoteView],
+      [],
+    ),
+  'updateRole' : IDL.Func([IDL.Opt(IDL.Text), Id, RoleInput], [Role], []),
+  'updateService' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, ServiceInput],
+      [Service],
+      [],
+    ),
   'updateServiceCategory' : IDL.Func(
-      [Id, ServiceCategoryInput],
+      [IDL.Opt(IDL.Text), Id, ServiceCategoryInput],
       [ServiceCategory],
       [],
     ),
-  'updateSupplier' : IDL.Func([Id, SupplierInput], [Supplier], []),
-  'updateTechnician' : IDL.Func([Id, TechnicianInput], [Technician], []),
-  'zeroInventory' : IDL.Func([], [ZeroInventoryResult], []),
-  'zeroServices' : IDL.Func([], [ZeroServicesResult], []),
+  'updateServiceTermsSettings' : IDL.Func(
+      [IDL.Opt(IDL.Text), ServiceTermsSettingsRawInput],
+      [ServiceTermsSettings],
+      [],
+    ),
+  'updateSupplier' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, SupplierInput],
+      [Supplier],
+      [],
+    ),
+  'updateTechnician' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, TechnicianInput],
+      [Technician],
+      [],
+    ),
+  'updateUserRole' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [UserListItem], []),
+  'updateWarrantyTermsSettings' : IDL.Func(
+      [IDL.Opt(IDL.Text), WarrantyTermsSettingsRawInput],
+      [WarrantyTermsSettings],
+      [],
+    ),
+  'validateRestoreFile' : IDL.Func(
+      [IDL.Opt(IDL.Text), IDL.Text],
+      [RestorePreviewOutcome],
+      [],
+    ),
+  'zeroInventory' : IDL.Func([IDL.Opt(IDL.Text)], [ZeroInventoryResult], []),
+  'zeroServices' : IDL.Func([IDL.Opt(IDL.Text)], [ZeroServicesResult], []),
 });
 
 export const idlInitArgs = [];
@@ -2101,6 +2803,7 @@ export const idlFactory = ({ IDL }) => {
     'lowStockThreshold' : IDL.Nat,
     'name' : IDL.Text,
     'unit' : IDL.Text,
+    'barcode' : IDL.Text,
     'category' : IDL.Text,
     'salePrice' : Money,
     'brand' : IDL.Text,
@@ -2125,6 +2828,29 @@ export const idlFactory = ({ IDL }) => {
     'category' : IDL.Text,
     'laborRate' : Money,
     'estimatedMinutes' : IDL.Nat,
+  });
+  const CloseShiftInput = IDL.Record({
+    'notes' : IDL.Opt(IDL.Text),
+    'declaredClosingBank' : Money,
+    'declaredClosingCash' : Money,
+  });
+  const ShiftStatus = IDL.Variant({ 'closed' : IDL.Null, 'open' : IDL.Null });
+  const Shift = IDL.Record({
+    'id' : Id,
+    'status' : ShiftStatus,
+    'openingBank' : Money,
+    'openingCash' : Money,
+    'differenceBank' : IDL.Int,
+    'differenceCash' : IDL.Int,
+    'closedAt' : IDL.Opt(Timestamp),
+    'closedBy' : IDL.Opt(IDL.Principal),
+    'notes' : IDL.Opt(IDL.Text),
+    'declaredClosingBank' : IDL.Opt(Money),
+    'declaredClosingCash' : IDL.Opt(Money),
+    'computedClosingBank' : Money,
+    'computedClosingCash' : Money,
+    'openedAt' : Timestamp,
+    'openedBy' : IDL.Principal,
   });
   const DriveAuthResult = IDL.Record({
     'connected' : IDL.Bool,
@@ -2347,6 +3073,7 @@ export const idlFactory = ({ IDL }) => {
     'createdAt' : Timestamp,
     'unit' : IDL.Text,
     'totalStock' : IDL.Nat,
+    'barcode' : IDL.Text,
     'category' : IDL.Text,
     'salePrice' : Money,
     'brand' : IDL.Text,
@@ -2415,6 +3142,7 @@ export const idlFactory = ({ IDL }) => {
     'total' : Money,
     'createdAt' : Timestamp,
     'items' : IDL.Vec(PurchaseItem),
+    'accepted' : IDL.Bool,
     'paidAmount' : Money,
     'supplierId' : Id,
   });
@@ -2549,6 +3277,19 @@ export const idlFactory = ({ IDL }) => {
     'subtotal' : Money,
   });
   const QuoteView = IDL.Record({ 'quote' : Quote, 'totals' : QuoteTotals });
+  const ModuleKey = IDL.Text;
+  const RoleInput = IDL.Record({
+    'name' : IDL.Text,
+    'modules' : IDL.Vec(ModuleKey),
+  });
+  const RoleKind = IDL.Variant({ 'custom' : IDL.Null, 'builtin' : IDL.Null });
+  const Role = IDL.Record({
+    'id' : Id,
+    'kind' : RoleKind,
+    'name' : IDL.Text,
+    'createdAt' : Timestamp,
+    'modules' : IDL.Vec(ModuleKey),
+  });
   const ServiceCategoryInput = IDL.Record({
     'name' : IDL.Text,
     'description' : IDL.Text,
@@ -2631,10 +3372,14 @@ export const idlFactory = ({ IDL }) => {
     'technicianId' : Id,
     'amount' : Money,
   });
-  const LocalBackup = IDL.Record({
-    'generatedAt' : IDL.Int,
-    'json' : IDL.Text,
-    'fileName' : IDL.Text,
+  const UserListItem = IDL.Record({
+    'id' : Id,
+    'roleName' : IDL.Text,
+    'active' : IDL.Bool,
+    'username' : IDL.Text,
+    'name' : IDL.Text,
+    'createdAt' : Timestamp,
+    'roleId' : Id,
   });
   const Value = IDL.Variant({
     'int' : IDL.Int,
@@ -2658,11 +3403,16 @@ export const idlFactory = ({ IDL }) => {
     'lowStockThreshold' : IDL.Nat,
     'name' : IDL.Text,
     'unit' : IDL.Text,
+    'barcode' : IDL.Text,
     'quantity' : IDL.Nat,
     'category' : IDL.Text,
     'salePrice' : Money,
     'brand' : IDL.Text,
     'costPrice' : Money,
+  });
+  const PartLookupResult = IDL.Variant({
+    'found' : PartView,
+    'notFound' : IDL.Null,
   });
   const AccountingPeriod = IDL.Record({
     'to' : IDL.Opt(Timestamp),
@@ -2674,6 +3424,7 @@ export const idlFactory = ({ IDL }) => {
   });
   const LedgerEntryKind = IDL.Variant({
     'expense' : IDL.Null,
+    'commission' : IDL.Null,
     'income' : IDL.Null,
   });
   const LedgerEntry = IDL.Record({
@@ -2688,12 +3439,14 @@ export const idlFactory = ({ IDL }) => {
   });
   const AccountingSummary = IDL.Record({
     'to' : IDL.Opt(Timestamp),
+    'totalCommissions' : Money,
     'expenseCount' : IDL.Nat,
     'invoiceCount' : IDL.Nat,
     'from' : IDL.Opt(Timestamp),
     'totalIncome' : Money,
     'totalExpenses' : Money,
     'profit' : IDL.Int,
+    'netProfit' : IDL.Int,
   });
   const CategoryBreakdown = IDL.Record({
     'total' : Money,
@@ -2721,9 +3474,11 @@ export const idlFactory = ({ IDL }) => {
   });
   const ProfitBreakdown = IDL.Record({
     'total' : ProfitBlock,
+    'totalCommission' : Money,
     'serviceLines' : IDL.Vec(ServiceProfitLine),
     'parts' : ProfitBlock,
     'services' : ProfitBlock,
+    'netProfit' : IDL.Int,
   });
   const AccountingReport = IDL.Record({
     'byPaymentMethod' : IDL.Vec(PaymentMethodBreakdown),
@@ -2731,6 +3486,15 @@ export const idlFactory = ({ IDL }) => {
     'summary' : AccountingSummary,
     'byExpenseCategory' : IDL.Vec(CategoryBreakdown),
     'profit' : ProfitBreakdown,
+  });
+  const BackupSectionChunk = IDL.Record({
+    'key' : IDL.Text,
+    'total' : IDL.Nat,
+    'done' : IDL.Bool,
+    'json' : IDL.Text,
+    'offset' : IDL.Nat,
+    'limit' : IDL.Nat,
+    'index' : IDL.Nat,
   });
   const BusinessSettings = IDL.Record({
     'taxId' : IDL.Text,
@@ -2855,6 +3619,57 @@ export const idlFactory = ({ IDL }) => {
     'orders' : IDL.Vec(CustomerOrderSummary),
     'motorcycles' : IDL.Vec(Motorcycle),
   });
+  const HopeMode = IDL.Variant({ 'auto' : IDL.Null, 'manual' : IDL.Null });
+  const HopeMessage = IDL.Record({
+    'mode' : HopeMode,
+    'text' : IDL.Text,
+    'enabled' : IDL.Bool,
+    'referenceDate' : IDL.Text,
+    'citation' : IDL.Text,
+  });
+  const CashMovementSource = IDL.Variant({
+    'pos' : IDL.Null,
+    'expense' : IDL.Null,
+    'other' : IDL.Null,
+    'invoice' : IDL.Null,
+    'commission' : IDL.Null,
+    'receivable' : IDL.Null,
+    'manual' : IDL.Null,
+    'purchase' : IDL.Null,
+  });
+  const CashMovementKind = IDL.Variant({
+    'expense' : IDL.Null,
+    'income' : IDL.Null,
+  });
+  const CashAccount = IDL.Variant({ 'bank' : IDL.Null, 'cash' : IDL.Null });
+  const CashMovement = IDL.Record({
+    'id' : Id,
+    'paymentMethod' : PaymentMethod,
+    'source' : CashMovementSource,
+    'kind' : CashMovementKind,
+    'reference' : IDL.Opt(IDL.Text),
+    'description' : IDL.Text,
+    'account' : CashAccount,
+    'timestamp' : Timestamp,
+    'amount' : Money,
+    'shiftId' : Id,
+  });
+  const PaymentMethodTotal = IDL.Record({
+    'method' : PaymentMethod,
+    'expense' : Money,
+    'income' : Money,
+  });
+  const DailyShiftReport = IDL.Record({
+    'movements' : IDL.Vec(CashMovement),
+    'bankIncome' : Money,
+    'totalIncome' : Money,
+    'byPaymentMethod' : IDL.Vec(PaymentMethodTotal),
+    'shift' : Shift,
+    'cashExpense' : Money,
+    'cashIncome' : Money,
+    'bankExpense' : Money,
+    'totalExpense' : Money,
+  });
   const OrderStatusCount = IDL.Record({
     'status' : IDL.Text,
     'count' : IDL.Nat,
@@ -2899,6 +3714,13 @@ export const idlFactory = ({ IDL }) => {
     'count' : IDL.Nat,
     'byCategory' : IDL.Vec(ExpenseCategoryTotal),
   });
+  const HopeSettings = IDL.Record({
+    'mode' : HopeMode,
+    'enabled' : IDL.Bool,
+    'updatedAt' : Timestamp,
+    'manualText' : IDL.Text,
+    'manualCitation' : IDL.Text,
+  });
   const InventoryValuationRow = IDL.Record({
     'sku' : IDL.Text,
     'saleValue' : Money,
@@ -2932,6 +3754,13 @@ export const idlFactory = ({ IDL }) => {
     'totals' : InventoryValuationTotals,
     'byCategory' : IDL.Vec(InventoryValuationCategory),
   });
+  const LocalBackupManifest = IDL.Record({
+    'generatedAt' : IDL.Int,
+    'fileName' : IDL.Text,
+    'sections' : IDL.Vec(IDL.Text),
+    'maxPageSize' : IDL.Nat,
+    'totalSections' : IDL.Nat,
+  });
   const PayableStatus = IDL.Variant({
     'pending' : IDL.Null,
     'paid' : IDL.Null,
@@ -2951,16 +3780,108 @@ export const idlFactory = ({ IDL }) => {
     'totalOutstanding' : Money,
     'openCount' : IDL.Nat,
   });
+  const ReminderPayable = IDL.Record({
+    'status' : IDL.Text,
+    'balance' : Money,
+    'supplierName' : IDL.Text,
+    'dueDate' : Timestamp,
+    'supplierId' : Id,
+  });
+  const ReminderSection_2 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderPayable),
+  });
+  const ReminderOrder = IDL.Record({
+    'id' : Id,
+    'customerName' : IDL.Text,
+    'plate' : IDL.Text,
+    'orderNumber' : IDL.Text,
+  });
+  const ReminderSection_5 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderOrder),
+  });
+  const ReminderAppointment = IDL.Record({
+    'id' : Id,
+    'customerName' : IDL.Text,
+    'status' : IDL.Text,
+    'customerId' : Id,
+    'scheduledAt' : Timestamp,
+  });
+  const ReminderSection = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderAppointment),
+  });
+  const ReminderFinishedOrder = IDL.Record({
+    'id' : Id,
+    'customerName' : IDL.Text,
+    'plate' : IDL.Text,
+    'orderNumber' : IDL.Text,
+    'daysInWorkshop' : IDL.Nat,
+  });
+  const ReminderSection_1 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderFinishedOrder),
+  });
+  const ReminderReceivable = IDL.Record({
+    'customerName' : IDL.Text,
+    'status' : IDL.Text,
+    'balance' : Money,
+    'dueDate' : Timestamp,
+    'invoiceId' : Id,
+    'invoiceNumber' : IDL.Text,
+  });
+  const ReminderSection_4 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderReceivable),
+  });
+  const ReminderQuote = IDL.Record({
+    'id' : Id,
+    'customerName' : IDL.Text,
+    'status' : IDL.Text,
+    'createdAt' : Timestamp,
+    'quoteNumber' : IDL.Text,
+  });
+  const ReminderSection_3 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderQuote),
+  });
+  const RemindersSummary = IDL.Record({
+    'payables' : IDL.Opt(ReminderSection_2),
+    'generatedAt' : Timestamp,
+    'unapprovedOrders' : IDL.Opt(ReminderSection_5),
+    'appointments' : IDL.Opt(ReminderSection),
+    'finishedOrders' : IDL.Opt(ReminderSection_1),
+    'receivables' : IDL.Opt(ReminderSection_4),
+    'pendingQuotes' : IDL.Opt(ReminderSection_3),
+  });
+  const ServiceTermsSettings = IDL.Record({
+    'text' : IDL.Text,
+    'updatedAt' : Timestamp,
+  });
+  const SessionInfo = IDL.Record({
+    'roleName' : IDL.Text,
+    'username' : IDL.Text,
+    'userId' : Id,
+    'name' : IDL.Text,
+    'roleId' : Id,
+    'modules' : IDL.Vec(ModuleKey),
+  });
   const TechnicianWorkload = IDL.Record({
     'technician' : Technician,
     'activeOrders' : IDL.Nat,
     'orderIds' : IDL.Vec(Id),
+  });
+  const WarrantyTermsSettings = IDL.Record({
+    'text' : IDL.Text,
+    'updatedAt' : Timestamp,
   });
   const InventoryImportRow = IDL.Record({
     'sku' : IDL.Text,
     'lowStockThreshold' : IDL.Nat,
     'name' : IDL.Text,
     'unit' : IDL.Text,
+    'barcode' : IDL.Text,
     'quantity' : IDL.Nat,
     'category' : IDL.Text,
     'salePrice' : Money,
@@ -3002,6 +3923,20 @@ export const idlFactory = ({ IDL }) => {
   const BackupListOutcome = IDL.Variant({
     'ok' : IDL.Vec(BackupFile),
     'err' : BackupError,
+  });
+  const CashMovementFilter = IDL.Record({
+    'to' : IDL.Opt(Timestamp),
+    'paymentMethod' : IDL.Opt(PaymentMethod),
+    'from' : IDL.Opt(Timestamp),
+    'kind' : IDL.Opt(CashMovementKind),
+    'account' : IDL.Opt(CashAccount),
+    'shiftId' : IDL.Opt(Id),
+  });
+  const CashMovementPage = IDL.Record({
+    'total' : IDL.Nat,
+    'offset' : IDL.Nat,
+    'limit' : IDL.Nat,
+    'items' : IDL.Vec(CashMovement),
   });
   const CommissionPaymentFilter = IDL.Record({
     'to' : IDL.Opt(Timestamp),
@@ -3223,6 +4158,17 @@ export const idlFactory = ({ IDL }) => {
     'limit' : IDL.Nat,
     'items' : IDL.Vec(Service),
   });
+  const ShiftFilter = IDL.Record({
+    'to' : IDL.Opt(Timestamp),
+    'status' : IDL.Opt(ShiftStatus),
+    'from' : IDL.Opt(Timestamp),
+  });
+  const ShiftPage = IDL.Record({
+    'total' : IDL.Nat,
+    'offset' : IDL.Nat,
+    'limit' : IDL.Nat,
+    'items' : IDL.Vec(Shift),
+  });
   const SupplierOrderFilter = IDL.Record({
     'search' : IDL.Opt(IDL.Text),
     'supplierId' : IDL.Opt(Id),
@@ -3236,12 +4182,16 @@ export const idlFactory = ({ IDL }) => {
     'specialty' : IDL.Opt(IDL.Text),
     'activeOnly' : IDL.Opt(IDL.Bool),
   });
-  const Principal = IDL.Principal;
-  const UserView = IDL.Record({
-    'principal' : Principal,
-    'name' : IDL.Text,
-    'createdAt' : Timestamp,
-    'role' : UserRole,
+  const UserPage = IDL.Record({
+    'total' : IDL.Nat,
+    'offset' : IDL.Nat,
+    'limit' : IDL.Nat,
+    'items' : IDL.Vec(UserListItem),
+  });
+  const LoginResult = IDL.Record({
+    'token' : IDL.Text,
+    'expiresAt' : Timestamp,
+    'user' : SessionInfo,
   });
   const NotificationSource = IDL.Variant({
     'pos' : IDL.Null,
@@ -3261,6 +4211,11 @@ export const idlFactory = ({ IDL }) => {
     'sent' : IDL.Bool,
     'email' : IDL.Text,
     'customerId' : Id,
+  });
+  const OpenShiftInput = IDL.Record({
+    'openingBank' : Money,
+    'openingCash' : Money,
+    'notes' : IDL.Opt(IDL.Text),
   });
   const CommissionPaymentInput = IDL.Record({
     'period' : CommissionPeriod,
@@ -3292,6 +4247,15 @@ export const idlFactory = ({ IDL }) => {
     'contactId' : Id,
     'phone' : IDL.Opt(IDL.Text),
   });
+  const CashMovementInput = IDL.Record({
+    'paymentMethod' : PaymentMethod,
+    'source' : CashMovementSource,
+    'kind' : CashMovementKind,
+    'reference' : IDL.Opt(IDL.Text),
+    'description' : IDL.Text,
+    'account' : CashAccount,
+    'amount' : Money,
+  });
   const PaymentInput = IDL.Record({
     'method' : PaymentMethod,
     'note' : IDL.Opt(IDL.Text),
@@ -3313,6 +4277,33 @@ export const idlFactory = ({ IDL }) => {
     'invoiceId' : Id,
     'performedBy' : IDL.Principal,
     'amount' : Money,
+  });
+  const ResetPasswordResult = IDL.Record({
+    'userId' : Id,
+    'temporaryPassword' : IDL.Text,
+  });
+  const RestoreSectionStatus = IDL.Variant({
+    'skipped' : IDL.Null,
+    'error' : IDL.Text,
+    'restored' : IDL.Null,
+  });
+  const RestoreSectionResult = IDL.Record({
+    'key' : IDL.Text,
+    'status' : RestoreSectionStatus,
+    'index' : IDL.Nat,
+    'restored' : IDL.Nat,
+  });
+  const RestoreError = IDL.Variant({
+    'invalidFormat' : IDL.Text,
+    'invalidSection' : IDL.Text,
+    'incompatibleVersion' : IDL.Nat,
+    'notAuthorized' : IDL.Null,
+    'noKnownSections' : IDL.Null,
+    'unknownSection' : IDL.Text,
+  });
+  const RestoreSectionOutcome = IDL.Variant({
+    'ok' : RestoreSectionResult,
+    'err' : RestoreError,
   });
   const DriveAuthStart = IDL.Record({
     'authorizationUrl' : IDL.Text,
@@ -3349,6 +4340,12 @@ export const idlFactory = ({ IDL }) => {
     'checkDigit' : IDL.Opt(IDL.Nat),
     'taxRate' : TaxRate,
   });
+  const HopeSettingsRawInput = IDL.Record({
+    'mode' : IDL.Text,
+    'enabled' : IDL.Bool,
+    'manualText' : IDL.Text,
+    'manualCitation' : IDL.Text,
+  });
   const InvoiceLineInput = IDL.Record({
     'id' : IDL.Opt(Id),
     'total' : Money,
@@ -3371,6 +4368,23 @@ export const idlFactory = ({ IDL }) => {
   const InvoiceReviewInput = IDL.Record({
     'lines' : IDL.Vec(InvoiceLineInput),
     'header' : InvoiceHeaderInput,
+  });
+  const ServiceTermsSettingsRawInput = IDL.Record({ 'text' : IDL.Text });
+  const WarrantyTermsSettingsRawInput = IDL.Record({ 'text' : IDL.Text });
+  const RestoreSectionInfo = IDL.Record({
+    'key' : IDL.Text,
+    'count' : IDL.Nat,
+    'index' : IDL.Nat,
+  });
+  const RestorePreview = IDL.Record({
+    'generatedAt' : IDL.Int,
+    'formatVersion' : IDL.Nat,
+    'sections' : IDL.Vec(RestoreSectionInfo),
+    'totalSections' : IDL.Nat,
+  });
+  const RestorePreviewOutcome = IDL.Variant({
+    'ok' : RestorePreview,
+    'err' : RestoreError,
   });
   const ZeroInventoryResult = IDL.Record({ 'affected' : IDL.Nat });
   const ZeroServicesResult = IDL.Record({ 'deleted' : IDL.Nat });
@@ -3405,64 +4419,125 @@ export const idlFactory = ({ IDL }) => {
     '_initialize_access_control' : IDL.Func([], [], []),
     '_internet_identity_sign_in_finish' : IDL.Func([], [Result__1], []),
     '_internet_identity_sign_in_start' : IDL.Func([], [IDL.Vec(IDL.Nat8)], []),
-    'addLabor' : IDL.Func([Id, LaborInput], [OrderView], []),
-    'addOrderPart' : IDL.Func([Id, OrderPartInput], [OrderView], []),
-    'addOrderPhoto' : IDL.Func([Id, OrderPhotoInput], [OrderView], []),
-    'adjustStock' : IDL.Func([AdjustmentInput], [Movement], []),
+    'addLabor' : IDL.Func([IDL.Opt(IDL.Text), Id, LaborInput], [OrderView], []),
+    'addOrderPart' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, OrderPartInput],
+        [OrderView],
+        [],
+      ),
+    'addOrderPhoto' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, OrderPhotoInput],
+        [OrderView],
+        [],
+      ),
+    'adjustStock' : IDL.Func(
+        [IDL.Opt(IDL.Text), AdjustmentInput],
+        [Movement],
+        [],
+      ),
     'assignCallerUserRole' : IDL.Func([IDL.Principal, UserRole], [], []),
-    'assignTechnician' : IDL.Func([Id, Id], [OrderView], []),
+    'assignTechnician' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
     'bulkCreateCustomers' : IDL.Func(
-        [IDL.Vec(CustomerInput)],
+        [IDL.Opt(IDL.Text), IDL.Vec(CustomerInput)],
         [BulkResult],
         [],
       ),
-    'bulkCreateParts' : IDL.Func([IDL.Vec(PartInput)], [BulkResult], []),
+    'bulkCreateParts' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Vec(PartInput)],
+        [BulkResult],
+        [],
+      ),
     'bulkCreateServices' : IDL.Func(
-        [IDL.Vec(ServiceInput)],
+        [IDL.Opt(IDL.Text), IDL.Vec(ServiceInput)],
         [IDL.Vec(Service)],
         [],
       ),
     'bulkUpdateCustomers' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(Id, CustomerInput))],
+        [IDL.Opt(IDL.Text), IDL.Vec(IDL.Tuple(Id, CustomerInput))],
         [BulkResult],
         [],
       ),
     'bulkUpdateParts' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(Id, PartInput))],
+        [IDL.Opt(IDL.Text), IDL.Vec(IDL.Tuple(Id, PartInput))],
         [BulkResult],
         [],
       ),
     'bulkUpdateServices' : IDL.Func(
-        [IDL.Vec(IDL.Tuple(Id, ServiceInput))],
+        [IDL.Opt(IDL.Text), IDL.Vec(IDL.Tuple(Id, ServiceInput))],
         [IDL.Vec(Service)],
         [],
       ),
-    'cancelOrder' : IDL.Func([Id, IDL.Text], [OrderView], []),
+    'cancelOrder' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, IDL.Text],
+        [OrderView],
+        [],
+      ),
+    'changeOwnPassword' : IDL.Func(
+        [IDL.Text, IDL.Text, IDL.Text],
+        [IDL.Bool],
+        [],
+      ),
+    'closeShift' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, CloseShiftInput],
+        [Shift],
+        [],
+      ),
     'completeDriveAuthorization' : IDL.Func(
-        [IDL.Text, IDL.Text],
+        [IDL.Opt(IDL.Text), IDL.Text, IDL.Text],
         [DriveAuthResult],
         [],
       ),
-    'confirmPurchaseInvoice' : IDL.Func([Id], [InvoiceApplyResult], []),
-    'convertAppointmentToOrder' : IDL.Func([Id], [OrderView], []),
-    'convertQuoteToInvoice' : IDL.Func([Id, PaymentMethod], [Invoice], []),
-    'convertQuoteToOrder' : IDL.Func([Id], [OrderView], []),
-    'createAppointment' : IDL.Func([AppointmentInput], [Appointment], []),
-    'createBackup' : IDL.Func([], [BackupOutcome], []),
-    'createCustomer' : IDL.Func([CustomerInput], [Customer], []),
-    'createExpense' : IDL.Func([ExpenseInput], [Expense], []),
+    'confirmPurchaseInvoice' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [InvoiceApplyResult],
+        [],
+      ),
+    'convertAppointmentToOrder' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [OrderView],
+        [],
+      ),
+    'convertQuoteToInvoice' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, PaymentMethod],
+        [Invoice],
+        [],
+      ),
+    'convertQuoteToOrder' : IDL.Func([IDL.Opt(IDL.Text), Id], [OrderView], []),
+    'createAppointment' : IDL.Func(
+        [IDL.Opt(IDL.Text), AppointmentInput],
+        [Appointment],
+        [],
+      ),
+    'createBackup' : IDL.Func([IDL.Opt(IDL.Text)], [BackupOutcome], []),
+    'createCustomer' : IDL.Func(
+        [IDL.Opt(IDL.Text), CustomerInput],
+        [Customer],
+        [],
+      ),
+    'createExpense' : IDL.Func(
+        [IDL.Opt(IDL.Text), ExpenseInput],
+        [Expense],
+        [],
+      ),
     'createExpenseCategory' : IDL.Func(
-        [ExpenseCategoryInput],
+        [IDL.Opt(IDL.Text), ExpenseCategoryInput],
         [ExpenseCategory],
         [],
       ),
     'createInvoiceFromOrder' : IDL.Func(
-        [Id, PaymentMethod, PaymentCondition, IDL.Opt(CreditPlanInput)],
+        [
+          IDL.Opt(IDL.Text),
+          Id,
+          PaymentMethod,
+          PaymentCondition,
+          IDL.Opt(CreditPlanInput),
+        ],
         [Invoice],
         [],
       ),
     'createInvoiceFromPosSale' : IDL.Func(
         [
+          IDL.Opt(IDL.Text),
           Id,
           IDL.Opt(Id),
           IDL.Opt(IDL.Text),
@@ -3477,6 +4552,7 @@ export const idlFactory = ({ IDL }) => {
       ),
     'createInvoiceFromQuote' : IDL.Func(
         [
+          IDL.Opt(IDL.Text),
           Id,
           Id,
           IDL.Vec(InvoiceLine),
@@ -3488,286 +4564,511 @@ export const idlFactory = ({ IDL }) => {
         [Invoice],
         [],
       ),
-    'createMotorcycle' : IDL.Func([MotorcycleInput], [Motorcycle], []),
-    'createOrder' : IDL.Func([OrderInput], [OrderView], []),
-    'createPart' : IDL.Func([PartInput], [PartView], []),
-    'createPosSale' : IDL.Func([PosSaleInput], [PosSale], []),
-    'createPurchase' : IDL.Func([PurchaseInput], [Purchase], []),
+    'createMotorcycle' : IDL.Func(
+        [IDL.Opt(IDL.Text), MotorcycleInput],
+        [Motorcycle],
+        [],
+      ),
+    'createOrder' : IDL.Func([IDL.Opt(IDL.Text), OrderInput], [OrderView], []),
+    'createPart' : IDL.Func([IDL.Opt(IDL.Text), PartInput], [PartView], []),
+    'createPosSale' : IDL.Func(
+        [IDL.Opt(IDL.Text), PosSaleInput],
+        [PosSale],
+        [],
+      ),
+    'createPurchase' : IDL.Func(
+        [IDL.Opt(IDL.Text), PurchaseInput],
+        [Purchase],
+        [],
+      ),
     'createPurchaseInvoiceDraft' : IDL.Func(
-        [CreateInvoiceInput],
+        [IDL.Opt(IDL.Text), CreateInvoiceInput],
         [PurchaseInvoice],
         [],
       ),
-    'createQuote' : IDL.Func([QuoteInput], [QuoteView], []),
-    'createService' : IDL.Func([ServiceInput], [Service], []),
+    'createQuote' : IDL.Func([IDL.Opt(IDL.Text), QuoteInput], [QuoteView], []),
+    'createRole' : IDL.Func([IDL.Opt(IDL.Text), RoleInput], [Role], []),
+    'createService' : IDL.Func(
+        [IDL.Opt(IDL.Text), ServiceInput],
+        [Service],
+        [],
+      ),
     'createServiceCategory' : IDL.Func(
-        [ServiceCategoryInput],
+        [IDL.Opt(IDL.Text), ServiceCategoryInput],
         [ServiceCategory],
         [],
       ),
-    'createSupplier' : IDL.Func([SupplierInput], [Supplier], []),
-    'createSupplierOrder' : IDL.Func([SupplierOrderInput], [SupplierOrder], []),
-    'createTechnician' : IDL.Func([TechnicianInput], [Technician], []),
+    'createSupplier' : IDL.Func(
+        [IDL.Opt(IDL.Text), SupplierInput],
+        [Supplier],
+        [],
+      ),
+    'createSupplierOrder' : IDL.Func(
+        [IDL.Opt(IDL.Text), SupplierOrderInput],
+        [SupplierOrder],
+        [],
+      ),
+    'createTechnician' : IDL.Func(
+        [IDL.Opt(IDL.Text), TechnicianInput],
+        [Technician],
+        [],
+      ),
     'createTechnicianLoan' : IDL.Func(
-        [TechnicianLoanInput],
+        [IDL.Opt(IDL.Text), TechnicianLoanInput],
         [TechnicianLoan],
         [],
       ),
-    'deleteAppointment' : IDL.Func([Id], [IDL.Bool], []),
-    'deleteExpense' : IDL.Func([Id], [IDL.Bool], []),
-    'deleteExpenseCategory' : IDL.Func([Id], [IDL.Bool], []),
-    'deleteOrder' : IDL.Func([Id], [IDL.Bool], []),
-    'deleteQuote' : IDL.Func([Id], [IDL.Bool], []),
-    'deleteService' : IDL.Func([Id], [IDL.Bool], []),
-    'deleteServiceCategory' : IDL.Func([Id], [IDL.Bool], []),
-    'deleteTechnician' : IDL.Func([Id], [IDL.Bool], []),
-    'deleteTechnicianLoan' : IDL.Func([Id], [IDL.Bool], []),
-    'disconnectDrive' : IDL.Func([], [], []),
-    'downloadLocalBackup' : IDL.Func([], [LocalBackup], ['query']),
+    'createUser' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Text, IDL.Text, Id, IDL.Text],
+        [UserListItem],
+        [],
+      ),
+    'deleteAppointment' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteExpense' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteExpenseCategory' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteInvoice' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteOrder' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deletePurchase' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteQuote' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteRole' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteService' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteServiceCategory' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteTechnician' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteTechnicianLoan' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteUser' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'disconnectDrive' : IDL.Func([IDL.Opt(IDL.Text)], [], []),
     'execute' : IDL.Func([IDL.Text], [Result], ['query']),
     'exportCustomersAggregated' : IDL.Func(
-        [],
+        [IDL.Opt(IDL.Text)],
         [IDL.Vec(CustomerExportRow)],
         ['query'],
       ),
-    'exportInventoryCsv' : IDL.Func([], [IDL.Vec(InventoryCsvRow)], ['query']),
+    'exportInventoryCsv' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [IDL.Vec(InventoryCsvRow)],
+        ['query'],
+      ),
+    'findPartByCode' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Text],
+        [PartLookupResult],
+        ['query'],
+      ),
     'findTechnicianByCode' : IDL.Func(
-        [IDL.Text],
+        [IDL.Opt(IDL.Text), IDL.Text],
         [IDL.Opt(Technician)],
         ['query'],
       ),
     'getAccountingReport' : IDL.Func(
-        [AccountingPeriod],
+        [IDL.Opt(IDL.Text), AccountingPeriod],
         [AccountingReport],
         ['query'],
       ),
     'getAccountingSummary' : IDL.Func(
-        [AccountingPeriod],
+        [IDL.Opt(IDL.Text), AccountingPeriod],
         [AccountingSummary],
         ['query'],
       ),
     'getApiDoc' : IDL.Func([], [IDL.Text], ['query']),
-    'getAppointment' : IDL.Func([Id], [IDL.Opt(Appointment)], ['query']),
-    'getBusinessSettings' : IDL.Func([], [BusinessSettings], ['query']),
+    'getAppointment' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Appointment)],
+        ['query'],
+      ),
+    'getBackupSection' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Nat, IDL.Nat, IDL.Nat],
+        [BackupSectionChunk],
+        ['query'],
+      ),
+    'getBusinessSettings' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [BusinessSettings],
+        ['query'],
+      ),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
     'getCommissionPayment' : IDL.Func(
-        [Id],
+        [IDL.Opt(IDL.Text), Id],
         [IDL.Opt(CommissionPayment)],
         ['query'],
       ),
     'getCommissionReport' : IDL.Func(
-        [CommissionPeriod],
+        [IDL.Opt(IDL.Text), CommissionPeriod],
         [CommissionReport],
         ['query'],
       ),
-    'getCompanyProfile' : IDL.Func([], [CompanyProfile], ['query']),
-    'getCustomer' : IDL.Func([Id], [IDL.Opt(Customer)], ['query']),
-    'getCustomerDetail' : IDL.Func([Id], [IDL.Opt(CustomerDetail)], ['query']),
-    'getDashboardSummary' : IDL.Func([], [DashboardSummary], ['query']),
-    'getDriveConnectionStatus' : IDL.Func([], [DriveConnectionStatus], []),
-    'getExpense' : IDL.Func([Id], [IDL.Opt(Expense)], ['query']),
+    'getCompanyProfile' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [CompanyProfile],
+        ['query'],
+      ),
+    'getCustomer' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Customer)],
+        ['query'],
+      ),
+    'getCustomerDetail' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(CustomerDetail)],
+        ['query'],
+      ),
+    'getDailyHopeMessage' : IDL.Func([], [HopeMessage], ['query']),
+    'getDailyShiftReport' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [DailyShiftReport],
+        ['query'],
+      ),
+    'getDashboardSummary' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [DashboardSummary],
+        ['query'],
+      ),
+    'getDriveConnectionStatus' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [DriveConnectionStatus],
+        [],
+      ),
+    'getExpense' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Expense)],
+        ['query'],
+      ),
     'getExpenseCategory' : IDL.Func(
-        [Id],
+        [IDL.Opt(IDL.Text), Id],
         [IDL.Opt(ExpenseCategory)],
         ['query'],
       ),
     'getExpenseSummary' : IDL.Func(
-        [ExpenseFilter],
+        [IDL.Opt(IDL.Text), ExpenseFilter],
         [ExpenseSummary],
         ['query'],
       ),
-    'getInventoryValuation' : IDL.Func([], [InventoryValuation], ['query']),
-    'getInvoice' : IDL.Func([Id], [IDL.Opt(Invoice)], ['query']),
-    'getOrder' : IDL.Func([Id], [IDL.Opt(OrderView)], ['query']),
-    'getPart' : IDL.Func([Id], [IDL.Opt(PartView)], ['query']),
-    'getPayable' : IDL.Func([Id], [IDL.Opt(Payable)], ['query']),
-    'getPosSale' : IDL.Func([Id], [IDL.Opt(PosSale)], ['query']),
+    'getHopeSettings' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [HopeSettings],
+        ['query'],
+      ),
+    'getInventoryValuation' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [InventoryValuation],
+        ['query'],
+      ),
+    'getInvoice' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Invoice)],
+        ['query'],
+      ),
+    'getLocalBackupManifest' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [LocalBackupManifest],
+        ['query'],
+      ),
+    'getOpenShift' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Opt(Shift)], ['query']),
+    'getOrder' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(OrderView)],
+        ['query'],
+      ),
+    'getPart' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(PartView)],
+        ['query'],
+      ),
+    'getPayable' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Payable)],
+        ['query'],
+      ),
+    'getPosSale' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(PosSale)],
+        ['query'],
+      ),
     'getPurchaseInvoice' : IDL.Func(
-        [Id],
+        [IDL.Opt(IDL.Text), Id],
         [IDL.Opt(PurchaseInvoice)],
         ['query'],
       ),
-    'getQuote' : IDL.Func([Id], [IDL.Opt(QuoteView)], ['query']),
-    'getReceivableSummary' : IDL.Func([], [ReceivableSummary], ['query']),
-    'getService' : IDL.Func([Id], [IDL.Opt(Service)], ['query']),
+    'getQuote' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(QuoteView)],
+        ['query'],
+      ),
+    'getReceivableSummary' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [ReceivableSummary],
+        ['query'],
+      ),
+    'getRemindersSummary' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [RemindersSummary],
+        ['query'],
+      ),
+    'getService' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Service)],
+        ['query'],
+      ),
     'getServiceCategory' : IDL.Func(
-        [Id],
+        [IDL.Opt(IDL.Text), Id],
         [IDL.Opt(ServiceCategory)],
         ['query'],
       ),
-    'getSupplier' : IDL.Func([Id], [IDL.Opt(Supplier)], ['query']),
-    'getTechnician' : IDL.Func([Id], [IDL.Opt(Technician)], ['query']),
+    'getServiceTermsSettings' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [ServiceTermsSettings],
+        ['query'],
+      ),
+    'getSession' : IDL.Func([IDL.Text], [IDL.Opt(SessionInfo)], ['query']),
+    'getShift' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Opt(Shift)], ['query']),
+    'getSupplier' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Supplier)],
+        ['query'],
+      ),
+    'getTechnician' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Technician)],
+        ['query'],
+      ),
     'getTechnicianCommissionSummary' : IDL.Func(
-        [Id, CommissionPeriod],
+        [IDL.Opt(IDL.Text), Id, CommissionPeriod],
         [IDL.Opt(TechnicianCommissionSummary)],
         ['query'],
       ),
-    'getTechnicianLoan' : IDL.Func([Id], [IDL.Opt(TechnicianLoan)], ['query']),
+    'getTechnicianLoan' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(TechnicianLoan)],
+        ['query'],
+      ),
     'getTechnicianWorkload' : IDL.Func(
-        [Id],
+        [IDL.Opt(IDL.Text), Id],
         [IDL.Opt(TechnicianWorkload)],
         ['query'],
       ),
+    'getWarrantyTermsSettings' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [WarrantyTermsSettings],
+        ['query'],
+      ),
     'importInventoryCsv' : IDL.Func(
-        [IDL.Vec(InventoryImportRow)],
+        [IDL.Opt(IDL.Text), IDL.Vec(InventoryImportRow)],
         [InventoryImportResult],
         [],
       ),
     'isCallerAdmin' : IDL.Func([], [IDL.Bool], ['query']),
     'listAppointments' : IDL.Func(
-        [AppointmentFilter],
+        [IDL.Opt(IDL.Text), AppointmentFilter],
         [IDL.Vec(Appointment)],
         ['query'],
       ),
-    'listBackups' : IDL.Func([], [BackupListOutcome], []),
+    'listBackups' : IDL.Func([IDL.Opt(IDL.Text)], [BackupListOutcome], []),
+    'listCashMovements' : IDL.Func(
+        [IDL.Opt(IDL.Text), CashMovementFilter, IDL.Nat, IDL.Nat],
+        [CashMovementPage],
+        ['query'],
+      ),
     'listCommissionLines' : IDL.Func(
-        [IDL.Opt(Id), CommissionPeriod],
+        [IDL.Opt(IDL.Text), IDL.Opt(Id), CommissionPeriod],
         [IDL.Vec(CommissionLine)],
         ['query'],
       ),
     'listCommissionPayments' : IDL.Func(
-        [CommissionPaymentFilter],
+        [IDL.Opt(IDL.Text), CommissionPaymentFilter],
         [IDL.Vec(CommissionPayment)],
         ['query'],
       ),
     'listCustomers' : IDL.Func(
-        [IDL.Opt(IDL.Text)],
+        [IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
         [IDL.Vec(Customer)],
         ['query'],
       ),
     'listCustomersPage' : IDL.Func(
-        [CustomerFilter, CustomerSort, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), CustomerFilter, CustomerSort, IDL.Nat, IDL.Nat],
         [CustomerPage],
         ['query'],
       ),
     'listCustomersPageDir' : IDL.Func(
-        [CustomerFilter, CustomerSort, IDL.Bool, IDL.Nat, IDL.Nat],
+        [
+          IDL.Opt(IDL.Text),
+          CustomerFilter,
+          CustomerSort,
+          IDL.Bool,
+          IDL.Nat,
+          IDL.Nat,
+        ],
         [CustomerPage],
         ['query'],
       ),
     'listExpenseCategories' : IDL.Func(
-        [ExpenseCategoryFilter],
+        [IDL.Opt(IDL.Text), ExpenseCategoryFilter],
         [IDL.Vec(ExpenseCategoryUsage)],
         ['query'],
       ),
     'listExpenses' : IDL.Func(
-        [ExpenseFilter, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), ExpenseFilter, IDL.Nat, IDL.Nat],
         [ExpensePage],
         ['query'],
       ),
     'listInvoices' : IDL.Func(
-        [InvoiceFilter__1, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), InvoiceFilter__1, IDL.Nat, IDL.Nat],
         [InvoicePage__1],
         ['query'],
       ),
     'listLedgerEntries' : IDL.Func(
-        [AccountingPeriod],
+        [IDL.Opt(IDL.Text), AccountingPeriod],
         [IDL.Vec(LedgerEntry)],
         ['query'],
       ),
-    'listLots' : IDL.Func([Id], [IDL.Vec(Lot)], ['query']),
+    'listLots' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Vec(Lot)], ['query']),
     'listMotorcycleCountsByCustomers' : IDL.Func(
-        [IDL.Vec(Id)],
+        [IDL.Opt(IDL.Text), IDL.Vec(Id)],
         [IDL.Vec(IDL.Tuple(Id, IDL.Nat))],
         ['query'],
       ),
-    'listMotorcycles' : IDL.Func([Id], [IDL.Vec(Motorcycle)], ['query']),
+    'listMotorcycles' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Vec(Motorcycle)],
+        ['query'],
+      ),
     'listMotorcyclesPage' : IDL.Func(
-        [MotorcycleFilter, MotorcycleSort, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), MotorcycleFilter, MotorcycleSort, IDL.Nat, IDL.Nat],
         [MotorcyclePage],
         ['query'],
       ),
     'listMotorcyclesPageDir' : IDL.Func(
-        [MotorcycleFilter, MotorcycleSort, IDL.Bool, IDL.Nat, IDL.Nat],
+        [
+          IDL.Opt(IDL.Text),
+          MotorcycleFilter,
+          MotorcycleSort,
+          IDL.Bool,
+          IDL.Nat,
+          IDL.Nat,
+        ],
         [MotorcyclePage],
         ['query'],
       ),
-    'listMovements' : IDL.Func([Id], [IDL.Vec(Movement)], ['query']),
+    'listMovements' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Vec(Movement)],
+        ['query'],
+      ),
     'listOrders' : IDL.Func(
-        [OrderFilter, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), OrderFilter, IDL.Nat, IDL.Nat],
         [OrderPage],
         ['query'],
       ),
-    'listPartFacets' : IDL.Func([], [PartFacets], ['query']),
+    'listPartFacets' : IDL.Func([IDL.Opt(IDL.Text)], [PartFacets], ['query']),
     'listParts' : IDL.Func(
-        [PartFilter, PartSort, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), PartFilter, PartSort, IDL.Nat, IDL.Nat],
         [PartPage],
         ['query'],
       ),
     'listPartsDir' : IDL.Func(
-        [PartFilter, PartSort, IDL.Bool, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), PartFilter, PartSort, IDL.Bool, IDL.Nat, IDL.Nat],
         [PartPage],
         ['query'],
       ),
-    'listPayables' : IDL.Func([], [IDL.Vec(Payable)], ['query']),
-    'listPayments' : IDL.Func([IDL.Opt(Id)], [IDL.Vec(Payment)], ['query']),
+    'listPayables' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [IDL.Vec(Payable)],
+        ['query'],
+      ),
+    'listPayments' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Opt(Id)],
+        [IDL.Vec(Payment)],
+        ['query'],
+      ),
     'listPosSales' : IDL.Func(
-        [PosSaleFilter, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), PosSaleFilter, IDL.Nat, IDL.Nat],
         [PosSalePage],
         ['query'],
       ),
     'listPurchaseInvoices' : IDL.Func(
-        [InvoiceFilter, InvoiceSort, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), InvoiceFilter, InvoiceSort, IDL.Nat, IDL.Nat],
         [InvoicePage],
         ['query'],
       ),
-    'listPurchases' : IDL.Func([IDL.Opt(Id)], [IDL.Vec(Purchase)], ['query']),
+    'listPurchases' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Opt(Id)],
+        [IDL.Vec(Purchase)],
+        ['query'],
+      ),
     'listQuotes' : IDL.Func(
-        [QuoteFilter, QuoteSort, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), QuoteFilter, QuoteSort, IDL.Nat, IDL.Nat],
         [QuotePage],
         ['query'],
       ),
     'listReceivables' : IDL.Func(
-        [ReceivableFilter],
+        [IDL.Opt(IDL.Text), ReceivableFilter],
         [IDL.Vec(Receivable)],
         ['query'],
       ),
+    'listRoles' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Vec(Role)], ['query']),
     'listServiceCategories' : IDL.Func(
-        [ServiceCategoryFilter],
+        [IDL.Opt(IDL.Text), ServiceCategoryFilter],
         [IDL.Vec(ServiceCategoryUsage)],
         ['query'],
       ),
     'listServices' : IDL.Func(
-        [ServiceFilter, ServiceSort, IDL.Nat, IDL.Nat],
+        [IDL.Opt(IDL.Text), ServiceFilter, ServiceSort, IDL.Nat, IDL.Nat],
         [ServicePage],
         ['query'],
       ),
+    'listShifts' : IDL.Func(
+        [IDL.Opt(IDL.Text), ShiftFilter, IDL.Nat, IDL.Nat],
+        [ShiftPage],
+        ['query'],
+      ),
     'listSupplierOrders' : IDL.Func(
-        [SupplierOrderFilter],
+        [IDL.Opt(IDL.Text), SupplierOrderFilter],
         [IDL.Vec(SupplierOrder)],
         ['query'],
       ),
     'listSuppliers' : IDL.Func(
-        [IDL.Opt(IDL.Text)],
+        [IDL.Opt(IDL.Text), IDL.Opt(IDL.Text)],
         [IDL.Vec(Supplier)],
         ['query'],
       ),
     'listTechnicianLoans' : IDL.Func(
-        [TechnicianLoanFilter],
+        [IDL.Opt(IDL.Text), TechnicianLoanFilter],
         [IDL.Vec(TechnicianLoan)],
         ['query'],
       ),
     'listTechnicianWorkload' : IDL.Func(
-        [],
+        [IDL.Opt(IDL.Text)],
         [IDL.Vec(TechnicianWorkload)],
         ['query'],
       ),
     'listTechnicians' : IDL.Func(
-        [TechnicianFilter],
+        [IDL.Opt(IDL.Text), TechnicianFilter],
         [IDL.Vec(Technician)],
         ['query'],
       ),
-    'listUsers' : IDL.Func([], [IDL.Vec(UserView)], ['query']),
-    'lowStockParts' : IDL.Func([], [IDL.Vec(PartView)], ['query']),
-    'markInvoicePaid' : IDL.Func([Id, PaymentMethod], [Invoice], []),
+    'listUsersPage' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Opt(IDL.Text), IDL.Nat, IDL.Nat],
+        [UserPage],
+        ['query'],
+      ),
+    'login' : IDL.Func([IDL.Text, IDL.Text], [LoginResult], []),
+    'logout' : IDL.Func([IDL.Text], [IDL.Bool], []),
+    'lowStockParts' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [IDL.Vec(PartView)],
+        ['query'],
+      ),
+    'markInvoicePaid' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, PaymentMethod],
+        [Invoice],
+        [],
+      ),
     'notifyCustomer' : IDL.Func(
         [CustomerNotificationInput],
         [CustomerNotificationResult],
         [],
       ),
+    'openShift' : IDL.Func([IDL.Opt(IDL.Text), OpenShiftInput], [Shift], []),
     'payTechnicianCommission' : IDL.Func(
-        [CommissionPaymentInput],
+        [IDL.Opt(IDL.Text), CommissionPaymentInput],
         [CommissionPayment],
         [],
       ),
@@ -3776,71 +5077,181 @@ export const idlFactory = ({ IDL }) => {
         [WhatsAppMessageResult],
         ['query'],
       ),
-    'registerInstallmentPayment' : IDL.Func([Id, IDL.Nat], [Invoice], []),
-    'registerPayment' : IDL.Func([PaymentInput], [Payment], []),
+    'registerCashMovement' : IDL.Func(
+        [IDL.Opt(IDL.Text), CashMovementInput],
+        [CashMovement],
+        [],
+      ),
+    'registerInstallmentPayment' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, IDL.Nat],
+        [Invoice],
+        [],
+      ),
+    'registerPayment' : IDL.Func(
+        [IDL.Opt(IDL.Text), PaymentInput],
+        [Payment],
+        [],
+      ),
     'registerReceivablePayment' : IDL.Func(
-        [ReceivablePaymentInput],
+        [IDL.Opt(IDL.Text), ReceivablePaymentInput],
         [ReceivablePayment],
         [],
       ),
-    'removeLabor' : IDL.Func([Id, Id], [OrderView], []),
-    'removeOrderPart' : IDL.Func([Id, Id], [OrderView], []),
-    'removeOrderPhoto' : IDL.Func([Id, Id], [OrderView], []),
-    'runPurchaseInvoiceExtraction' : IDL.Func([Id], [PurchaseInvoice], []),
+    'removeLabor' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
+    'removeOrderPart' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
+    'removeOrderPhoto' : IDL.Func([IDL.Opt(IDL.Text), Id, Id], [OrderView], []),
+    'resetUserPassword' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [ResetPasswordResult],
+        [],
+      ),
+    'restoreSection' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Text, IDL.Nat],
+        [RestoreSectionOutcome],
+        [],
+      ),
+    'runPurchaseInvoiceExtraction' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [PurchaseInvoice],
+        [],
+      ),
     'saveCallerUserProfile' : IDL.Func([IDL.Text], [UserProfile], []),
     'schema' : IDL.Func([], [IDL.Text], ['query']),
-    'setUserRole' : IDL.Func([IDL.Principal, UserRole], [UserView], []),
-    'startDriveAuthorization' : IDL.Func([], [DriveAuthStart], []),
+    'setUserActive' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, IDL.Bool],
+        [UserListItem],
+        [],
+      ),
+    'startDriveAuthorization' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [DriveAuthStart],
+        [],
+      ),
     'transform' : IDL.Func(
         [TransformationInput],
         [TransformationOutput],
         ['query'],
       ),
-    'unassignTechnician' : IDL.Func([Id, Id], [OrderView], []),
-    'updateAppointment' : IDL.Func([Id, AppointmentInput], [Appointment], []),
+    'unassignTechnician' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, Id],
+        [OrderView],
+        [],
+      ),
+    'updateAppointment' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, AppointmentInput],
+        [Appointment],
+        [],
+      ),
     'updateAppointmentStatus' : IDL.Func(
-        [Id, AppointmentStatus],
+        [IDL.Opt(IDL.Text), Id, AppointmentStatus],
         [Appointment],
         [],
       ),
     'updateBusinessSettings' : IDL.Func(
-        [BusinessSettings],
+        [IDL.Opt(IDL.Text), BusinessSettings],
         [BusinessSettings],
         [],
       ),
+    'updateCallerName' : IDL.Func([IDL.Text, IDL.Text], [SessionInfo], []),
     'updateCompanyProfile' : IDL.Func(
-        [CompanyProfileRawInput],
+        [IDL.Opt(IDL.Text), CompanyProfileRawInput],
         [CompanyProfile],
         [],
       ),
-    'updateCustomer' : IDL.Func([Id, CustomerInput], [Customer], []),
-    'updateExpense' : IDL.Func([Id, ExpenseInput], [Expense], []),
+    'updateCustomer' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, CustomerInput],
+        [Customer],
+        [],
+      ),
+    'updateExpense' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, ExpenseInput],
+        [Expense],
+        [],
+      ),
     'updateExpenseCategory' : IDL.Func(
-        [Id, ExpenseCategoryInput],
+        [IDL.Opt(IDL.Text), Id, ExpenseCategoryInput],
         [ExpenseCategory],
         [],
       ),
-    'updateLaborTechnician' : IDL.Func([Id, Id, IDL.Opt(Id)], [OrderView], []),
-    'updateMotorcycle' : IDL.Func([Id, MotorcycleInput], [Motorcycle], []),
-    'updateOrderStatus' : IDL.Func([Id, OrderStatus], [OrderView], []),
-    'updatePart' : IDL.Func([Id, PartInput], [PartView], []),
+    'updateHopeSettings' : IDL.Func(
+        [IDL.Opt(IDL.Text), HopeSettingsRawInput],
+        [HopeSettings],
+        [],
+      ),
+    'updateLaborTechnician' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, Id, IDL.Opt(Id)],
+        [OrderView],
+        [],
+      ),
+    'updateMotorcycle' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, MotorcycleInput],
+        [Motorcycle],
+        [],
+      ),
+    'updateOrderStatus' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, OrderStatus],
+        [OrderView],
+        [],
+      ),
+    'updatePart' : IDL.Func([IDL.Opt(IDL.Text), Id, PartInput], [PartView], []),
     'updatePurchaseInvoiceReview' : IDL.Func(
-        [Id, InvoiceReviewInput],
+        [IDL.Opt(IDL.Text), Id, InvoiceReviewInput],
         [PurchaseInvoice],
         [],
       ),
-    'updateQuote' : IDL.Func([Id, QuoteInput], [QuoteView], []),
-    'updateQuoteStatus' : IDL.Func([Id, QuoteStatus], [QuoteView], []),
-    'updateService' : IDL.Func([Id, ServiceInput], [Service], []),
+    'updateQuote' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, QuoteInput],
+        [QuoteView],
+        [],
+      ),
+    'updateQuoteStatus' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, QuoteStatus],
+        [QuoteView],
+        [],
+      ),
+    'updateRole' : IDL.Func([IDL.Opt(IDL.Text), Id, RoleInput], [Role], []),
+    'updateService' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, ServiceInput],
+        [Service],
+        [],
+      ),
     'updateServiceCategory' : IDL.Func(
-        [Id, ServiceCategoryInput],
+        [IDL.Opt(IDL.Text), Id, ServiceCategoryInput],
         [ServiceCategory],
         [],
       ),
-    'updateSupplier' : IDL.Func([Id, SupplierInput], [Supplier], []),
-    'updateTechnician' : IDL.Func([Id, TechnicianInput], [Technician], []),
-    'zeroInventory' : IDL.Func([], [ZeroInventoryResult], []),
-    'zeroServices' : IDL.Func([], [ZeroServicesResult], []),
+    'updateServiceTermsSettings' : IDL.Func(
+        [IDL.Opt(IDL.Text), ServiceTermsSettingsRawInput],
+        [ServiceTermsSettings],
+        [],
+      ),
+    'updateSupplier' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, SupplierInput],
+        [Supplier],
+        [],
+      ),
+    'updateTechnician' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, TechnicianInput],
+        [Technician],
+        [],
+      ),
+    'updateUserRole' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, Id],
+        [UserListItem],
+        [],
+      ),
+    'updateWarrantyTermsSettings' : IDL.Func(
+        [IDL.Opt(IDL.Text), WarrantyTermsSettingsRawInput],
+        [WarrantyTermsSettings],
+        [],
+      ),
+    'validateRestoreFile' : IDL.Func(
+        [IDL.Opt(IDL.Text), IDL.Text],
+        [RestorePreviewOutcome],
+        [],
+      ),
+    'zeroInventory' : IDL.Func([IDL.Opt(IDL.Text)], [ZeroInventoryResult], []),
+    'zeroServices' : IDL.Func([IDL.Opt(IDL.Text)], [ZeroServicesResult], []),
   });
 };
 

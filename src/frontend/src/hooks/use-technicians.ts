@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Id,
@@ -16,6 +17,7 @@ export interface TechnicianListParams {
 
 export function useTechnicians(params: TechnicianListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const search = params.search.trim();
 
   return useQuery({
@@ -32,7 +34,7 @@ export function useTechnicians(params: TechnicianListParams) {
         specialty: params.specialty ?? undefined,
         activeOnly: params.activeOnly ? true : undefined,
       };
-      return actor.listTechnicians(filter);
+      return actor.listTechnicians(token, filter);
     },
     enabled: !!actor && !isFetching,
   });
@@ -40,12 +42,13 @@ export function useTechnicians(params: TechnicianListParams) {
 
 export function useTechnician(id: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["technician", id?.toString() ?? "none"],
     queryFn: async (): Promise<Technician | null> => {
       if (!actor || id === null) return null;
-      return actor.getTechnician(id);
+      return actor.getTechnician(token, id);
     },
     enabled: !!actor && !isFetching && id !== null,
   });
@@ -53,12 +56,13 @@ export function useTechnician(id: Id | null) {
 
 export function useTechnicianWorkloads() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["technician-workloads"],
     queryFn: async (): Promise<TechnicianWorkload[]> => {
       if (!actor) return [];
-      return actor.listTechnicianWorkload();
+      return actor.listTechnicianWorkload(token);
     },
     enabled: !!actor && !isFetching,
   });
@@ -66,12 +70,13 @@ export function useTechnicianWorkloads() {
 
 export function useCreateTechnician() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: TechnicianInput): Promise<Technician> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createTechnician(input);
+      return actor.createTechnician(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["technicians"] });
@@ -84,6 +89,7 @@ export function useCreateTechnician() {
 
 export function useUpdateTechnician() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -95,7 +101,7 @@ export function useUpdateTechnician() {
       input: TechnicianInput;
     }): Promise<Technician> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateTechnician(id, input);
+      return actor.updateTechnician(token, id, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["technicians"] });
@@ -108,12 +114,13 @@ export function useUpdateTechnician() {
 
 export function useDeleteTechnician() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: Id): Promise<boolean> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.deleteTechnician(id);
+      return actor.deleteTechnician(token, id);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["technicians"] });

@@ -31,6 +31,7 @@ import OrderStatusValue "OrderStatusValue";
 import PaymentMethodValue "PaymentMethodValue";
 import PaymentStatusValue "PaymentStatusValue";
 import UserRoleValue "UserRoleValue";
+import RoleKindValue "RoleKindValue";
 import OrderPartListValue "OrderPartListValue";
 import LaborItemListValue "LaborItemListValue";
 import OrderPhotoListValue "OrderPhotoListValue";
@@ -53,6 +54,11 @@ import ExtractionStatusValue "ExtractionStatusValue";
 import PurchaseInvoiceStatusValue "PurchaseInvoiceStatusValue";
 import InvoiceFileKindValue "InvoiceFileKindValue";
 import OptPrincipalValue "OptPrincipalValue";
+import ModuleKeyListValue "ModuleKeyListValue";
+import ShiftStatusValue "ShiftStatusValue";
+import CashMovementKindValue "CashMovementKindValue";
+import CashAccountValue "CashAccountValue";
+import CashMovementSourceValue "CashMovementSourceValue";
 
 import Common "types/common";
 import InventoryTypes "types/inventory";
@@ -76,6 +82,7 @@ import ReceivableTypes "types/receivables";
 import SupplierOrderTypes "types/supplier-orders";
 import PurchaseInvoiceIntakeTypes "types/purchase-invoice-intake";
 import BackupTypes "types/backup";
+import CashTypes "types/cash";
 
 import InventoryApi "mixins/inventory-api";
 import CustomersApi "mixins/customers-api";
@@ -96,12 +103,20 @@ import ExpenseCategoriesApi "mixins/expense-categories-api";
 import AccountingApi "mixins/accounting-api";
 import PosApi "mixins/pos-api";
 import ReceivablesApi "mixins/receivables-api";
+import RemindersApi "mixins/reminders-api";
 import SupplierOrdersApi "mixins/supplier-orders-api";
 import PurchaseInvoiceIntakeApi "mixins/purchase-invoice-intake-api";
+import CashApi "mixins/cash-api";
 import NotificationsApi "mixins/notifications-api";
+import HopeApi "mixins/hope-api";
+import ServiceTermsApi "mixins/service-terms-api";
+import WarrantyTermsApi "mixins/warranty-terms-api";
 import BackupApi "mixins/backup-api";
 import BackupLib "lib/backup";
 import ApiDocMixin "mixins/api-doc";
+import HopeTypes "types/hope";
+import ServiceTermsTypes "types/service-terms";
+import WarrantyTermsTypes "types/warranty-terms";
 
 actor {
   let accessControlState : AccessControl.AccessControlState;
@@ -130,6 +145,14 @@ actor {
 
   let userProfiles : Map.Map<Principal, UserTypes.UserProfile>;
 
+  // Acceso con usuario y contraseña: credenciales (hash + sal), sesiones
+  // opacas con vencimiento y roles editables. Estado nuevo; `userProfiles`
+  // se conserva intacto.
+  let credentials : Map.Map<Common.Id, UserTypes.Credential>;
+  let sessions : Map.Map<Text, UserTypes.Session>;
+  let roles : Map.Map<Common.Id, UserTypes.Role>;
+  let userCounters : { var nextUserId : Nat; var nextRoleId : Nat };
+
   // ── Nuevos módulos ──────────────────────────────────────────────────────
   let quotes : Map.Map<Common.Id, QuoteTypes.Quote>;
   let services : Map.Map<Common.Id, ServiceTypes.Service>;
@@ -149,8 +172,21 @@ actor {
   // Facturas de compra cargadas en PDF o foto para actualizar el inventario.
   let purchaseInvoices : Map.Map<Common.Id, PurchaseInvoiceIntakeTypes.PurchaseInvoice>;
 
+  // Caja y Bancos: turnos y movimientos de tesorería.
+  let shifts : Map.Map<Common.Id, CashTypes.Shift>;
+  let cashMovements : Map.Map<Common.Id, CashTypes.CashMovement>;
+
   // Credenciales OAuth de Google Drive del administrador (respaldo manual).
   let driveCredentials : { var credentials : ?BackupTypes.DriveCredentials };
+
+  // Mensaje diario de esperanza bíblica: configuración persistente (fila única).
+  let hope : { var settings : HopeTypes.HopeSettings };
+
+  // Pie de página editable «Términos y condiciones del Servicio» (fila única).
+  let serviceTerms : { var settings : ServiceTermsTypes.ServiceTermsSettings };
+
+  // Términos y Condiciones de Garantía editables (fila única).
+  let warrantyTerms : { var settings : WarrantyTermsTypes.WarrantyTermsSettings };
 
   let counters : {
     var nextPartId : Nat;
@@ -186,30 +222,37 @@ actor {
     var nextSupplierOrderId : Nat;
     var nextPurchaseInvoiceId : Nat;
     var nextPurchaseInvoiceLineId : Nat;
+    var nextShiftId : Nat;
+    var nextCashMovementId : Nat;
   };
 
-  include InventoryApi(accessControlState, parts, lots, movements, counters);
-  include CustomersApi(customers, motorcycles, orders, counters);
-  include WorkshopApi(orders, parts, lots, movements, customers, motorcycles, services, counters, businessSettings, company);
-  include PurchasingApi(accessControlState, suppliers, purchases, payments, lots, movements, counters);
-  include BillingApi(accessControlState, invoices, businessSettings, counters, orders, customers, company);
-  include DashboardApi(accessControlState, parts, lots, orders, purchases, payments);
-  include UsersApi(accessControlState, userProfiles);
-  include QuotesApi(accessControlState, quotes, customers, motorcycles, parts, services, orders, invoices, businessSettings, company, counters);
-  include ServicesApi(accessControlState, services, counters);
-  include ServiceCategoriesApi(serviceCategories, services, counters);
-  include TechniciansApi(technicians, orders, counters);
-  include CommissionsApi(technicianLoans, commissionPayments, paidCommissionLines, technicians, orders, motorcycles, services, counters);
-  include CompanyApi(accessControlState, company);
-  include AppointmentsApi(appointments, customers, motorcycles, technicians, orders, businessSettings, company, counters);
-  include ExpensesApi(expenses, suppliers, expenseCategories, counters);
-  include ExpenseCategoriesApi(expenseCategories, expenses, counters);
-  include AccountingApi(accessControlState, invoices, expenses, parts, lots, orders, technicians, services);
-  include PosApi(posSales, parts, lots, movements, customers, invoices, businessSettings, company, counters);
-  include ReceivablesApi(accessControlState, invoices, receivablePayments, counters);
-  include SupplierOrdersApi(accessControlState, suppliers, supplierOrders, counters);
-  include PurchaseInvoiceIntakeApi(accessControlState, purchaseInvoices, parts, lots, movements, suppliers, counters);
-  include NotificationsApi(customers, suppliers, orders, quotes, invoices, appointments, services, company);
+  include InventoryApi(accessControlState, parts, lots, movements, counters, credentials, sessions, roles);
+  include CustomersApi(accessControlState, customers, motorcycles, orders, counters, credentials, sessions, roles);
+  include WorkshopApi(accessControlState, orders, parts, lots, movements, customers, motorcycles, services, counters, businessSettings, company, credentials, sessions, roles);
+  include PurchasingApi(accessControlState, suppliers, purchases, payments, lots, movements, counters, credentials, sessions, roles);
+  include BillingApi(accessControlState, invoices, businessSettings, counters, orders, customers, company, credentials, sessions, roles, posSales, receivablePayments);
+  include DashboardApi(accessControlState, parts, lots, orders, purchases, payments, credentials, sessions, roles);
+  include UsersApi(accessControlState, userProfiles, credentials, sessions, roles, userCounters);
+  include QuotesApi(accessControlState, quotes, customers, motorcycles, parts, services, orders, invoices, businessSettings, company, counters, credentials, sessions, roles);
+  include ServicesApi(accessControlState, services, counters, credentials, sessions, roles);
+  include ServiceCategoriesApi(accessControlState, serviceCategories, services, counters, credentials, sessions, roles);
+  include TechniciansApi(accessControlState, technicians, orders, counters, credentials, sessions, roles);
+  include CommissionsApi(accessControlState, technicianLoans, commissionPayments, paidCommissionLines, technicians, orders, motorcycles, services, counters, credentials, sessions, roles);
+  include CompanyApi(accessControlState, company, credentials, sessions, roles);
+  include AppointmentsApi(accessControlState, appointments, customers, motorcycles, technicians, orders, businessSettings, company, counters, credentials, sessions, roles);
+  include ExpensesApi(accessControlState, expenses, suppliers, expenseCategories, counters, credentials, sessions, roles);
+  include ExpenseCategoriesApi(accessControlState, expenseCategories, expenses, counters, credentials, sessions, roles);
+  include AccountingApi(accessControlState, invoices, expenses, parts, lots, orders, technicians, services, credentials, sessions, roles);
+  include PosApi(accessControlState, posSales, parts, lots, movements, customers, invoices, businessSettings, company, counters, credentials, sessions, roles);
+  include ReceivablesApi(accessControlState, invoices, receivablePayments, counters, credentials, sessions, roles);
+  include RemindersApi(accessControlState, appointments, invoices, receivablePayments, suppliers, purchases, payments, quotes, orders, customers, motorcycles, credentials, sessions, roles);
+  include SupplierOrdersApi(accessControlState, suppliers, supplierOrders, counters, credentials, sessions, roles);
+  include PurchaseInvoiceIntakeApi(accessControlState, purchaseInvoices, parts, lots, movements, suppliers, counters, credentials, sessions, roles);
+  include CashApi(accessControlState, shifts, cashMovements, counters, credentials, sessions, roles);
+  include NotificationsApi(customers, suppliers, orders, quotes, invoices, appointments, services, company, hope);
+  include HopeApi(accessControlState, hope, credentials, sessions, roles);
+  include ServiceTermsApi(accessControlState, serviceTerms, credentials, sessions, roles);
+  include WarrantyTermsApi(accessControlState, warrantyTerms, credentials, sessions, roles);
   include BackupApi(accessControlState, driveCredentials, {
     parts;
     lots;
@@ -234,7 +277,7 @@ actor {
     receivablePayments;
     supplierOrders;
     company;
-  } : BackupLib.State);
+  } : BackupLib.State, credentials, sessions, roles);
   include ApiDocMixin();
 
   // Sample owner for the per-user `userProfile` entity; the value is ignored.
@@ -247,6 +290,7 @@ actor {
         .sample({
           id = 0;
           sku = "";
+          barcode = "";
           name = "";
           category = "";
           brand = "";
@@ -366,6 +410,7 @@ actor {
           items = [];
           total = 0;
           paidAmount = 0;
+          accepted = false;
           createdAt = 0;
         })
         .edge("supplierId", "supplier")
@@ -440,6 +485,49 @@ actor {
         .payload("createdAt", func (p : UserTypes.UserProfile) : Common.Timestamp = p.createdAt)
         .ownedBy("principal")
         .scopedPerUser()
+        .build(),
+
+      // ── Credenciales de acceso (solo controladores) ─────────────────────
+      // Contiene el hash y la sal de cada contraseña: nunca debe ser legible
+      // por usuarios no administradores, por eso se expone `controllerOnly`.
+      credentials.toEntityManual(
+        "credential",
+        "Credential",
+        "id",
+      )
+        .sample({
+          id = 0;
+          username = "";
+          name = "";
+          roleId = 0;
+          active = true;
+          salt = "" : Blob;
+          passwordHash = "" : Blob;
+          iterations = 0;
+          createdAt = 0;
+          updatedAt = 0;
+        })
+        .payload("id", func (c : UserTypes.Credential) : Common.Id = c.id)
+        .payload("username", func (c : UserTypes.Credential) : Text = c.username)
+        .payload("name", func (c : UserTypes.Credential) : Text = c.name)
+        .payload("roleId", func (c : UserTypes.Credential) : Common.Id = c.roleId)
+        .payload("active", func (c : UserTypes.Credential) : Bool = c.active)
+        .payload("createdAt", func (c : UserTypes.Credential) : Common.Timestamp = c.createdAt)
+        .payload("updatedAt", func (c : UserTypes.Credential) : Common.Timestamp = c.updatedAt)
+        .edge("roleId", "role")
+        .controllerOnly()
+        .build(),
+
+      // ── Roles editables (administrables) ────────────────────────────────
+      roles.toEntity("role", "Role", "id")
+        .sample({
+          id = 0;
+          name = "";
+          kind = #custom;
+          modules = [];
+          createdAt = 0;
+        })
+        .controllerOnly()
         .build(),
 
       // ── Cotizaciones ────────────────────────────────────────────────────
@@ -714,6 +802,46 @@ actor {
         .controllerOnly()
         .build(),
 
+      // ── Caja y Bancos: turnos ───────────────────────────────────────────
+      shifts.toEntity("shift", "Shift", "id")
+        .sample({
+          id = 0;
+          openedAt = 0;
+          closedAt = null;
+          openingCash = 0;
+          openingBank = 0;
+          declaredClosingCash = null;
+          declaredClosingBank = null;
+          computedClosingCash = 0;
+          computedClosingBank = 0;
+          differenceCash = 0;
+          differenceBank = 0;
+          status = #open;
+          openedBy = anyPrincipal;
+          closedBy = null;
+          notes = null;
+        })
+        .controllerOnly()
+        .build(),
+
+      // ── Caja y Bancos: movimientos ──────────────────────────────────────
+      cashMovements.toEntity("cashMovement", "CashMovement", "id")
+        .sample({
+          id = 0;
+          shiftId = 0;
+          timestamp = 0;
+          kind = #income;
+          paymentMethod = #cash;
+          amount = 0;
+          account = #cash;
+          description = "";
+          reference = null;
+          source = #manual;
+        })
+        .edge("shiftId", "shift")
+        .controllerOnly()
+        .build(),
+
       // ── Perfil de la empresa (fila única) ───────────────────────────────
       OQL.Entity.manual<CompanyTypes.CompanyProfile>(
         "companyProfile",
@@ -763,6 +891,51 @@ actor {
         .payload("accountEmail", func (c : BackupTypes.DriveCredentials) : ?Text = c.accountEmail)
         .payload("connectedAt", func (c : BackupTypes.DriveCredentials) : Int = c.connectedAt)
         .payload("hasRefreshToken", func (c : BackupTypes.DriveCredentials) : Bool = c.refreshToken != "")
+        .controllerOnly()
+        .build(),
+
+      // ── Mensaje diario de esperanza bíblica (fila única) ────────────────
+      OQL.Entity.manual<HopeTypes.HopeSettings>(
+        "hopeSetting",
+        func () = [hope.settings].values(),
+        "HopeSettings",
+        "mode",
+      )
+        .sample({
+          enabled = false;
+          mode = #auto;
+          manualText = "";
+          manualCitation = "";
+          updatedAt = 0;
+        })
+        .controllerOnly()
+        .build(),
+
+      // ── Pie de página «Términos y condiciones del Servicio» (fila única) ─
+      OQL.Entity.manual<ServiceTermsTypes.ServiceTermsSettings>(
+        "serviceTermsSetting",
+        func () = [serviceTerms.settings].values(),
+        "ServiceTermsSettings",
+        "text",
+      )
+        .sample({
+          text = "";
+          updatedAt = 0;
+        })
+        .controllerOnly()
+        .build(),
+
+      // ── Términos y Condiciones de Garantía (fila única) ─────────────────
+      OQL.Entity.manual<WarrantyTermsTypes.WarrantyTermsSettings>(
+        "warrantyTermsSetting",
+        func () = [warrantyTerms.settings].values(),
+        "WarrantyTermsSettings",
+        "text",
+      )
+        .sample({
+          text = "";
+          updatedAt = 0;
+        })
         .controllerOnly()
         .build(),
     ];

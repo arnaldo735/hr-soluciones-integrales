@@ -276,6 +276,18 @@ export function colombiaTimeLabel(date: Date): string {
   return `${hours}:${minutes}`;
 }
 
+/**
+ * `DD/MM/AAAA` date label in Colombia time, matching the format the backend
+ * returns in `HopeMessage.referenceDate`.
+ */
+export function formatColombiaDateDDMMYYYY(date: Date): string {
+  const parts = toColombiaParts(date);
+  if (!parts) return "—";
+  const day = `${parts.day}`.padStart(2, "0");
+  const month = `${parts.month}`.padStart(2, "0");
+  return `${day}/${month}/${parts.year}`;
+}
+
 /** `YYYY-MM-DD` for a date input from a backend nanosecond timestamp. */
 export function colombiaDateInput(
   timestamp: Timestamp | undefined | null,

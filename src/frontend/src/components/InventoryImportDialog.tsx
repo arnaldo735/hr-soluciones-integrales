@@ -17,6 +17,7 @@ import { AlertTriangle, CheckCircle2, Loader2 } from "lucide-react";
 /** CSV column order shared by the inventory export and import templates. */
 export const INVENTORY_CSV_HEADERS = [
   "sku",
+  "codigo_barras",
   "nombre",
   "categoria",
   "marca",

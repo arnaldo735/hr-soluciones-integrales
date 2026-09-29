@@ -1,3 +1,4 @@
+import { CompanyHeader } from "@/components/CompanyHeader";
 import { PageHeader } from "@/components/PageHeader";
 import { StatusBadge } from "@/components/StatusBadge";
 import { Button } from "@/components/ui/button";
@@ -10,17 +11,16 @@ import {
   useInventoryValuation,
 } from "@/hooks/use-accounting";
 import { useCompanyProfile } from "@/hooks/use-company";
+import { companyHeaderFromProfile } from "@/lib/company-header";
+import type { CompanyHeaderData } from "@/lib/company-header";
 import {
   colombiaDateInput,
   colombiaEndOfDay,
   colombiaStartOfDay,
-  fiscalRegimeLabel,
   formatDate,
   formatDateTime,
   formatMoney,
-  formatNit,
   formatNumber,
-  taxResponsibilityLabel,
   toColombiaParts,
 } from "@/lib/format";
 import type {
@@ -351,6 +351,33 @@ function ProfitBreakdownPanel({
         <ProfitBlockCard block={profit.total} ocid={`${ocid}.total`} />
       </div>
 
+      <dl
+        data-ocid={`${ocid}.net_summary`}
+        className="grid gap-x-6 gap-y-2 rounded-lg border border-border bg-muted/30 px-4 py-3 sm:grid-cols-2"
+      >
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-sm text-muted-foreground">
+            Comisiones de técnicos del periodo
+          </dt>
+          <dd className="data-rail text-sm font-semibold text-destructive">
+            −{formatMoney(profit.totalCommission)}
+          </dd>
+        </div>
+        <div className="flex items-baseline justify-between gap-3">
+          <dt className="text-sm font-medium">
+            Utilidad neta después de comisiones
+          </dt>
+          <dd
+            className={cn(
+              "data-rail text-sm font-semibold",
+              marginTone(profit.netProfit),
+            )}
+          >
+            {formatMoney(profit.netProfit)}
+          </dd>
+        </div>
+      </dl>
+
       <ServiceProfitLinesPanel
         lines={profit.serviceLines}
         ocid={`${ocid}.service_lines`}
@@ -484,6 +511,15 @@ function ServiceProfitLinesPanel({
 }
 
 function LedgerKindBadge({ kind }: { kind: LedgerEntryKind }) {
+  if (kind === LedgerEntryKind.commission) {
+    return (
+      <StatusBadge
+        label="Comisión técnico"
+        tone="pending"
+        icon={<ArrowDownRight className="size-3" aria-hidden="true" />}
+      />
+    );
+  }
   const isIncome = kind === LedgerEntryKind.income;
   return (
     <StatusBadge
@@ -498,6 +534,11 @@ function LedgerKindBadge({ kind }: { kind: LedgerEntryKind }) {
       }
     />
   );
+}
+
+/** True when a ledger entry increases utility (only income does). */
+function isLedgerIncome(kind: LedgerEntryKind): boolean {
+  return kind === LedgerEntryKind.income;
 }
 
 // --- Valoración de inventario -------------------------------------------
@@ -597,54 +638,26 @@ function ValuationKpi({
 }
 
 interface ReportHeaderProps {
-  companyName: string;
-  companyContact: string;
-  companyLogoUrl?: string;
-  fiscalLines: string[];
+  header: CompanyHeaderData | null;
   cutoff: string;
 }
 
-/** Formal document header: company identity, report title and cutoff date. */
-function ReportHeader({
-  companyName,
-  companyContact,
-  companyLogoUrl,
-  fiscalLines,
-  cutoff,
-}: ReportHeaderProps) {
+/**
+ * Formal document header: the complete company identity block (logo, razón
+ * social, NIT con dígito de verificación, régimen, responsabilidad, dirección,
+ * ciudad, teléfono, correo y web) plus the report title and cutoff date.
+ * Unconfigured company fields are omitted cleanly by `CompanyHeader`.
+ */
+function ReportHeader({ header, cutoff }: ReportHeaderProps) {
   return (
     <header className="space-y-3">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div className="flex min-w-0 items-start gap-3">
-          {companyLogoUrl ? (
-            <img
-              src={companyLogoUrl}
-              alt=""
-              data-ocid="accounting.valuation.document.logo"
-              className="size-12 shrink-0 object-contain"
-            />
-          ) : null}
-          <div className="min-w-0 space-y-1">
-            <p className="font-display text-lg font-bold tracking-tight">
-              {companyName}
-            </p>
-            {companyContact ? (
-              <p className="report-muted text-xs">{companyContact}</p>
-            ) : null}
-            {fiscalLines.length > 0 ? (
-              <div
-                data-ocid="accounting.valuation.document.fiscal_block"
-                className="space-y-0.5"
-              >
-                {fiscalLines.map((line) => (
-                  <p key={line} className="report-muted text-xs">
-                    {line}
-                  </p>
-                ))}
-              </div>
-            ) : null}
-          </div>
-        </div>
+        <CompanyHeader
+          header={header}
+          ocid="accounting.valuation.document.company"
+          variant="document"
+          className="min-w-0 flex-1"
+        />
         <div className="text-right">
           <p className="font-display text-sm font-semibold uppercase tracking-wider">
             Informe de valoración de inventario
@@ -1085,6 +1098,32 @@ export function AccountingPage() {
     [entries],
   );
 
+  /**
+   * Running totals of the ledger: income adds, expenses and technician
+   * commissions subtract. The net utility reconciles with the summary's
+   * `netProfit` when the backend reports the same period.
+   */
+  const ledgerTotals = useMemo(() => {
+    let income = 0n;
+    let expenses = 0n;
+    let commissions = 0n;
+    for (const entry of entries) {
+      if (entry.kind === LedgerEntryKind.income) {
+        income += entry.amount;
+      } else if (entry.kind === LedgerEntryKind.commission) {
+        commissions += entry.amount;
+      } else {
+        expenses += entry.amount;
+      }
+    }
+    return {
+      income,
+      expenses,
+      commissions,
+      net: income - expenses - commissions,
+    };
+  }, [entries]);
+
   const categoryRows = useMemo<BreakdownRow[]>(
     () =>
       [...(report?.byExpenseCategory ?? [])]
@@ -1132,6 +1171,14 @@ export function AccountingPage() {
       },
       { Concepto: "Periodo desde", Monto: from || "inicio" },
       { Concepto: "Periodo hasta", Monto: to || "hoy" },
+      {
+        Concepto: "Comisiones de técnicos",
+        Monto: (Number(summary.totalCommissions) / 100).toFixed(2),
+      },
+      {
+        Concepto: "Utilidad neta",
+        Monto: (Number(summary.netProfit) / 100).toFixed(2),
+      },
     ];
 
     if (profitView) {
@@ -1172,9 +1219,6 @@ export function AccountingPage() {
       rows,
     );
   }, [summary, profitView, from, to]);
-
-  const profitTone =
-    summary && summary.profit < 0n ? "text-destructive" : "text-foreground";
 
   // --- Valoración de inventario (foto del inventario actual) --------------
 
@@ -1237,22 +1281,10 @@ export function AccountingPage() {
   const companyQuery = useCompanyProfile();
   const company = companyQuery.data ?? null;
 
-  const companyName = company?.legalName || "HR SOLUCIONES INTEGRALES";
-  const companyContact = [
-    company?.address,
-    company?.city,
-    company?.phone,
-    company?.email,
-  ]
-    .filter((part): part is string => !!part && part.trim() !== "")
-    .join(" · ");
-  const companyFiscalLines = company
-    ? [
-        formatNit(company.taxId, company.checkDigit),
-        fiscalRegimeLabel(company.fiscalRegime),
-        taxResponsibilityLabel(company.taxResponsibility),
-      ]
-    : [];
+  const companyHeader = useMemo<CompanyHeaderData | null>(
+    () => companyHeaderFromProfile(company),
+    [company],
+  );
 
   // Cutoff is the moment the report is generated, in Colombia time.
   const [cutoffAt] = useState(() => new Date());
@@ -1509,13 +1541,15 @@ export function AccountingPage() {
         <>
           <section
             data-ocid="accounting.kpis"
-            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4"
+            className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3"
           >
             {reportQuery.isLoading || !summary ? (
               <>
                 <KpiSkeleton ocid="accounting.kpi.income" />
                 <KpiSkeleton ocid="accounting.kpi.expenses" />
                 <KpiSkeleton ocid="accounting.kpi.profit" />
+                <KpiSkeleton ocid="accounting.kpi.commissions" />
+                <KpiSkeleton ocid="accounting.kpi.net_profit" />
                 <KpiSkeleton ocid="accounting.kpi.counts" />
               </>
             ) : (
@@ -1543,6 +1577,22 @@ export function AccountingPage() {
                   hint="Ingresos menos gastos"
                   icon={Scale}
                   tone="info"
+                />
+                <KpiCard
+                  ocid="accounting.kpi.commissions"
+                  label="Comisiones técnicos"
+                  value={formatMoney(summary.totalCommissions)}
+                  hint="Comisiones del periodo que reducen la utilidad"
+                  icon={ArrowDownRight}
+                  tone="warning"
+                />
+                <KpiCard
+                  ocid="accounting.kpi.net_profit"
+                  label="Utilidad neta"
+                  value={formatMoney(summary.netProfit)}
+                  hint="Utilidad después de comisiones de técnicos"
+                  icon={Scale}
+                  tone="primary"
                 />
                 <KpiCard
                   ocid="accounting.kpi.counts"
@@ -1682,7 +1732,9 @@ export function AccountingPage() {
                   </thead>
                   <tbody>
                     {sortedEntries.map((entry: LedgerEntry, index) => {
-                      const isIncome = entry.kind === LedgerEntryKind.income;
+                      const isIncome = isLedgerIncome(entry.kind);
+                      const isCommission =
+                        entry.kind === LedgerEntryKind.commission;
                       return (
                         <tr
                           key={entry.id.toString()}
@@ -1696,6 +1748,14 @@ export function AccountingPage() {
                             <span className="block truncate font-medium">
                               {entry.concept}
                             </span>
+                            {isCommission && entry.referenceType ? (
+                              <span className="block truncate font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                                {entry.referenceType}
+                                {entry.referenceId !== undefined
+                                  ? ` #${entry.referenceId.toString()}`
+                                  : ""}
+                              </span>
+                            ) : null}
                           </td>
                           <td className="px-4 py-2.5 text-muted-foreground">
                             {categoryLabel(entry.category)}
@@ -1725,19 +1785,30 @@ export function AccountingPage() {
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                   Ingresos{" "}
                   <span className="data-rail text-success">
-                    {formatMoney(summary?.totalIncome ?? 0n)}
+                    {formatMoney(ledgerTotals.income)}
                   </span>
                 </p>
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
                   Egresos{" "}
                   <span className="data-rail text-destructive">
-                    {formatMoney(summary?.totalExpenses ?? 0n)}
+                    {formatMoney(ledgerTotals.expenses)}
                   </span>
                 </p>
                 <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-                  Utilidad{" "}
-                  <span className={cn("data-rail font-semibold", profitTone)}>
-                    {formatMoney(summary?.profit ?? 0n)}
+                  Comisiones{" "}
+                  <span className="data-rail text-destructive">
+                    {formatMoney(ledgerTotals.commissions)}
+                  </span>
+                </p>
+                <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
+                  Utilidad neta{" "}
+                  <span
+                    className={cn(
+                      "data-rail font-semibold",
+                      marginTone(ledgerTotals.net),
+                    )}
+                  >
+                    {formatMoney(ledgerTotals.net)}
                   </span>
                 </p>
               </div>
@@ -1863,13 +1934,7 @@ export function AccountingPage() {
             className="scroll-slim overflow-x-auto py-2"
           >
             <div className="report-sheet invoice-sheet space-y-5">
-              <ReportHeader
-                companyName={companyName}
-                companyContact={companyContact}
-                companyLogoUrl={company?.logoUrl ?? undefined}
-                fiscalLines={companyFiscalLines}
-                cutoff={cutoffLabel}
-              />
+              <ReportHeader header={companyHeader} cutoff={cutoffLabel} />
 
               <div
                 data-ocid="accounting.valuation.kpis"

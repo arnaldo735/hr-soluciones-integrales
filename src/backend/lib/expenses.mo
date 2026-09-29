@@ -1,4 +1,3 @@
-import Char "mo:core/Char";
 import List "mo:core/List";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
@@ -10,6 +9,7 @@ import Common "../types/common";
 import Types "../types/expenses";
 import ExpenseCategoryTypes "../types/expense-categories";
 import PurchasingTypes "../types/purchasing";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -29,10 +29,10 @@ module {
     let searchOk = switch (filter.search) {
       case null { true };
       case (?term) {
-        let needle = term.trim(#predicate (func(c : Char) : Bool { c.isWhitespace() })).toLower();
+        let needle = Search.normalize(term);
         if (needle == "") { true } else {
           let supplier = expense.supplierName ?? "";
-          expense.concept.toLower().contains(#text needle) or supplier.toLower().contains(#text needle);
+          Search.containsAny([expense.concept, supplier], needle);
         };
       };
     };
@@ -196,7 +196,7 @@ module {
       total;
       count;
       byCategory = byCategory.toArray().sort(
-        func (a, b) = Text.compare(a.categoryName.toLower(), b.categoryName.toLower())
+        func (a, b) = Text.compare(Search.sortKey(a.categoryName), Search.sortKey(b.categoryName))
       );
     };
   };

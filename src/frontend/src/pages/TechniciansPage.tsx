@@ -25,6 +25,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { useOrders } from "@/hooks/use-orders";
 import {
@@ -544,6 +545,7 @@ function WorkloadCard({
 
 export function TechniciansPage() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const navigate = useNavigate();
   const rawSearch = useSearch({ strict: false }) as Record<string, unknown>;
   const urlTerm = typeof rawSearch.q === "string" ? rawSearch.q : "";
@@ -603,12 +605,12 @@ export function TechniciansPage() {
   // Active orders for every technician, resolved in one pass so the workload
   // view can render each technician's assigned orders without N queries.
   const activeOrdersQuery = useQuery({
-    queryKey: ["technician-active-orders"],
+    queryKey: ["technician-active-orders", token],
     queryFn: async (): Promise<OrderView[]> => {
       if (!actor) return [];
       const pages = await Promise.all(
         ACTIVE_ORDER_STATUSES.map((status) =>
-          actor.listOrders({ status }, 0n, 200n),
+          actor.listOrders(token, { status }, 0n, 200n),
         ),
       );
       return pages.flatMap((page) => page.items);

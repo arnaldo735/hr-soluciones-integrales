@@ -218,6 +218,58 @@ type BusinessSettings__98731410 =
     taxId : Text;
     taxRate : TaxRate__336751505
   };
+type CashAccount__323211785 = {#bank; #cash};
+type CashAccount__902959872 = {#bank; #cash};
+type CashMovementKind__179568172 = {#expense; #income};
+type CashMovementKind__943209229 = {#expense; #income};
+type CashMovementSource__83556937 =
+  {
+    #commission;
+    #expense;
+    #invoice;
+    #manual;
+    #other;
+    #pos;
+    #purchase;
+    #receivable
+  };
+type CashMovementSource__942156605 =
+  {
+    #commission;
+    #expense;
+    #invoice;
+    #manual;
+    #other;
+    #pos;
+    #purchase;
+    #receivable
+  };
+type CashMovement__400271751 =
+  {
+    account : CashAccount__902959872;
+    amount : Money__819205568;
+    description : Text;
+    id : Id__159637782;
+    kind : CashMovementKind__179568172;
+    paymentMethod : PaymentMethod__626958939;
+    reference : ?Text;
+    shiftId : Id__159637782;
+    source : CashMovementSource__942156605;
+    timestamp : Timestamp__28896168
+  };
+type CashMovement__993932864 =
+  {
+    account : CashAccount__323211785;
+    amount : Money__439604249;
+    description : Text;
+    id : Id__588154672;
+    kind : CashMovementKind__943209229;
+    paymentMethod : PaymentMethod__1022097888;
+    reference : ?Text;
+    shiftId : Id__588154672;
+    source : CashMovementSource__83556937;
+    timestamp : Timestamp__962255091
+  };
 type CommissionLineKey__183384074 =
   {laborId : Id__338555919; orderId : Id__338555919};
 type CommissionLineKey__183503415 =
@@ -845,6 +897,32 @@ type Counters__512489927 =
     var nextTechnicianId : Nat;
     var nextTechnicianLoanId : Nat
   };
+type Credential__1064989174 =
+  {
+    active : Bool;
+    createdAt : Timestamp__778030842;
+    id : Id__389469852;
+    iterations : Nat;
+    name : Text;
+    passwordHash : Blob;
+    roleId : Id__389469852;
+    salt : Blob;
+    updatedAt : Timestamp__778030842;
+    username : Text
+  };
+type Credential__1299528 =
+  {
+    active : Bool;
+    createdAt : Timestamp__725804286;
+    id : Id__604508663;
+    iterations : Nat;
+    name : Text;
+    passwordHash : Blob;
+    roleId : Id__604508663;
+    salt : Blob;
+    updatedAt : Timestamp__725804286;
+    username : Text
+  };
 type Customer__134735249 =
   {
     address : ?Text;
@@ -1185,8 +1263,27 @@ type FiscalRegime__592884474 = {#noResponsableIva; #responsableIva};
 type FiscalRegime__647565061 = {#noResponsableIva; #responsableIva};
 type FiscalRegime__667926507 = {#noResponsableIva; #responsableIva};
 type FiscalRegime__773564200 = {#noResponsableIva; #responsableIva};
+type HopeMode__1012962955 = {#auto; #manual};
+type HopeMode__42909460 = {#auto; #manual};
+type HopeSettings__550851164 =
+  {
+    enabled : Bool;
+    manualCitation : Text;
+    manualText : Text;
+    mode : HopeMode__42909460;
+    updatedAt : Timestamp__784179051
+  };
+type HopeSettings__943209667 =
+  {
+    enabled : Bool;
+    manualCitation : Text;
+    manualText : Text;
+    mode : HopeMode__1012962955;
+    updatedAt : Timestamp__1013442764
+  };
 type Id__1058561351 = Nat;
 type Id__1073409734 = Nat;
+type Id__159637782 = Nat;
 type Id__181169964 = Nat;
 type Id__216382997 = Id__389469852;
 type Id__290385373 = Id__389469852;
@@ -1202,7 +1299,10 @@ type Id__493596235 = Id__389469852;
 type Id__526914916 = Id__389469852;
 type Id__540884235 = Id__389469852;
 type Id__554453025 = Id__389469852;
+type Id__588154672 = Id__389469852;
+type Id__604508663 = Nat;
 type Id__620611075 = Id__389469852;
+type Id__652808647 = Nat;
 type Id__677737347 = Nat;
 type Id__682458743 = Nat;
 type Id__68706484 = Nat;
@@ -1817,16 +1917,20 @@ type Map__230067015<K, V> = Map__405889023<K, V>;
 type Map__405889023<K, V> = Map__603270868<K, V>;
 type Map__603270868<K, V> =
   {var root : Node__204828119<K, V>; var size : Nat__227979830};
+type ModuleKey__1006668257 = Text;
+type ModuleKey__771781029 = Text;
 type Money__1003075393 = Nat;
 type Money__100584181 = Money__698460738;
 type Money__1029900408 = Money__698460738;
 type Money__1031111499 = Money__698460738;
 type Money__1052153277 = Money__698460738;
+type Money__18294427 = Nat;
 type Money__186267775 = Nat;
 type Money__376147918 = Nat;
 type Money__37724346 = Money__698460738;
 type Money__386013016 = Money__698460738;
 type Money__418178358 = Nat;
+type Money__439604249 = Money__698460738;
 type Money__441407701 = Money__698460738;
 type Money__527404733 = Money__698460738;
 type Money__528897802 = Money__698460738;
@@ -1838,6 +1942,7 @@ type Money__736808655 = Nat;
 type Money__747169860 = Nat;
 type Money__772428565 = Nat;
 type Money__787739131 = Nat;
+type Money__819205568 = Nat;
 type Money__876449361 = Money__698460738;
 type Money__956068342 = Money__698460738;
 type Money__990610718 = Nat;
@@ -2209,6 +2314,51 @@ type NewActor__248761742 =
     suppliers : Map__230067015<Id__181169964, Supplier__616715695>;
     userProfiles : Map__230067015<Principal, UserProfile__958225441>
   };
+type NewActor__256259615 =
+  {
+    cashMovements : Map__230067015<Id__159637782, CashMovement__400271751>;
+    counters :
+      {
+        var nextAppointmentId : Nat;
+        var nextCashMovementId : Nat;
+        var nextCommissionPaymentId : Nat;
+        var nextCustomerId : Nat;
+        var nextExpenseCategoryId : Nat;
+        var nextExpenseId : Nat;
+        var nextInvoiceId : Nat;
+        var nextInvoiceNumber : Nat;
+        var nextLaborId : Nat;
+        var nextLotId : Nat;
+        var nextMotorcycleId : Nat;
+        var nextMovementId : Nat;
+        var nextOrderId : Nat;
+        var nextOrderPartId : Nat;
+        var nextOrderPhotoId : Nat;
+        var nextPartId : Nat;
+        var nextPaymentId : Nat;
+        var nextPosSaleId : Nat;
+        var nextPosSaleNumber : Nat;
+        var nextPurchaseId : Nat;
+        var nextPurchaseInvoiceId : Nat;
+        var nextPurchaseInvoiceLineId : Nat;
+        var nextPurchaseItemId : Nat;
+        var nextQuoteId : Nat;
+        var nextQuoteNumber : Nat;
+        var nextQuotePartLineId : Nat;
+        var nextQuoteServiceLineId : Nat;
+        var nextReceivablePaymentId : Nat;
+        var nextServiceCategoryId : Nat;
+        var nextServiceId : Nat;
+        var nextShiftId : Nat;
+        var nextSupplierId : Nat;
+        var nextSupplierOrderId : Nat;
+        var nextTechnicianId : Nat;
+        var nextTechnicianLoanId : Nat
+      };
+    purchases : Map__230067015<Id__159637782, NewPurchase__794519091>;
+    shifts : Map__230067015<Id__159637782, Shift__338655551>
+  };
+type NewActor__261022624 = {hope : {var settings : HopeSettings__550851164}};
 type NewActor__341238509 =
   {
     accessControlState : AccessControlState__201339279;
@@ -2362,6 +2512,17 @@ type NewActor__619974250 =
     technicians : Map__230067015<Id__338555919, Technician__67773430>;
     userProfiles : Map__230067015<Principal, UserProfile__823120487>
   };
+type NewActor__694455010 =
+  {serviceTerms : {var settings : ServiceTermsSettings__548859786}};
+type NewActor__705461471 =
+  {
+    credentials : Map__230067015<Id__604508663, Credential__1299528>;
+    roles : Map__230067015<Id__604508663, Role__187702079>;
+    sessions : Map__230067015<Text, Session__63039528>;
+    userCounters : {var nextRoleId : Nat; var nextUserId : Nat}
+  };
+type NewActor__712516871 =
+  {parts : Map__230067015<Id__652808647, NewPart__907269024>};
 type NewActor__732283469 =
   {
     accessControlState : AccessControlState__201339279;
@@ -2393,6 +2554,8 @@ type NewActor__732283469 =
     technicians : Map__230067015<Id__677737347, NewTechnician__308856466>;
     userProfiles : Map__230067015<Principal, UserProfile__24825253>
   };
+type NewActor__793188255 =
+  {warrantyTerms : {var settings : WarrantyTermsSettings__271750821}};
 type NewActor__949499829 =
   {
     accessControlState : AccessControlState__201339279;
@@ -2698,6 +2861,20 @@ type NewLaborItem__749707682 =
     serviceId : ?Id__338555919;
     technicianId : ?Id__338555919
   };
+type NewPart__907269024 =
+  {
+    barcode : Text;
+    brand : Text;
+    category : Text;
+    costPrice : Money__18294427;
+    createdAt : Timestamp__193039771;
+    id : Id__652808647;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__18294427;
+    sku : Text;
+    unit : Text
+  };
 type NewPosSale__364845527 =
   {
     amountReceived : Money__787739131;
@@ -2717,6 +2894,16 @@ type NewPosSale__364845527 =
     tax : Money__787739131;
     taxRate : TaxRate__799697541;
     total : Money__787739131
+  };
+type NewPurchase__794519091 =
+  {
+    accepted : Bool;
+    createdAt : Timestamp__28896168;
+    id : Id__159637782;
+    items : [PurchaseItem__1036896537];
+    paidAmount : Money__819205568;
+    supplierId : Id__159637782;
+    total : Money__819205568
   };
 type NewStatusChange__380276342 =
   {
@@ -2832,6 +3019,46 @@ type OldActor__1033119137 =
     suppliers : Map__230067015<Id__1058561351, Supplier__304850569>;
     technicians : Map__230067015<Id__1058561351, Technician__714662660>;
     userProfiles : Map__230067015<Principal, UserProfile__46133562>
+  };
+type OldActor__148175652 =
+  {
+    counters :
+      {
+        var nextAppointmentId : Nat;
+        var nextCommissionPaymentId : Nat;
+        var nextCustomerId : Nat;
+        var nextExpenseCategoryId : Nat;
+        var nextExpenseId : Nat;
+        var nextInvoiceId : Nat;
+        var nextInvoiceNumber : Nat;
+        var nextLaborId : Nat;
+        var nextLotId : Nat;
+        var nextMotorcycleId : Nat;
+        var nextMovementId : Nat;
+        var nextOrderId : Nat;
+        var nextOrderPartId : Nat;
+        var nextOrderPhotoId : Nat;
+        var nextPartId : Nat;
+        var nextPaymentId : Nat;
+        var nextPosSaleId : Nat;
+        var nextPosSaleNumber : Nat;
+        var nextPurchaseId : Nat;
+        var nextPurchaseInvoiceId : Nat;
+        var nextPurchaseInvoiceLineId : Nat;
+        var nextPurchaseItemId : Nat;
+        var nextQuoteId : Nat;
+        var nextQuoteNumber : Nat;
+        var nextQuotePartLineId : Nat;
+        var nextQuoteServiceLineId : Nat;
+        var nextReceivablePaymentId : Nat;
+        var nextServiceCategoryId : Nat;
+        var nextServiceId : Nat;
+        var nextSupplierId : Nat;
+        var nextSupplierOrderId : Nat;
+        var nextTechnicianId : Nat;
+        var nextTechnicianLoanId : Nat
+      };
+    purchases : Map__230067015<Id__159637782, OldPurchase__822295502>
   };
 type OldActor__175115580 =
   {
@@ -3015,6 +3242,9 @@ type OldActor__3928544 =
     technicians : Map__230067015<Id__68706484, Technician__31894530>;
     userProfiles : Map__230067015<Principal, UserProfile__1039889572>
   };
+type OldActor__463938666 = {};
+type OldActor__511848114 =
+  {parts : Map__230067015<Id__652808647, OldPart__949652648>};
 type OldActor__61572473 =
   {
     purchaseInvoices :
@@ -3079,6 +3309,7 @@ type OldActor__853359044 =
     technicians : Map__230067015<Id__677737347, OldTechnician__1042617869>;
     userProfiles : Map__230067015<Principal, UserProfile__24825253>
   };
+type OldActor__904324871 = {};
 type OldActor__959457706 =
   {
     accessControlState : AccessControlState__201339279;
@@ -3110,6 +3341,7 @@ type OldActor__959457706 =
     technicians : Map__230067015<Id__465323056, Technician__48228132>;
     userProfiles : Map__230067015<Principal, UserProfile__499403371>
   };
+type OldActor__969310924 = {};
 type OldCommissionPayment__898454579 =
   {
     baseAmount : Money__787739131;
@@ -3326,6 +3558,19 @@ type OldLaborItem__69696053 =
 type OldLaborItem__942707965 =
   {description : Text; id : Id__677737347; price : Money__747169860};
 type OldOrderStatus__769879847 = {#delivered; #inRepair; #ready; #received};
+type OldPart__949652648 =
+  {
+    brand : Text;
+    category : Text;
+    costPrice : Money__18294427;
+    createdAt : Timestamp__193039771;
+    id : Id__652808647;
+    lowStockThreshold : Nat;
+    name : Text;
+    salePrice : Money__18294427;
+    sku : Text;
+    unit : Text
+  };
 type OldPosSale__229032272 =
   {
     amountReceived : Money__787739131;
@@ -3376,6 +3621,15 @@ type OldPurchaseInvoice__701326455 =
     supplierId : ?Id__766779107;
     supplierName : ?Text;
     updatedAt : Timestamp__444955092
+  };
+type OldPurchase__822295502 =
+  {
+    createdAt : Timestamp__28896168;
+    id : Id__159637782;
+    items : [PurchaseItem__1036896537];
+    paidAmount : Money__819205568;
+    supplierId : Id__159637782;
+    total : Money__819205568
   };
 type OldTechnician__1042617869 =
   {
@@ -3686,6 +3940,7 @@ type Part__316907304 =
   };
 type Part__351611452 =
   {
+    barcode : Text;
     brand : Text;
     category : Text;
     costPrice : Money__37724346;
@@ -3787,6 +4042,7 @@ type PaymentMethod__194147893 = {#card; #cash; #mixed; #transfer};
 type PaymentMethod__393737467 = {#card; #cash; #mixed; #transfer};
 type PaymentMethod__468337666 = {#card; #cash; #mixed; #transfer};
 type PaymentMethod__621175407 = {#card; #cash; #mixed; #transfer};
+type PaymentMethod__626958939 = {#card; #cash; #mixed; #transfer};
 type PaymentMethod__688764164 = {#card; #cash; #mixed; #transfer};
 type PaymentMethod__864907580 = {#card; #cash; #mixed; #transfer};
 type PaymentMethod__869464483 = {#card; #cash; #mixed; #transfer};
@@ -4302,6 +4558,14 @@ type PurchaseInvoice__991269810 =
     supplierTaxId : Text;
     updatedAt : Timestamp__344700625
   };
+type PurchaseItem__1036896537 =
+  {
+    id : Id__159637782;
+    lotNumber : Text;
+    partId : Id__159637782;
+    quantity : Nat;
+    unitCost : Money__819205568
+  };
 type PurchaseItem__1053946700 =
   {
     id : Id__831659287;
@@ -4473,6 +4737,7 @@ type Purchase__664651860 =
   };
 type Purchase__798005954 =
   {
+    accepted : Bool;
     createdAt : Timestamp__905264509;
     id : Id__713514965;
     items : [PurchaseItem__361326607];
@@ -4859,6 +5124,24 @@ type ReceivablePayment__98412797 =
     note : ?Text;
     performedBy : Principal
   };
+type RoleKind__1040820660 = {#builtin; #custom};
+type RoleKind__199078347 = {#builtin; #custom};
+type Role__187702079 =
+  {
+    createdAt : Timestamp__725804286;
+    id : Id__604508663;
+    kind : RoleKind__199078347;
+    modules : [ModuleKey__1006668257];
+    name : Text
+  };
+type Role__717780527 =
+  {
+    createdAt : Timestamp__778030842;
+    id : Id__389469852;
+    kind : RoleKind__1040820660;
+    modules : [ModuleKey__771781029];
+    name : Text
+  };
 type ServiceCategory__1000625021 =
   {
     createdAt : Timestamp__613503416;
@@ -4915,6 +5198,10 @@ type ServiceCategory__913063150 =
     id : Id__682458743;
     name : Text
   };
+type ServiceTermsSettings__221926357 =
+  {text : Text; updatedAt : Timestamp__907606281};
+type ServiceTermsSettings__548859786 =
+  {text : Text; updatedAt : Timestamp__41724193};
 type Service__103523136 =
   {
     active : Bool;
@@ -5035,9 +5322,61 @@ type Service__980514341 =
     laborRate : Money__100584181;
     name : Text
   };
+type Session__215299129 =
+  {
+    createdAt : Timestamp__778030842;
+    credentialId : Id__389469852;
+    expiresAt : Timestamp__778030842;
+    token : Text
+  };
+type Session__63039528 =
+  {
+    createdAt : Timestamp__725804286;
+    credentialId : Id__604508663;
+    expiresAt : Timestamp__725804286;
+    token : Text
+  };
 type Set__1053317950<T> =
   {var root : Node__620761243<T>; var size : Nat__227979830};
 type Set__70493310<T> = Set__1053317950<T>;
+type ShiftStatus__760447563 = {#closed; #open};
+type ShiftStatus__994584569 = {#closed; #open};
+type Shift__338655551 =
+  {
+    closedAt : ?Timestamp__28896168;
+    closedBy : ?Principal;
+    computedClosingBank : Money__819205568;
+    computedClosingCash : Money__819205568;
+    declaredClosingBank : ?Money__819205568;
+    declaredClosingCash : ?Money__819205568;
+    differenceBank : Int;
+    differenceCash : Int;
+    id : Id__159637782;
+    notes : ?Text;
+    openedAt : Timestamp__28896168;
+    openedBy : Principal;
+    openingBank : Money__819205568;
+    openingCash : Money__819205568;
+    status : ShiftStatus__994584569
+  };
+type Shift__537473466 =
+  {
+    closedAt : ?Timestamp__962255091;
+    closedBy : ?Principal;
+    computedClosingBank : Money__439604249;
+    computedClosingCash : Money__439604249;
+    declaredClosingBank : ?Money__439604249;
+    declaredClosingCash : ?Money__439604249;
+    differenceBank : Int;
+    differenceCash : Int;
+    id : Id__588154672;
+    notes : ?Text;
+    openedAt : Timestamp__962255091;
+    openedBy : Principal;
+    openingBank : Money__439604249;
+    openingCash : Money__439604249;
+    status : ShiftStatus__760447563
+  };
 type StatusChange__267153055 =
   {
     at : Timestamp__1039836891;
@@ -5563,20 +5902,26 @@ type Technician__993081514 =
     specialty : Text
   };
 type Timestamp__1013091471 = Timestamp__301639476;
+type Timestamp__1013442764 = Timestamp__301639476;
 type Timestamp__1028304436 = Int;
 type Timestamp__1039836891 = Int;
 type Timestamp__1061877594 = Timestamp__301639476;
 type Timestamp__1068123972 = Timestamp__301639476;
 type Timestamp__119754329 = Timestamp__301639476;
 type Timestamp__177202075 = Timestamp__301639476;
+type Timestamp__193039771 = Int;
 type Timestamp__205116725 = Int;
 type Timestamp__214345855 = Int;
+type Timestamp__246367626 = Timestamp__301639476;
 type Timestamp__272335516 = Timestamp__301639476;
 type Timestamp__288252184 = Timestamp__301639476;
+type Timestamp__28896168 = Int;
 type Timestamp__301639476 = Int;
 type Timestamp__310406396 = Int;
 type Timestamp__344700625 = Timestamp__301639476;
 type Timestamp__365108338 = Timestamp__301639476;
+type Timestamp__395156637 = Int;
+type Timestamp__41724193 = Int;
 type Timestamp__43627346 = Timestamp__301639476;
 type Timestamp__444955092 = Int;
 type Timestamp__486448937 = Int;
@@ -5585,13 +5930,17 @@ type Timestamp__605599695 = Int;
 type Timestamp__613503416 = Int;
 type Timestamp__641042506 = Timestamp__301639476;
 type Timestamp__704461902 = Timestamp__301639476;
+type Timestamp__725804286 = Int;
 type Timestamp__731026236 = Timestamp__301639476;
 type Timestamp__7607913 = Int;
 type Timestamp__778030842 = Timestamp__301639476;
+type Timestamp__784179051 = Int;
 type Timestamp__833512101 = Timestamp__301639476;
 type Timestamp__836802844 = Int;
 type Timestamp__881976031 = Timestamp__301639476;
 type Timestamp__905264509 = Timestamp__301639476;
+type Timestamp__907606281 = Timestamp__301639476;
+type Timestamp__962255091 = Timestamp__301639476;
 type Timestamp__980149596 = Timestamp__301639476;
 type UserProfile__1039889572 =
   {
@@ -5636,6 +5985,10 @@ type UserRole__693728699 = {#admin; #guest; #user};
 type UserRole__782166656 = {#admin; #guest; #user};
 type UserRole__869643639 = {#admin; #guest; #user};
 type UserRole__91647283 = {#admin; #guest; #user};
+type WarrantyTermsSettings__137001890 =
+  {text : Text; updatedAt : Timestamp__246367626};
+type WarrantyTermsSettings__271750821 =
+  {text : Text; updatedAt : Timestamp__395156637};
 type WorkshopOrder__1046213111 =
   {
     createdAt : Timestamp__214345855;
@@ -5773,7 +6126,13 @@ type WorkshopOrder__99849144 =
   "20260925_000000" : (old : OldActor__3928544) -> NewActor__963881556;
   "20260926_000000" : (old : OldActor__624391799) -> NewActor__341238509;
   "20260927_000000" : (old : OldActor__263139629) -> NewActor__949499829;
-  "20260928_000000" : (old : OldActor__61572473) -> NewActor__486559717
+  "20260928_000000" : (old : OldActor__61572473) -> NewActor__486559717;
+  "20260929_000000" : (_old : {}) -> NewActor__705461471;
+  "20260930_000000" : (old : OldActor__148175652) -> NewActor__256259615;
+  "20261001_000000" : (old : OldActor__511848114) -> NewActor__712516871;
+  "20261002_000000" : (_old : OldActor__969310924) -> NewActor__261022624;
+  "20261003_000000" : (_old : OldActor__463938666) -> NewActor__694455010;
+  "20261004_000000" : (_old : OldActor__904324871) -> NewActor__793188255
 }
 actor  {
   stable accessControlState :
@@ -5787,6 +6146,11 @@ actor  {
       var size : Nat__227979830
     };
   stable businessSettings : {var settings : BusinessSettings__949434397};
+  stable cashMovements :
+    {
+      var root : Node__204828119<Id__389469852, CashMovement__993932864>;
+      var size : Nat__227979830
+    };
   stable commissionPayments :
     {
       var root : Node__204828119<Id__389469852, CommissionPayment__799068375>;
@@ -5796,6 +6160,7 @@ actor  {
   stable counters :
     {
       var nextAppointmentId : Nat;
+      var nextCashMovementId : Nat;
       var nextCommissionPaymentId : Nat;
       var nextCustomerId : Nat;
       var nextExpenseCategoryId : Nat;
@@ -5824,10 +6189,16 @@ actor  {
       var nextReceivablePaymentId : Nat;
       var nextServiceCategoryId : Nat;
       var nextServiceId : Nat;
+      var nextShiftId : Nat;
       var nextSupplierId : Nat;
       var nextSupplierOrderId : Nat;
       var nextTechnicianId : Nat;
       var nextTechnicianLoanId : Nat
+    };
+  stable credentials :
+    {
+      var root : Node__204828119<Id__389469852, Credential__1064989174>;
+      var size : Nat__227979830
     };
   stable customers :
     {
@@ -5845,6 +6216,7 @@ actor  {
       var root : Node__204828119<Id__389469852, Expense__809941540>;
       var size : Nat__227979830
     };
+  stable hope : {var settings : HopeSettings__943209667};
   stable invoices :
     {
       var root : Node__204828119<Id__389469852, Invoice__752737744>;
@@ -5910,14 +6282,30 @@ actor  {
       var root : Node__204828119<Id__389469852, ReceivablePayment__151011044>;
       var size : Nat__227979830
     };
+  stable roles :
+    {
+      var root : Node__204828119<Id__389469852, Role__717780527>;
+      var size : Nat__227979830
+    };
   stable serviceCategories :
     {
       var root : Node__204828119<Id__389469852, ServiceCategory__648716726>;
       var size : Nat__227979830
     };
+  stable serviceTerms : {var settings : ServiceTermsSettings__221926357};
   stable services :
     {
       var root : Node__204828119<Id__389469852, Service__980514341>;
+      var size : Nat__227979830
+    };
+  stable sessions :
+    {
+      var root : Node__204828119<Text, Session__215299129>;
+      var size : Nat__227979830
+    };
+  stable shifts :
+    {
+      var root : Node__204828119<Id__389469852, Shift__537473466>;
       var size : Nat__227979830
     };
   stable supplierOrders :
@@ -5940,9 +6328,11 @@ actor  {
       var root : Node__204828119<Id__389469852, Technician__993081514>;
       var size : Nat__227979830
     };
+  stable userCounters : {var nextRoleId : Nat; var nextUserId : Nat};
   stable userProfiles :
     {
       var root : Node__204828119<Principal, UserProfile__277265826>;
       var size : Nat__227979830
-    }
+    };
+  stable warrantyTerms : {var settings : WarrantyTermsSettings__137001890}
 };

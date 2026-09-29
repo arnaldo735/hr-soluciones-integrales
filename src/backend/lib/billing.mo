@@ -10,6 +10,9 @@ import Types "../types/billing";
 import CustomerTypes "../types/customers";
 import CompanyTypes "../types/company";
 import WorkshopTypes "../types/workshop";
+import PosTypes "../types/pos";
+import ReceivableTypes "../types/receivables";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -180,7 +183,21 @@ module {
     at + (months * 30 * 24 * 60 * 60 * 1_000_000_000);
   };
 
-  // Solo las órdenes entregadas son facturables.
+  // ¿Existe ya una factura que referencia esta orden de taller? Mientras la
+  // factura exista, la orden queda bloqueada y no puede facturarse de nuevo.
+  func hasInvoiceForOrder(state : State, orderId : Common.Id) : Bool {
+    state.invoices.values().any(
+      func (invoice) {
+        switch (invoice.origin) {
+          case (#workshopOrder) { invoice.orderId == ?orderId };
+          case (_) { false };
+        };
+      }
+    );
+  };
+
+  // Solo las órdenes entregadas son facturables, y solo una vez: si ya existe
+  // una factura para la orden, se rechaza hasta que esa factura se elimine.
   public func createInvoiceFromOrder(
     state : State,
     orders : Map.Map<Common.Id, WorkshopTypes.WorkshopOrder>,
@@ -197,6 +214,9 @@ module {
       case (#delivered) {};
       case (#cancelled) { Runtime.trap("La orden está cancelada y no se puede facturar") };
       case (_) { Runtime.trap("Solo se puede facturar una orden entregada") };
+    };
+    if (hasInvoiceForOrder(state, orderId)) {
+      Runtime.trap("La orden ya tiene una factura asociada");
     };
     let lines = List.empty<Types.InvoiceLine>();
     for (part in order.parts.values()) {
@@ -268,8 +288,12 @@ module {
     );
   };
 
+  // Una venta POS solo puede facturarse una vez: si ya apunta a una factura
+  // (`invoiceId` distinto de cero), se rechaza hasta que esa factura se
+  // elimine y libere la venta.
   public func createInvoiceFromPosSale(
     state : State,
+    posSales : Map.Map<Common.Id, PosTypes.PosSale>,
     customers : Map.Map<Common.Id, CustomerTypes.Customer>,
     posSaleId : Common.Id,
     customerId : ?Common.Id,
@@ -282,6 +306,10 @@ module {
     performedBy : Principal,
   ) : Types.Invoice {
     ignore performedBy;
+    let sale = posSales.get(posSaleId) ?? Runtime.trap("Venta de mostrador no encontrada");
+    if (sale.invoiceId != 0) {
+      Runtime.trap("La venta de mostrador ya tiene una factura asociada");
+    };
     let fallback = customerName ?? "Cliente de mostrador";
     persistInvoice(
       state,
@@ -307,8 +335,8 @@ module {
         let searchOk = switch (filter.search) {
           case null { true };
           case (?term) {
-            let q = term.toLower();
-            inv.number.toLower().contains(#text q) or inv.customerName.toLower().contains(#text q);
+            let q = Search.normalize(term);
+            Search.containsAny([inv.number, inv.customerName], q);
           };
         };
         let fromOk = switch (filter.from) {
@@ -332,6 +360,61 @@ module {
     state.invoices.get(id);
   };
 
+  // ¿La factura tiene algún cobro registrado? Es true cuando ya está pagada,
+  // cuando alguna cuota del plan está pagada o cuando existe al menos un abono
+  // de cuentas por cobrar sobre ella.
+  func hasRegisteredPayments(
+    state : State,
+    receivablePayments : Map.Map<Common.Id, ReceivableTypes.ReceivablePayment>,
+    invoice : Types.Invoice,
+  ) : Bool {
+    if (invoice.paymentStatus == #paid) { return true };
+    switch (invoice.installments) {
+      case (?plan) {
+        if (plan.installments.any(func (installment) = installment.paid)) { return true };
+      };
+      case null {};
+    };
+    for (payment in receivablePayments.values()) {
+      if (payment.invoiceId == invoice.id) { return true };
+    };
+    false;
+  };
+
+  // Elimina una factura solo cuando está pendiente de pago y no tiene ningún
+  // abono registrado. Al eliminarla se libera la OT o venta POS de origen para
+  // poder facturarse de nuevo. Falla si la factura ya tiene pagos o abonos.
+  public func deleteInvoice(
+    state : State,
+    posSales : Map.Map<Common.Id, PosTypes.PosSale>,
+    receivablePayments : Map.Map<Common.Id, ReceivableTypes.ReceivablePayment>,
+    id : Common.Id,
+    performedBy : Principal,
+  ) : Bool {
+    ignore performedBy;
+    let invoice = state.invoices.get(id) ?? Runtime.trap("Factura no encontrada");
+    if (hasRegisteredPayments(state, receivablePayments, invoice)) {
+      Runtime.trap("No se puede eliminar la factura porque ya tiene pagos o abonos registrados");
+    };
+    // Libera la venta POS de origen: deja de apuntar a la factura eliminada,
+    // de modo que la venta queda disponible para facturarse de nuevo. La orden
+    // de taller no guarda referencia a la factura, así que al desaparecer esta
+    // vuelve a ser facturable sin más.
+    switch (invoice.posSaleId) {
+      case null {};
+      case (?saleId) {
+        switch (posSales.get(saleId)) {
+          case (?sale) { posSales.add(saleId, { sale with invoiceId = 0 }) };
+          case null {};
+        };
+      };
+    };
+    state.invoices.remove(id);
+    true;
+  };
+
+  // Marca una factura como pagada. Rechaza un segundo cobro de una factura ya
+  // pagada y, en una factura a crédito, da por pagadas todas sus cuotas.
   public func markInvoicePaid(
     state : State,
     id : Common.Id,
@@ -339,11 +422,29 @@ module {
     performedBy : Principal,
   ) : Types.Invoice {
     ignore performedBy;
-    let invoice = state.invoices.get(id) ?? Runtime.trap("Invoice not found");
+    let invoice = state.invoices.get(id) ?? Runtime.trap("Factura no encontrada");
+    if (invoice.paymentStatus == #paid) {
+      Runtime.trap("La factura ya fue cobrada");
+    };
+    let at = Time.now();
+    let installments = switch (invoice.installments) {
+      case null { null };
+      case (?plan) {
+        ?{
+          plan with
+          installments = plan.installments.map(
+            func (installment) {
+              if (installment.paid) { installment } else { { installment with paid = true; paidAt = ?at } };
+            }
+          );
+        };
+      };
+    };
     let updated : Types.Invoice = {
       invoice with
       paymentMethod;
       paymentStatus = #paid;
+      installments;
     };
     state.invoices.add(id, updated);
     updated;
@@ -359,6 +460,9 @@ module {
   ) : Types.Invoice {
     ignore performedBy;
     let invoice = state.invoices.get(id) ?? Runtime.trap("Factura no encontrada");
+    if (invoice.paymentStatus == #paid) {
+      Runtime.trap("La factura ya fue cobrada");
+    };
     let plan = invoice.installments ?? Runtime.trap("La factura no tiene plan de cuotas");
     var found = false;
     let installments = plan.installments.map(

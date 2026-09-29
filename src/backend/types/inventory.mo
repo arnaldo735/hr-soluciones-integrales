@@ -8,6 +8,9 @@ module {
   public type Part = {
     id : Id;
     sku : Text;
+    /// Código de barras del producto (EAN/UPC u otro). Cadena vacía cuando el
+    /// repuesto no tiene código asignado.
+    barcode : Text;
     name : Text;
     category : Text;
     brand : Text;
@@ -21,6 +24,7 @@ module {
   public type PartView = {
     id : Id;
     sku : Text;
+    barcode : Text;
     name : Text;
     category : Text;
     brand : Text;
@@ -63,6 +67,7 @@ module {
 
   public type PartInput = {
     sku : Text;
+    barcode : Text;
     name : Text;
     category : Text;
     brand : Text;
@@ -106,9 +111,18 @@ module {
   public type InventoryError = {
     #notFound : Id;
     #duplicateSku : Text;
+    #duplicateBarcode : Text;
     #invalidQuantity;
     #insufficientStock : { partId : Id; available : Nat; requested : Nat };
     #notAuthorized;
+  };
+
+  // Resultado de buscar un repuesto por código de barras o SKU. `#found`
+  // devuelve la vista del repuesto; `#notFound` indica que ningún repuesto
+  // coincide con el código consultado.
+  public type PartLookupResult = {
+    #found : PartView;
+    #notFound;
   };
 
   // ── Importación masiva (CSV) ────────────────────────────────────────────
@@ -137,6 +151,7 @@ module {
 
   public type InventoryCsvRow = {
     sku : Text;
+    barcode : Text;
     name : Text;
     category : Text;
     brand : Text;
@@ -150,6 +165,7 @@ module {
   public type InventoryImportRow = {
     rowNumber : Nat;
     sku : Text;
+    barcode : Text;
     name : Text;
     category : Text;
     brand : Text;

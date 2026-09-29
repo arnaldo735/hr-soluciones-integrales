@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Customer,
@@ -183,6 +184,7 @@ function toSupplierInput(row: ContactImportRow): SupplierInput {
  */
 export function useContactImport(kind: ContactImportKind) {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -206,6 +208,7 @@ export function useContactImport(kind: ContactImportKind) {
       if (kind === "customer") {
         if (creations.length > 0) {
           const result = await actor.bulkCreateCustomers(
+            token,
             creations.map(toCustomerInput),
           );
           created += result.created;
@@ -222,6 +225,7 @@ export function useContactImport(kind: ContactImportKind) {
         }
         if (updates.length > 0) {
           const result = await actor.bulkUpdateCustomers(
+            token,
             updates.map(
               (row) => [row.matchedId as Id, toCustomerInput(row)] as const,
             ),
@@ -241,7 +245,7 @@ export function useContactImport(kind: ContactImportKind) {
       } else {
         for (const row of creations) {
           try {
-            await actor.createSupplier(toSupplierInput(row));
+            await actor.createSupplier(token, toSupplierInput(row));
             created += 1n;
             outcomes.set(row.key, { status: "valid" });
           } catch (error) {
@@ -258,6 +262,7 @@ export function useContactImport(kind: ContactImportKind) {
         for (const row of updates) {
           try {
             await actor.updateSupplier(
+              token,
               row.matchedId as Id,
               toSupplierInput(row),
             );

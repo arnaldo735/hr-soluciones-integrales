@@ -95,6 +95,7 @@ function part(overrides: Partial<PartView> = {}): PartView {
     costPrice: 12000n,
     lowStockThreshold: 5n,
     totalStock: 12n,
+    barcode: "",
     lowStock: false,
     createdAt: 1_700_000_000_000_000_000n,
     ...overrides,
@@ -125,6 +126,7 @@ function csvRow(overrides: Partial<InventoryCsvRow> = {}): InventoryCsvRow {
     salePrice: 25000n,
     costPrice: 12000n,
     lowStockThreshold: 5n,
+    barcode: "",
     quantity: 12n,
     ...overrides,
   };
@@ -221,6 +223,8 @@ function accountingReport(): AccountingReport {
       totalIncome: 0n,
       totalExpenses: 0n,
       profit: 0n,
+      totalCommissions: 0n,
+      netProfit: 0n,
     },
     entries: [],
     byExpenseCategory: [],
@@ -247,6 +251,8 @@ function accountingReport(): AccountingReport {
         margin: 0n,
         marginBps: 0n,
       },
+      totalCommission: 0n,
+      netProfit: 0n,
       serviceLines: [],
     },
   };

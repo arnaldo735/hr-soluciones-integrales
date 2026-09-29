@@ -4,9 +4,11 @@ import Runtime "mo:core/Runtime";
 import OutCall "mo:caffeineai-http-outcalls/outcall";
 import AccessControl "mo:caffeineai-authorization/access-control";
 import Types "../types/purchase-invoice-intake";
+import UserTypes "../types/users";
 import InventoryTypes "../types/inventory";
 import PurchasingTypes "../types/purchasing";
 import PurchaseInvoiceIntakeLib "../lib/purchase-invoice-intake";
+import UsersLib "../lib/users";
 
 mixin (
   accessControlState : AccessControl.AccessControlState,
@@ -22,6 +24,9 @@ mixin (
     var nextLotId : Nat;
     var nextMovementId : Nat;
   },
+  credentials : Map.Map<Types.Id, UserTypes.Credential>,
+  sessions : Map.Map<Text, UserTypes.Session>,
+  roles : Map.Map<Types.Id, UserTypes.Role>,
 ) {
   func purchaseInvoiceIntakeState() : PurchaseInvoiceIntakeLib.State = {
     invoices = purchaseInvoices;
@@ -32,9 +37,9 @@ mixin (
     counters;
   };
 
-  func requirePurchaseInvoiceAdmin(caller : Principal) {
-    if (not AccessControl.isAdmin(accessControlState, caller)) {
-      Runtime.trap("Unauthorized: Only admins can manage purchase invoices");
+  func requirePurchaseInvoiceModule(caller : Principal, token : ?Text) {
+    if (not UsersLib.canAccessModule({ credentials; sessions; roles }, accessControlState, caller, token, "purchaseInvoices")) {
+      Runtime.trap("Unauthorized: no tiene acceso al módulo de facturas de compra");
     };
   };
 
@@ -45,33 +50,33 @@ mixin (
     OutCall.transform(input);
   };
 
-  public shared ({ caller }) func createPurchaseInvoiceDraft(input : Types.CreateInvoiceInput) : async Types.PurchaseInvoice {
-    requirePurchaseInvoiceAdmin(caller);
+  public shared ({ caller }) func createPurchaseInvoiceDraft(token : ?Text, input : Types.CreateInvoiceInput) : async Types.PurchaseInvoice {
+    requirePurchaseInvoiceModule(caller, token);
     PurchaseInvoiceIntakeLib.createDraft(purchaseInvoiceIntakeState(), input);
   };
 
-  public shared ({ caller }) func runPurchaseInvoiceExtraction(invoiceId : Types.Id) : async Types.PurchaseInvoice {
-    requirePurchaseInvoiceAdmin(caller);
+  public shared ({ caller }) func runPurchaseInvoiceExtraction(token : ?Text, invoiceId : Types.Id) : async Types.PurchaseInvoice {
+    requirePurchaseInvoiceModule(caller, token);
     await* PurchaseInvoiceIntakeLib.runExtraction<system>(purchaseInvoiceIntakeState(), invoiceId, transform);
   };
 
-  public shared ({ caller }) func updatePurchaseInvoiceReview(invoiceId : Types.Id, input : Types.InvoiceReviewInput) : async Types.PurchaseInvoice {
-    requirePurchaseInvoiceAdmin(caller);
+  public shared ({ caller }) func updatePurchaseInvoiceReview(token : ?Text, invoiceId : Types.Id, input : Types.InvoiceReviewInput) : async Types.PurchaseInvoice {
+    requirePurchaseInvoiceModule(caller, token);
     PurchaseInvoiceIntakeLib.updateReview(purchaseInvoiceIntakeState(), invoiceId, input);
   };
 
-  public shared ({ caller }) func confirmPurchaseInvoice(invoiceId : Types.Id) : async Types.InvoiceApplyResult {
-    requirePurchaseInvoiceAdmin(caller);
+  public shared ({ caller }) func confirmPurchaseInvoice(token : ?Text, invoiceId : Types.Id) : async Types.InvoiceApplyResult {
+    requirePurchaseInvoiceModule(caller, token);
     PurchaseInvoiceIntakeLib.confirmInvoice(purchaseInvoiceIntakeState(), invoiceId, caller);
   };
 
-  public query ({ caller }) func listPurchaseInvoices(filter : Types.InvoiceFilter, sort : Types.InvoiceSort, offset : Nat, limit : Nat) : async Types.InvoicePage {
-    requirePurchaseInvoiceAdmin(caller);
+  public query ({ caller }) func listPurchaseInvoices(token : ?Text, filter : Types.InvoiceFilter, sort : Types.InvoiceSort, offset : Nat, limit : Nat) : async Types.InvoicePage {
+    requirePurchaseInvoiceModule(caller, token);
     PurchaseInvoiceIntakeLib.listInvoices(purchaseInvoiceIntakeState(), filter, sort, offset, limit);
   };
 
-  public query ({ caller }) func getPurchaseInvoice(invoiceId : Types.Id) : async ?Types.PurchaseInvoice {
-    requirePurchaseInvoiceAdmin(caller);
+  public query ({ caller }) func getPurchaseInvoice(token : ?Text, invoiceId : Types.Id) : async ?Types.PurchaseInvoice {
+    requirePurchaseInvoiceModule(caller, token);
     PurchaseInvoiceIntakeLib.getInvoice(purchaseInvoiceIntakeState(), invoiceId);
   };
 };

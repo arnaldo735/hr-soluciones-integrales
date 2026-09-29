@@ -12,6 +12,17 @@ export type {
   AccountingSummary,
   AdjustmentInput,
   Appointment,
+  CashMovement,
+  CashMovementFilter,
+  CashMovementInput,
+  CashMovementPage,
+  CloseShiftInput,
+  DailyShiftReport,
+  OpenShiftInput,
+  PaymentMethodTotal,
+  Shift,
+  ShiftFilter,
+  ShiftPage,
   AppointmentFilter,
   AppointmentInput,
   BulkResult,
@@ -50,6 +61,9 @@ export type {
   ExpenseInput,
   ExpensePage,
   ExpenseSummary,
+  HopeMessage,
+  HopeSettings,
+  HopeSettingsRawInput as HopeSettingsInput,
   Id,
   Installment,
   InstallmentPlan,
@@ -98,6 +112,7 @@ export type {
   OrderView,
   PartFilter,
   PartInput,
+  PartLookupResult,
   PartPage,
   PartView,
   Payable,
@@ -142,6 +157,11 @@ export type {
   ServiceFilter,
   ServiceInput,
   ServicePage,
+  ServiceTermsSettings,
+  ServiceTermsSettingsRawInput as ServiceTermsSettingsInput,
+  WarrantyTermsSettings,
+  WarrantyTermsSettingsRawInput as WarrantyTermsSettingsInput,
+  SessionInfo,
   StatusChange,
   Supplier,
   SupplierInput,
@@ -159,7 +179,6 @@ export type {
   TechnicianWorkload,
   Timestamp,
   UserProfile,
-  UserView,
   WhatsAppMessageInput,
   WhatsAppMessageResult,
   WorkshopOrder,
@@ -179,10 +198,14 @@ import type {
 export {
   AdjustmentDirection,
   AppointmentStatus,
+  CashAccount,
+  CashMovementKind,
+  CashMovementSource,
   CustomerSort,
   DocumentType,
   ExtractionStatus,
   FiscalRegime,
+  HopeMode,
   ImportRowStatus,
   InvoiceFileKind,
   InvoiceLineKind,
@@ -203,7 +226,9 @@ export {
   QuoteSort,
   QuoteStatus,
   ReceivableStatus,
+  RoleKind,
   ServiceSort,
+  ShiftStatus,
   TaxResponsibility,
   UserRole,
   WhatsAppContactKind,
@@ -226,6 +251,11 @@ export interface NavModule {
   to: string;
   /** True when the module is restricted to administrators. */
   adminOnly: boolean;
+  /**
+   * Clave de módulo del backend que habilita esta entrada, o `null` cuando la
+   * entrada no depende de un módulo del rol (p. ej. el panel de resumen).
+   */
+  moduleKey?: string | null;
 }
 
 /** One of the six consolidated navigation flows in the sidebar. */
@@ -462,6 +492,10 @@ export interface ProfitBreakdownView {
   parts: ProfitBlockView;
   services: ProfitBlockView;
   total: ProfitBlockView;
+  /** Total technician commission deducted in the period, in cents. */
+  totalCommission: Money;
+  /** Net profit after deducting technician commissions, in cents. */
+  netProfit: bigint;
   /** Per-service detail backing the services block. */
   serviceLines: ServiceProfitLineView[];
 }
@@ -529,3 +563,44 @@ export type PurchaseInvoiceHeaderInput = InvoiceHeaderInput;
  * cents.
  */
 export type PurchaseInvoiceLineInput = InvoiceLineInput;
+
+/* ---------------------------------------------------------------------------
+ * Términos y condiciones de garantía (documento de la orden de trabajo).
+ * ------------------------------------------------------------------------- */
+
+/** A single numbered clause of the warranty legend. */
+export interface WarrantyClause {
+  /** 1-based clause number, rendered as "1." … "8.". */
+  number: number;
+  /** Clause title in upper case, e.g. "ALCANCE DE LA GARANTÍA". */
+  title: string;
+  /** Full clause body text. */
+  body: string;
+}
+
+/**
+ * The identification block printed at the top of the warranty document:
+ * cliente, motocicleta, fecha del servicio y técnico responsable.
+ */
+export interface WarrantyDocumentData {
+  /** Workshop order number the warranty belongs to, e.g. "OT-000123". */
+  orderNumber: string;
+  /** Customer full name. */
+  customerName: string;
+  /** Customer document number; empty when the customer has none on file. */
+  customerDocument: string;
+  /** Motorcycle brand, e.g. "Yamaha". */
+  motorcycleBrand: string;
+  /** Motorcycle model, e.g. "FZ 2.0". */
+  motorcycleModel: string;
+  /** Motorcycle model year. */
+  motorcycleYear: bigint;
+  /** Motorcycle plate, e.g. "ABC12D". */
+  motorcyclePlate: string;
+  /** Date the service was performed, as a backend timestamp. */
+  serviceDate: Timestamp;
+  /** Technician code, e.g. "TEC-01"; empty when none is assigned. */
+  technicianCode: string;
+  /** Technician full name; empty when none is assigned. */
+  technicianName: string;
+}

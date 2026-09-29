@@ -107,6 +107,7 @@ function purchase(overrides: Partial<Purchase> = {}): Purchase {
     paidAmount: 300000n,
     createdAt: TS,
     items: [],
+    accepted: true,
     ...overrides,
   };
 }

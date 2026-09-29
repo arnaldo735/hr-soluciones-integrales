@@ -1,4 +1,3 @@
-import Char "mo:core/Char";
 import List "mo:core/List";
 import Map "mo:core/Map";
 import Runtime "mo:core/Runtime";
@@ -8,6 +7,7 @@ import Time "mo:core/Time";
 import Common "../types/common";
 import Types "../types/expense-categories";
 import ExpenseTypes "../types/expenses";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -23,7 +23,7 @@ module {
   // --- helpers -------------------------------------------------------------
 
   func normalize(name : Text) : Text {
-    name.trim(#predicate (func(c : Char) : Bool { c.isWhitespace() })).toLower();
+    Search.normalize(name);
   };
 
   func matches(category : Types.ExpenseCategory, filter : Types.ExpenseCategoryFilter) : Bool {
@@ -32,7 +32,7 @@ module {
       case (?term) {
         let needle = normalize(term);
         if (needle == "") { true } else {
-          category.name.toLower().contains(#text needle) or category.description.toLower().contains(#text needle);
+          Search.containsAny([category.name, category.description], needle);
         };
       };
     };
@@ -84,7 +84,7 @@ module {
       };
     };
     matched.toArray().sort(
-      func (a, b) = Text.compare(a.category.name.toLower(), b.category.name.toLower())
+      func (a, b) = Text.compare(Search.sortKey(a.category.name), Search.sortKey(b.category.name))
     );
   };
 

@@ -19,6 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { usePurchaseInvoices } from "@/hooks/use-purchase-invoices";
 import { formatDate, formatNumber } from "@/lib/format";
@@ -67,11 +68,12 @@ const ALL = "all";
 /** Supplier directory used to populate the supplier filter. */
 function useSupplierDirectory() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: ["suppliers", "purchase-invoice-filter"],
     queryFn: async (): Promise<Supplier[]> => {
       if (!actor) return [];
-      return actor.listSuppliers(null);
+      return actor.listSuppliers(token, null);
     },
     enabled: !!actor && !isFetching,
     staleTime: 60_000,

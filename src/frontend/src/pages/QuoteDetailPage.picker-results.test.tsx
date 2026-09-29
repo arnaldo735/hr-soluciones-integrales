@@ -108,6 +108,7 @@ function part(overrides: Partial<PartView> = {}): PartView {
     createdAt: 1_700_000_000_000_000_000n,
     unit: "pza",
     totalStock: 8n,
+    barcode: "",
     category: "Frenos",
     salePrice: 25000n,
     brand: "Genérico",
@@ -319,6 +320,7 @@ describe("QuoteDetailPage picker result semantics", () => {
 
     await waitFor(() =>
       expect(listPartsMock).toHaveBeenLastCalledWith(
+        null,
         { search: "balata" },
         PartSort.name,
         expect.anything(),
@@ -338,6 +340,7 @@ describe("QuoteDetailPage picker result semantics", () => {
 
     await waitFor(() =>
       expect(listServicesMock).toHaveBeenLastCalledWith(
+        null,
         expect.objectContaining({ search: "aceite", activeOnly: true }),
         ServiceSort.name,
         expect.anything(),

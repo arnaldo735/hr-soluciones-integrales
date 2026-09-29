@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   CreateInvoiceInput,
@@ -6,6 +7,7 @@ import type {
   InvoiceFilter,
   InvoiceReviewInput,
   InvoiceSort,
+  PartView,
   PurchaseInvoice,
   PurchaseInvoicePage,
   Supplier,
@@ -49,6 +51,7 @@ export interface PurchaseInvoiceListParams {
 /** Página de facturas de compra con filtros, orden y paginación. */
 export function usePurchaseInvoices(params: PurchaseInvoiceListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const search = params.search.trim();
 
   return useQuery({
@@ -72,6 +75,7 @@ export function usePurchaseInvoices(params: PurchaseInvoiceListParams) {
         search: search.length > 0 ? search : undefined,
       };
       return actor.listPurchaseInvoices(
+        token,
         filter,
         params.sort,
         BigInt(params.offset),
@@ -85,12 +89,13 @@ export function usePurchaseInvoices(params: PurchaseInvoiceListParams) {
 /** Detalle de una factura de compra procesada. */
 export function usePurchaseInvoice(invoiceId: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: [INVOICE_KEY, "detail", invoiceId?.toString() ?? "none"],
     queryFn: async (): Promise<PurchaseInvoice | null> => {
       if (!actor || invoiceId === null) return null;
-      return actor.getPurchaseInvoice(invoiceId);
+      return actor.getPurchaseInvoice(token, invoiceId);
     },
     enabled: !!actor && !isFetching && invoiceId !== null,
   });
@@ -99,12 +104,13 @@ export function usePurchaseInvoice(invoiceId: Id | null) {
 /** Registra el archivo subido y crea el borrador de factura de compra. */
 export function useCreatePurchaseInvoiceDraft() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: CreateInvoiceInput): Promise<PurchaseInvoice> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createPurchaseInvoiceDraft(input);
+      return actor.createPurchaseInvoiceDraft(token, input);
     },
     onSuccess: () => {
       invalidateInvoiceData(queryClient);
@@ -115,12 +121,13 @@ export function useCreatePurchaseInvoiceDraft() {
 /** Ejecuta la extracción de datos sobre una factura cargada. */
 export function useRunPurchaseInvoiceExtraction() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (invoiceId: Id): Promise<PurchaseInvoice> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.runPurchaseInvoiceExtraction(invoiceId);
+      return actor.runPurchaseInvoiceExtraction(token, invoiceId);
     },
     onSuccess: () => {
       invalidateInvoiceData(queryClient);
@@ -131,6 +138,7 @@ export function useRunPurchaseInvoiceExtraction() {
 /** Guarda la revisión manual del encabezado y las líneas extraídas. */
 export function useUpdatePurchaseInvoiceReview() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -140,6 +148,7 @@ export function useUpdatePurchaseInvoiceReview() {
     }): Promise<PurchaseInvoice> => {
       if (!actor) throw new Error("Backend no disponible");
       return actor.updatePurchaseInvoiceReview(
+        token,
         variables.invoiceId,
         variables.input,
       );
@@ -153,15 +162,71 @@ export function useUpdatePurchaseInvoiceReview() {
 /** Confirma la factura y aplica sus líneas al inventario. */
 export function useConfirmPurchaseInvoice() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (invoiceId: Id): Promise<InvoiceApplyResult> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.confirmPurchaseInvoice(invoiceId);
+      return actor.confirmPurchaseInvoice(token, invoiceId);
     },
     onSuccess: () => {
       invalidateInvoiceData(queryClient);
+    },
+  });
+}
+
+/**
+ * Elimina una compra mientras no haya sido aceptada/confirmada. El backend
+ * rechaza la operación si la compra ya fue aceptada, tiene pagos o ya afectó
+ * inventario; el mensaje de error se propaga tal cual para mostrarlo.
+ */
+export function useDeletePurchase() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (purchaseId: Id): Promise<boolean> => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.deletePurchase(token, purchaseId);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["purchases"] });
+      void queryClient.invalidateQueries({ queryKey: ["purchase"] });
+      void queryClient.invalidateQueries({ queryKey: [INVOICE_KEY] });
+      void queryClient.invalidateQueries({ queryKey: ["payables"] });
+      void queryClient.invalidateQueries({ queryKey: ["parts"] });
+      void queryClient.invalidateQueries({ queryKey: ["part"] });
+      void queryClient.invalidateQueries({ queryKey: ["low-stock"] });
+      void queryClient.invalidateQueries({ queryKey: ["movements"] });
+      void queryClient.invalidateQueries({ queryKey: ["inventory-valuation"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounting-summary"] });
+      void queryClient.invalidateQueries({ queryKey: ["accounting-report"] });
+      void queryClient.invalidateQueries({ queryKey: ["ledger-entries"] });
+      void queryClient.invalidateQueries({ queryKey: ["dashboard-summary"] });
+    },
+  });
+}
+
+/**
+ * Resuelve un código de barras o SKU a un repuesto del catálogo usando
+ * `findPartByCode` del backend, que coincide tanto con el código de barras como
+ * con el SKU.
+ *
+ * Devuelve el `PartView` cuando el código existe y `null` cuando no, para que
+ * el llamador asigne el repuesto a la línea correspondiente o muestre el aviso
+ * de "producto no encontrado" sin agregar nada.
+ */
+export function useFindPartByCode() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+
+  return useMutation({
+    mutationFn: async (code: string): Promise<PartView | null> => {
+      if (!actor) throw new Error("Backend no disponible");
+      const result = await actor.findPartByCode(token, code);
+      return result.__kind__ === "found" ? result.found : null;
     },
   });
 }
@@ -172,12 +237,13 @@ export function useConfirmPurchaseInvoice() {
  */
 export function useCreateSupplier() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: SupplierInput): Promise<Supplier> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createSupplier(input);
+      return actor.createSupplier(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["suppliers"] });

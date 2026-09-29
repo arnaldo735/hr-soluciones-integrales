@@ -1,6 +1,7 @@
 import { InvoiceSort } from "@/backend";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { useCompanyProfile } from "@/hooks/use-company";
 import { useRole } from "@/hooks/use-role";
@@ -76,15 +77,75 @@ const EMPTY_METRICS: DashboardMetrics = {
 };
 
 /**
+ * Módulos del backend que exige cada lectura del panel. Un endpoint con
+ * alcance de módulo falla con `Runtime.trap` cuando el rol de la sesión no
+ * incluye la clave, así que cada lectura se condiciona a su módulo para que un
+ * rol parcial siga viendo el panel con los datos que sí puede consultar.
+ */
+const DASHBOARD_MODULES = {
+  workshop: "workshop",
+  appointments: "appointments",
+  technicians: "technicians",
+  inventory: "inventory",
+  services: "services",
+  customers: "customers",
+  quotes: "quotes",
+  billing: "billing",
+  pos: "pos",
+  purchaseInvoices: "purchaseInvoices",
+  receivables: "receivables",
+  payables: "payables",
+  expenses: "expenses",
+  commissions: "commissions",
+  accounting: "accounting",
+} as const;
+
+/**
+ * Resuelve si el rol activo puede consultar un módulo. `modules === null`
+ * significa sin restricción (administrador por Internet Identity); un arreglo
+ * vacío significa que el rol no habilita ningún módulo.
+ */
+function canAccess(modules: string[] | null, moduleKey: string): boolean {
+  if (modules === null) return true;
+  return modules.includes(moduleKey);
+}
+
+/**
  * Aggregates the live counters shown on each flow shortcut. Every call is a
  * cheap list/count read; the panel is the only consumer, so the metrics live
- * here instead of in a shared hook.
+ * here instead of in a shared hook. Cada lectura se omite cuando el rol no
+ * tiene el módulo correspondiente, de modo que un rol parcial nunca hace
+ * fallar el `Promise.all` completo.
  */
-function useDashboardMetrics(isAdmin: boolean) {
+function useDashboardMetrics(modules: string[] | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+
+  const canWorkshop = canAccess(modules, DASHBOARD_MODULES.workshop);
+  const canAppointments = canAccess(modules, DASHBOARD_MODULES.appointments);
+  const canTechnicians = canAccess(modules, DASHBOARD_MODULES.technicians);
+  const canInventory = canAccess(modules, DASHBOARD_MODULES.inventory);
+  const canServices = canAccess(modules, DASHBOARD_MODULES.services);
+  const canCustomers = canAccess(modules, DASHBOARD_MODULES.customers);
+  const canQuotes = canAccess(modules, DASHBOARD_MODULES.quotes);
+  const canBilling = canAccess(modules, DASHBOARD_MODULES.billing);
+  const canPos = canAccess(modules, DASHBOARD_MODULES.pos);
+  const canPurchaseInvoices = canAccess(
+    modules,
+    DASHBOARD_MODULES.purchaseInvoices,
+  );
+  const canReceivables = canAccess(modules, DASHBOARD_MODULES.receivables);
+  const canPayables = canAccess(modules, DASHBOARD_MODULES.payables);
+  const canExpenses = canAccess(modules, DASHBOARD_MODULES.expenses);
+  const canCommissions = canAccess(modules, DASHBOARD_MODULES.commissions);
+  const canAccounting = canAccess(modules, DASHBOARD_MODULES.accounting);
 
   return useQuery({
-    queryKey: ["dashboard-metrics", isAdmin],
+    queryKey: [
+      "dashboard-metrics",
+      modules === null ? "all" : [...modules].sort().join(","),
+      token,
+    ],
     queryFn: async (): Promise<DashboardMetrics> => {
       if (!actor) return EMPTY_METRICS;
 
@@ -105,35 +166,57 @@ function useDashboardMetrics(isAdmin: boolean) {
         commissionLines,
         accounting,
       ] = await Promise.all([
-        actor.listOrders({}, 0n, 1n),
-        actor.listAppointments({}),
-        actor.listTechnicians({}),
-        actor.listParts({}, PartSort.name, 0n, 1n),
-        actor.listServices({}, ServiceSort.name, 0n, 1n),
-        actor.listCustomers(null),
-        actor.listQuotes({}, QuoteSort.createdAt, 0n, 1n),
-        isAdmin ? actor.listInvoices({}, 0n, 1n) : Promise.resolve(null),
-        actor.listPosSales({}, 0n, 1n),
-        isAdmin
-          ? actor.listPurchaseInvoices({}, InvoiceSort.createdAt, 0n, 1n)
+        canWorkshop
+          ? actor.listOrders(token, {}, 0n, 1n)
           : Promise.resolve(null),
-        isAdmin ? actor.listReceivables({}) : Promise.resolve(null),
-        isAdmin ? actor.listPayables() : Promise.resolve(null),
-        isAdmin ? actor.listExpenses({}, 0n, 1n) : Promise.resolve(null),
-        isAdmin ? actor.listCommissionPayments({}) : Promise.resolve(null),
-        isAdmin ? actor.getAccountingSummary({}) : Promise.resolve(null),
+        canAppointments
+          ? actor.listAppointments(token, {})
+          : Promise.resolve(null),
+        canTechnicians
+          ? actor.listTechnicians(token, {})
+          : Promise.resolve(null),
+        canInventory
+          ? actor.listParts(token, {}, PartSort.name, 0n, 1n)
+          : Promise.resolve(null),
+        canServices
+          ? actor.listServices(token, {}, ServiceSort.name, 0n, 1n)
+          : Promise.resolve(null),
+        canCustomers ? actor.listCustomers(token, null) : Promise.resolve(null),
+        canQuotes
+          ? actor.listQuotes(token, {}, QuoteSort.createdAt, 0n, 1n)
+          : Promise.resolve(null),
+        canBilling
+          ? actor.listInvoices(token, {}, 0n, 1n)
+          : Promise.resolve(null),
+        canPos ? actor.listPosSales(token, {}, 0n, 1n) : Promise.resolve(null),
+        canPurchaseInvoices
+          ? actor.listPurchaseInvoices(token, {}, InvoiceSort.createdAt, 0n, 1n)
+          : Promise.resolve(null),
+        canReceivables
+          ? actor.listReceivables(token, {})
+          : Promise.resolve(null),
+        canPayables ? actor.listPayables(token) : Promise.resolve(null),
+        canExpenses
+          ? actor.listExpenses(token, {}, 0n, 1n)
+          : Promise.resolve(null),
+        canCommissions
+          ? actor.listCommissionPayments(token, {})
+          : Promise.resolve(null),
+        canAccounting
+          ? actor.getAccountingSummary(token, {})
+          : Promise.resolve(null),
       ]);
 
       return {
-        activeOrders: orders.total,
-        appointments: BigInt(appointments.length),
-        technicians: BigInt(technicians.length),
-        parts: parts.total,
-        services: services.total,
-        customers: BigInt(customers.length),
-        quotes: quotes.total,
+        activeOrders: orders?.total ?? 0n,
+        appointments: BigInt(appointments?.length ?? 0),
+        technicians: BigInt(technicians?.length ?? 0),
+        parts: parts?.total ?? 0n,
+        services: services?.total ?? 0n,
+        customers: BigInt(customers?.length ?? 0),
+        quotes: quotes?.total ?? 0n,
         invoices: invoices?.total ?? 0n,
-        posSales: posSales.total,
+        posSales: posSales?.total ?? 0n,
         purchaseInvoices: purchaseInvoices?.total ?? 0n,
         receivables: BigInt(receivables?.length ?? 0),
         payables: BigInt(payables?.length ?? 0),
@@ -283,7 +366,8 @@ interface Shortcut {
   metric: (metrics: DashboardMetrics) => string;
   caption: string;
   tone: ShortcutTone;
-  adminOnly: boolean;
+  /** Módulo del backend que habilita este acceso; `null` = siempre visible. */
+  moduleKey: string | null;
 }
 
 interface FlowGroup {
@@ -307,7 +391,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.activeOrders),
         caption: "órdenes registradas",
         tone: "primary",
-        adminOnly: false,
+        moduleKey: "workshop",
       },
       {
         key: "appointments",
@@ -317,7 +401,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.appointments),
         caption: "citas agendadas",
         tone: "primary",
-        adminOnly: false,
+        moduleKey: "appointments",
       },
       {
         key: "technicians",
@@ -327,7 +411,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.technicians),
         caption: "técnicos en nómina",
         tone: "primary",
-        adminOnly: false,
+        moduleKey: "technicians",
       },
     ],
   },
@@ -344,7 +428,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.parts),
         caption: "repuestos en catálogo",
         tone: "accent",
-        adminOnly: false,
+        moduleKey: "inventory",
       },
       {
         key: "services",
@@ -354,7 +438,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.services),
         caption: "servicios ofrecidos",
         tone: "accent",
-        adminOnly: false,
+        moduleKey: "services",
       },
       {
         key: "service-categories",
@@ -364,7 +448,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.services),
         caption: "servicios clasificados",
         tone: "accent",
-        adminOnly: true,
+        moduleKey: "serviceCategories",
       },
       {
         key: "customers",
@@ -374,7 +458,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.customers),
         caption: "clientes registrados",
         tone: "accent",
-        adminOnly: false,
+        moduleKey: "customers",
       },
       {
         key: "suppliers",
@@ -384,7 +468,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.purchaseInvoices),
         caption: "facturas de compra",
         tone: "accent",
-        adminOnly: true,
+        moduleKey: "suppliers",
       },
     ],
   },
@@ -401,7 +485,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.quotes),
         caption: "cotizaciones emitidas",
         tone: "primary",
-        adminOnly: false,
+        moduleKey: "quotes",
       },
       {
         key: "invoices",
@@ -411,7 +495,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.invoices),
         caption: "facturas de venta",
         tone: "primary",
-        adminOnly: true,
+        moduleKey: "billing",
       },
       {
         key: "pos",
@@ -421,7 +505,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.posSales),
         caption: "ventas de mostrador",
         tone: "primary",
-        adminOnly: false,
+        moduleKey: "pos",
       },
     ],
   },
@@ -438,7 +522,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.purchaseInvoices),
         caption: "facturas registradas",
         tone: "accent",
-        adminOnly: true,
+        moduleKey: "purchaseInvoices",
       },
       {
         key: "payables",
@@ -448,7 +532,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.payables),
         caption: "cuentas pendientes",
         tone: "accent",
-        adminOnly: true,
+        moduleKey: "payables",
       },
     ],
   },
@@ -465,7 +549,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.customers),
         caption: "clientes en cartera",
         tone: "info",
-        adminOnly: true,
+        moduleKey: "company",
       },
       {
         key: "receivables",
@@ -475,7 +559,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.receivables),
         caption: "cuentas por cobrar",
         tone: "info",
-        adminOnly: true,
+        moduleKey: "receivables",
       },
       {
         key: "expenses",
@@ -485,7 +569,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.expenses),
         caption: "gastos registrados",
         tone: "info",
-        adminOnly: true,
+        moduleKey: "expenses",
       },
       {
         key: "commissions",
@@ -495,7 +579,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.commissions),
         caption: "pagos de comisión",
         tone: "info",
-        adminOnly: true,
+        moduleKey: "commissions",
       },
       {
         key: "accounting",
@@ -505,7 +589,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.accounting),
         caption: "facturas del periodo",
         tone: "info",
-        adminOnly: true,
+        moduleKey: "accounting",
       },
       {
         key: "settings",
@@ -515,7 +599,7 @@ const FLOW_GROUPS: FlowGroup[] = [
         metric: (m) => formatNumber(m.payables),
         caption: "cuentas por pagar",
         tone: "info",
-        adminOnly: true,
+        moduleKey: "settings",
       },
     ],
   },
@@ -525,10 +609,12 @@ function ShortcutCard({
   shortcut,
   metrics,
   index,
+  accessible,
 }: {
   shortcut: Shortcut;
   metrics: DashboardMetrics;
   index: number;
+  accessible: boolean;
 }) {
   return (
     <Link
@@ -543,13 +629,23 @@ function ShortcutCard({
         </span>
         <span className="flow-shortcut-name">{shortcut.label}</span>
       </span>
-      <span
-        className="flow-shortcut-metric"
-        data-tone={shortcut.tone}
-        aria-label={`${shortcut.metric(metrics)} ${shortcut.caption}`}
-      >
-        {shortcut.metric(metrics)}
-      </span>
+      {accessible ? (
+        <span
+          className="flow-shortcut-metric"
+          data-tone={shortcut.tone}
+          aria-label={`${shortcut.metric(metrics)} ${shortcut.caption}`}
+        >
+          {shortcut.metric(metrics)}
+        </span>
+      ) : (
+        <span
+          className="flow-shortcut-metric text-muted-foreground"
+          data-tone={shortcut.tone}
+          aria-label="Sin acceso a este módulo"
+        >
+          —
+        </span>
+      )}
       <span className="flow-shortcut-caption">{shortcut.caption}</span>
     </Link>
   );
@@ -558,14 +654,14 @@ function ShortcutCard({
 function FlowGroupSection({
   group,
   metrics,
-  isAdmin,
+  modules,
 }: {
   group: FlowGroup;
   metrics: DashboardMetrics;
-  isAdmin: boolean;
+  modules: string[] | null;
 }) {
-  const shortcuts = group.shortcuts.filter(
-    (shortcut) => isAdmin || !shortcut.adminOnly,
+  const shortcuts = group.shortcuts.filter((shortcut) =>
+    canAccess(modules, shortcut.moduleKey ?? ""),
   );
 
   if (shortcuts.length === 0) return null;
@@ -592,6 +688,7 @@ function FlowGroupSection({
             shortcut={shortcut}
             metrics={metrics}
             index={index}
+            accessible={canAccess(modules, shortcut.moduleKey ?? "")}
           />
         ))}
       </div>
@@ -645,18 +742,46 @@ function MechanicNotice() {
   );
 }
 
+/**
+ * Aviso neutral para un rol que no tiene el módulo `company`: el panel sigue
+ * funcionando y solo se omite la identidad del taller.
+ */
+function CompanyRestrictedNotice() {
+  return (
+    <div
+      data-ocid="dashboard.company_header.restricted_state"
+      className="company-header"
+    >
+      <div className="company-header-logo" aria-hidden="true">
+        <Building2 className="size-6" />
+      </div>
+      <p className="company-header-name">Perfil de empresa restringido</p>
+      <p className="company-header-legal">
+        Tu rol no incluye el módulo de empresa
+      </p>
+      <p className="mx-auto mt-3 max-w-md text-xs text-muted-foreground">
+        Los accesos directos a los flujos que sí puedes usar siguen disponibles
+        más abajo.
+      </p>
+    </div>
+  );
+}
+
 /* ---------------------------------------------------------------------------
  * Page
  * ------------------------------------------------------------------------- */
 
 export function DashboardPage() {
-  const { isAdmin, isLoading: isRoleLoading } = useRole();
-  const profileQuery = useCompanyProfile();
-  const metricsQuery = useDashboardMetrics(isAdmin);
+  const { isAdmin, isLoading: isRoleLoading, modules } = useRole();
+  const canCompany = canAccess(modules, "company");
+  const profileQuery = useCompanyProfile({ enabled: canCompany });
+  const metricsQuery = useDashboardMetrics(modules);
 
-  const isError = profileQuery.isError || metricsQuery.isError;
+  const isError = metricsQuery.isError;
   const showSkeleton =
-    isRoleLoading || profileQuery.isLoading || metricsQuery.isLoading;
+    isRoleLoading ||
+    (canCompany && profileQuery.isLoading) ||
+    metricsQuery.isLoading;
 
   const metrics = metricsQuery.data ?? EMPTY_METRICS;
   const profile = profileQuery.data ?? null;
@@ -664,7 +789,9 @@ export function DashboardPage() {
   // "Actualizar" and "Reintentar" must always hit the backend, so the cached
   // freshness window is bypassed explicitly instead of relying on staleTime.
   const refetchAll = () => {
-    void profileQuery.refetch({ cancelRefetch: true });
+    if (canCompany) {
+      void profileQuery.refetch({ cancelRefetch: true });
+    }
     void metricsQuery.refetch({ cancelRefetch: true });
   };
 
@@ -722,6 +849,8 @@ export function DashboardPage() {
         <>
           {showSkeleton ? (
             <CompanyHeaderSkeleton />
+          ) : !canCompany ? (
+            <CompanyRestrictedNotice />
           ) : profile ? (
             <CompanyHeader profile={profile} />
           ) : (
@@ -743,7 +872,7 @@ export function DashboardPage() {
                   key={group.id}
                   group={group}
                   metrics={metrics}
-                  isAdmin={isAdmin}
+                  modules={modules}
                 />
               ))}
             </div>

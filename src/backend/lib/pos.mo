@@ -3,7 +3,6 @@ import Map "mo:core/Map";
 import Nat "mo:core/Nat";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
-import Text "mo:core/Text";
 import Time "mo:core/Time";
 
 import Common "../types/common";
@@ -12,6 +11,7 @@ import InventoryTypes "../types/inventory";
 import CustomerTypes "../types/customers";
 import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -155,13 +155,13 @@ module {
   func matches(sale : Types.PosSale, filter : Types.PosSaleFilter) : Bool {    let searchOk = switch (filter.search) {
       case null { true };
       case (?term) {
-        let needle = term.toLower();
+        let needle = Search.normalize(term);
         if (needle == "") { true } else {
           let customerOk = switch (sale.customerName) {
-            case (?name) { name.toLower().contains(#text needle) };
+            case (?name) { Search.contains(name, needle) };
             case null { false };
           };
-          sale.saleNumber.toLower().contains(#text needle) or customerOk;
+          Search.contains(sale.saleNumber, needle) or customerOk;
         };
       };
     };

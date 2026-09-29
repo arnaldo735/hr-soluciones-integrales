@@ -123,7 +123,7 @@ describe("SuppliersPage", () => {
     renderWithProviders(<SuppliersPage />);
 
     await waitFor(() => expect(listSuppliersMock).toHaveBeenCalled());
-    expect(listSuppliersMock).toHaveBeenLastCalledWith(null);
+    expect(listSuppliersMock).toHaveBeenLastCalledWith(null, null);
 
     await userEvent.type(
       screen.getByTestId("suppliers.search_input"),
@@ -131,7 +131,7 @@ describe("SuppliersPage", () => {
     );
 
     await waitFor(() =>
-      expect(listSuppliersMock).toHaveBeenLastCalledWith("Norte"),
+      expect(listSuppliersMock).toHaveBeenLastCalledWith(null, "Norte"),
     );
   });
 

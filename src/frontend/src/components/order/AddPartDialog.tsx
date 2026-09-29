@@ -1,3 +1,4 @@
+import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -24,8 +25,8 @@ import {
   useParts,
 } from "@/hooks/use-orders";
 import { formatMoney, formatNumber } from "@/lib/format";
-import type { Id } from "@/lib/types";
-import { AlertTriangle, PackagePlus, Search, X } from "lucide-react";
+import type { Id, PartView } from "@/lib/types";
+import { AlertTriangle, PackagePlus, ScanLine, Search, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 interface AddPartDialogProps {
@@ -45,6 +46,8 @@ export function AddPartDialog({
   const [formError, setFormError] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
+  const [isScanOpen, setIsScanOpen] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search), 250);
@@ -80,11 +83,30 @@ export function AddPartDialog({
     setFormError(null);
     setSearch("");
     setDebouncedSearch("");
+    setIsScanOpen(false);
+    setScanError(null);
   }
 
   function handleOpenChange(next: boolean) {
     if (!next) reset();
     onOpenChange(next);
+  }
+
+  /**
+   * Adds a scanned part to the line. The scanner already resolved the code
+   * through `findPartByCode`, so the part is selected directly and the user
+   * confirms lot and quantity before saving.
+   */
+  function handleScanned(part: PartView) {
+    setPartId(part.id);
+    setLotId(null);
+    setFormError(null);
+    setScanError(null);
+    setIsScanOpen(false);
+  }
+
+  function handleScanNotFound(code: string) {
+    setScanError(`Producto no encontrado para el código ${code}.`);
   }
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
@@ -141,7 +163,24 @@ export function AddPartDialog({
 
         <form onSubmit={handleSubmit} noValidate className="space-y-4">
           <div className="space-y-2">
-            <Label htmlFor="add-part-search">Repuesto</Label>
+            <div className="flex items-center justify-between gap-2">
+              <Label htmlFor="add-part-search">Repuesto</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  setScanError(null);
+                  setIsScanOpen((current) => !current);
+                }}
+                aria-expanded={isScanOpen}
+                data-ocid="order_detail.add_part.scan_button"
+                className="gap-1.5"
+              >
+                <ScanLine className="size-4" aria-hidden="true" />
+                {isScanOpen ? "Cerrar escáner" : "Escanear"}
+              </Button>
+            </div>
             <div className="relative">
               <Search
                 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
@@ -162,7 +201,36 @@ export function AddPartDialog({
               />
             </div>
 
-            {partsQuery.isLoading ? (
+            {isScanOpen ? (
+              <BarcodeScanner
+                ocid="order_detail.add_part.scanner"
+                title="Escanear repuesto"
+                hint="Apunta la cámara al código del repuesto o ingrésalo manualmente."
+                onDetected={(part) => handleScanned(part)}
+                onNotFound={handleScanNotFound}
+              />
+            ) : null}
+            {scanError ? (
+              <p
+                data-ocid="order_detail.add_part.scan_not_found_state"
+                className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5 text-xs text-destructive"
+              >
+                <AlertTriangle
+                  className="mt-0.5 size-4 shrink-0"
+                  aria-hidden="true"
+                />
+                {scanError}
+              </p>
+            ) : null}
+
+            {term.length === 0 ? (
+              <p
+                data-ocid="order_detail.add_part.prompt_state"
+                className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground"
+              >
+                Escribe el SKU o el nombre del repuesto para ver coincidencias.
+              </p>
+            ) : partsQuery.isLoading ? (
               <div
                 data-ocid="order_detail.add_part.loading_state"
                 className="space-y-1.5"
@@ -186,9 +254,7 @@ export function AddPartDialog({
                 data-ocid="order_detail.add_part.empty_state"
                 className="rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground"
               >
-                {term.length > 0
-                  ? `Sin repuestos que coincidan con “${term}”.`
-                  : "No hay repuestos con existencia disponible en el inventario."}
+                {`Sin repuestos que coincidan con “${term}”.`}
               </p>
             ) : (
               <ul

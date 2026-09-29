@@ -1,6 +1,8 @@
 import { DriveBackupCard } from "@/components/DriveBackupCard";
 import { LocalBackupCard } from "@/components/LocalBackupCard";
-import { Badge } from "@/components/ui/badge";
+import { RestoreBackupCard } from "@/components/RestoreBackupCard";
+import { ServiceTermsCard } from "@/components/ServiceTermsCard";
+import { WarrantyTermsCard } from "@/components/WarrantyTermsCard";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -11,31 +13,28 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Skeleton } from "@/components/ui/skeleton";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
+import { Switch } from "@/components/ui/switch";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
-import { formatDate, formatPrincipal } from "@/lib/format";
-import type { BusinessSettings, UserProfile, UserView } from "@/lib/types";
-import { UserRole } from "@/lib/types";
+import {
+  useDailyHopeMessage,
+  useHopeSettings,
+  useUpdateHopeSettings,
+} from "@/hooks/use-hope";
+import { formatColombiaDateDDMMYYYY } from "@/lib/format";
+import { HopeMode } from "@/lib/types";
+import type { UserProfile } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  BookOpen,
   Building2,
   Check,
+  KeyRound,
   Loader2,
   Save,
   ShieldCheck,
@@ -44,25 +43,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-
-const ROLE_LABELS: Record<UserRole, string> = {
-  [UserRole.admin]: "Administrador",
-  [UserRole.user]: "Mecánico",
-  [UserRole.guest]: "Invitado",
-};
-
-const ROLE_ORDER: UserRole[] = [UserRole.admin, UserRole.user, UserRole.guest];
-
-function roleBadgeClass(role: UserRole): string {
-  switch (role) {
-    case UserRole.admin:
-      return "border-primary/40 bg-primary/10 text-primary";
-    case UserRole.user:
-      return "border-info/40 bg-info/10 text-info";
-    default:
-      return "border-border bg-muted text-muted-foreground";
-  }
-}
 
 function errorMessage(error: unknown): string {
   if (error instanceof Error && error.message) return error.message;
@@ -98,13 +78,14 @@ function SectionHeading({
 
 function BusinessSettingsForm() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   const settingsQuery = useQuery({
     queryKey: ["business-settings"],
-    queryFn: async (): Promise<BusinessSettings> => {
+    queryFn: async () => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.getBusinessSettings();
+      return actor.getBusinessSettings(token);
     },
     enabled: !!actor && !isFetching,
   });
@@ -128,9 +109,15 @@ function BusinessSettingsForm() {
   }, [settingsQuery.data, initialized]);
 
   const saveMutation = useMutation({
-    mutationFn: async (settings: BusinessSettings) => {
+    mutationFn: async (settings: {
+      name: string;
+      taxId: string;
+      address: string;
+      phone: string;
+      taxRate: bigint;
+    }) => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateBusinessSettings(settings);
+      return actor.updateBusinessSettings(token, settings);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["business-settings"] });
@@ -337,8 +324,9 @@ function BusinessSettingsForm() {
   );
 }
 
-function CallerProfileCard() {
+export function CallerProfileCard() {
   const { actor, isFetching } = useBackend();
+  const { user, roleName, token, refetch } = useAuth();
   const queryClient = useQueryClient();
 
   const profileQuery = useQuery({
@@ -353,21 +341,39 @@ function CallerProfileCard() {
   const [displayName, setDisplayName] = useState("");
   const [initialized, setInitialized] = useState(false);
 
+  const sessionName = user?.name ?? profileQuery.data?.name ?? "";
+  const username = user?.username ?? "";
+  const displayRole = user ? roleName : profileQuery.data ? roleName : "";
+
   useEffect(() => {
+    if (initialized) return;
+    if (user) {
+      setDisplayName(user.name);
+      setInitialized(true);
+      return;
+    }
     const data = profileQuery.data;
-    if (!data || initialized) return;
+    if (!data) return;
     setDisplayName(data.name);
     setInitialized(true);
-  }, [profileQuery.data, initialized]);
+  }, [user, profileQuery.data, initialized]);
 
   const saveMutation = useMutation({
     mutationFn: async (value: string) => {
       if (!actor) throw new Error("Backend no disponible");
+      // Con una sesión de usuario y contraseña, el nombre visible vive en la
+      // credencial (el que aparece en el listado de usuarios); la vía de
+      // Internet Identity sigue usando el perfil del llamador.
+      if (token) {
+        return actor.updateCallerName(token, value);
+      }
       return actor.saveCallerUserProfile(value);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["caller-profile"] });
-      void queryClient.invalidateQueries({ queryKey: ["users"] });
+      void queryClient.invalidateQueries({ queryKey: ["auth-session"] });
+      void queryClient.invalidateQueries({ queryKey: ["users-page"] });
+      refetch();
       toast.success("Nombre actualizado");
     },
     onError: (error) => {
@@ -377,7 +383,10 @@ function CallerProfileCard() {
     },
   });
 
-  const canSubmit = displayName.trim() !== "" && !saveMutation.isPending;
+  const canSubmit =
+    displayName.trim() !== "" &&
+    displayName.trim() !== sessionName &&
+    !saveMutation.isPending;
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -390,15 +399,15 @@ function CallerProfileCard() {
       <SectionHeading
         icon={<UserRound className="size-4" aria-hidden="true" />}
         title="Mi perfil"
-        description="El nombre con el que apareces en las órdenes y movimientos."
+        description="Tu nombre, usuario de acceso y rol en el taller."
       />
       <CardContent className="pt-6">
-        {profileQuery.isLoading ? (
+        {profileQuery.isLoading && !user ? (
           <div data-ocid="settings.profile.loading_state" className="space-y-2">
             <Skeleton className="h-4 w-24" />
             <Skeleton className="h-9 w-full max-w-sm" />
           </div>
-        ) : profileQuery.isError ? (
+        ) : profileQuery.isError && !user ? (
           <div
             data-ocid="settings.profile.error_state"
             className="flex flex-col items-start gap-3"
@@ -418,83 +427,615 @@ function CallerProfileCard() {
             </Button>
           </div>
         ) : (
-          <form
-            onSubmit={handleSubmit}
-            className="flex flex-col gap-4 sm:flex-row sm:items-end"
-            data-ocid="settings.profile.form"
-          >
-            <div className="w-full space-y-2 sm:max-w-sm">
-              <Label htmlFor="profile-name">Nombre para mostrar</Label>
-              <Input
-                id="profile-name"
-                value={displayName}
-                onChange={(event) => setDisplayName(event.target.value)}
-                placeholder="Tu nombre"
-                autoComplete="name"
-                data-ocid="settings.profile.name_input"
-              />
-            </div>
-            <Button
-              type="submit"
-              disabled={!canSubmit}
-              data-ocid="settings.profile.save_button"
-              className="gap-2"
+          <div className="space-y-5">
+            <dl className="grid gap-3 sm:grid-cols-3">
+              <div className="space-y-1">
+                <dt className="field-label">Nombre</dt>
+                <dd
+                  data-ocid="settings.profile.name_value"
+                  className="truncate text-sm font-medium"
+                >
+                  {sessionName || "Sin nombre"}
+                </dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="field-label">Usuario de acceso</dt>
+                <dd
+                  data-ocid="settings.profile.username_value"
+                  className="users-username truncate"
+                >
+                  {username || "—"}
+                </dd>
+              </div>
+              <div className="space-y-1">
+                <dt className="field-label">Rol</dt>
+                <dd data-ocid="settings.profile.role_value" className="text-sm">
+                  <span className="badge-role" data-role="custom">
+                    {displayRole || "—"}
+                  </span>
+                </dd>
+              </div>
+            </dl>
+
+            <form
+              onSubmit={handleSubmit}
+              className="flex flex-col gap-4 border-t border-border pt-5 sm:flex-row sm:items-end"
+              data-ocid="settings.profile.form"
             >
-              {saveMutation.isPending ? (
-                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
-              ) : (
-                <Check className="size-4" aria-hidden="true" />
-              )}
-              {saveMutation.isPending ? "Guardando…" : "Guardar nombre"}
-            </Button>
-          </form>
+              <div className="w-full space-y-2 sm:max-w-sm">
+                <Label htmlFor="profile-name">Nombre para mostrar</Label>
+                <Input
+                  id="profile-name"
+                  value={displayName}
+                  onChange={(event) => setDisplayName(event.target.value)}
+                  placeholder="Tu nombre"
+                  autoComplete="name"
+                  data-ocid="settings.profile.name_input"
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={!canSubmit}
+                data-ocid="settings.profile.save_button"
+                className="gap-2"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Check className="size-4" aria-hidden="true" />
+                )}
+                {saveMutation.isPending ? "Guardando…" : "Guardar nombre"}
+              </Button>
+            </form>
+          </div>
         )}
       </CardContent>
     </Card>
   );
 }
 
-function UsersTable() {
-  const { actor, isFetching } = useBackend();
-  const queryClient = useQueryClient();
+export function ChangePasswordCard() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
 
-  const usersQuery = useQuery({
-    queryKey: ["users"],
-    queryFn: async (): Promise<UserView[]> => {
-      if (!actor) return [];
-      return actor.listUsers();
-    },
-    enabled: !!actor && !isFetching,
-  });
+  const [currentPassword, setCurrentPassword] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [feedback, setFeedback] = useState<{
+    tone: "success" | "error";
+    message: string;
+  } | null>(null);
 
-  const roleMutation = useMutation({
+  const changeMutation = useMutation({
     mutationFn: async (input: {
-      principal: UserView["principal"];
-      role: UserRole;
+      currentPassword: string;
+      newPassword: string;
     }) => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.setUserRole(input.principal, input.role);
+      if (!token) {
+        throw new Error(
+          "Debes iniciar sesión con usuario y contraseña para cambiarla.",
+        );
+      }
+      return actor.changeOwnPassword(
+        token,
+        input.currentPassword,
+        input.newPassword,
+      );
     },
-    onSuccess: () => {
-      void queryClient.invalidateQueries({ queryKey: ["users"] });
-      void queryClient.invalidateQueries({ queryKey: ["caller-role"] });
-      toast.success("Rol actualizado");
+    onSuccess: (changed) => {
+      if (changed) {
+        setCurrentPassword("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setFeedback({
+          tone: "success",
+          message: "Tu contraseña se actualizó correctamente.",
+        });
+        toast.success("Contraseña actualizada");
+      } else {
+        setFeedback({
+          tone: "error",
+          message:
+            "La contraseña actual no es correcta. Verifícala e inténtalo de nuevo.",
+        });
+      }
     },
     onError: (error) => {
-      toast.error("No se pudo actualizar el rol", {
-        description: errorMessage(error),
-      });
+      setFeedback({ tone: "error", message: errorMessage(error) });
     },
   });
 
-  const users = usersQuery.data ?? [];
+  const mismatch = confirmPassword !== "" && newPassword !== confirmPassword;
+  const canSubmit =
+    currentPassword !== "" &&
+    newPassword !== "" &&
+    confirmPassword !== "" &&
+    !mismatch &&
+    !changeMutation.isPending;
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit) return;
+    setFeedback(null);
+    changeMutation.mutate({ currentPassword, newPassword });
+  }
 
   return (
-    <Card data-ocid="settings.users.card" className="rounded-lg shadow-none">
+    <Card data-ocid="settings.password.card" className="rounded-lg shadow-none">
+      <SectionHeading
+        icon={<KeyRound className="size-4" aria-hidden="true" />}
+        title="Cambiar contraseña"
+        description="Actualiza la contraseña con la que ingresas a la aplicación."
+      />
+      <CardContent className="pt-6">
+        <form
+          onSubmit={handleSubmit}
+          className="grid max-w-xl gap-4"
+          data-ocid="settings.password.form"
+        >
+          <div className="space-y-2">
+            <Label htmlFor="password-current">Contraseña actual</Label>
+            <Input
+              id="password-current"
+              type="password"
+              value={currentPassword}
+              onChange={(event) => setCurrentPassword(event.target.value)}
+              autoComplete="current-password"
+              data-ocid="settings.password.current_input"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password-new">Contraseña nueva</Label>
+            <Input
+              id="password-new"
+              type="password"
+              value={newPassword}
+              onChange={(event) => setNewPassword(event.target.value)}
+              autoComplete="new-password"
+              data-ocid="settings.password.new_input"
+            />
+          </div>
+
+          <div className="space-y-2">
+            <Label htmlFor="password-confirm">Confirmar contraseña nueva</Label>
+            <Input
+              id="password-confirm"
+              type="password"
+              value={confirmPassword}
+              onChange={(event) => setConfirmPassword(event.target.value)}
+              autoComplete="new-password"
+              aria-invalid={mismatch}
+              aria-describedby={mismatch ? "password-confirm-error" : undefined}
+              data-ocid="settings.password.confirm_input"
+            />
+            {mismatch && (
+              <p
+                id="password-confirm-error"
+                data-ocid="settings.password.confirm_error"
+                className="text-xs text-destructive"
+              >
+                Las contraseñas nuevas no coinciden.
+              </p>
+            )}
+          </div>
+
+          {feedback && (
+            <div
+              data-ocid={
+                feedback.tone === "success"
+                  ? "settings.password.success_state"
+                  : "settings.password.error_state"
+              }
+              className="auth-alert"
+              data-tone={feedback.tone === "success" ? "info" : "error"}
+            >
+              {feedback.tone === "success" ? (
+                <Check className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+              ) : (
+                <AlertTriangle
+                  className="mt-0.5 size-4 shrink-0"
+                  aria-hidden="true"
+                />
+              )}
+              <span>{feedback.message}</span>
+            </div>
+          )}
+
+          <div className="flex justify-end">
+            <Button
+              type="submit"
+              disabled={!canSubmit}
+              data-ocid="settings.password.submit_button"
+              className="gap-2"
+            >
+              {changeMutation.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <KeyRound className="size-4" aria-hidden="true" />
+              )}
+              {changeMutation.isPending
+                ? "Actualizando…"
+                : "Cambiar contraseña"}
+            </Button>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function HopeMessageCard() {
+  const settingsQuery = useHopeSettings();
+  const dailyQuery = useDailyHopeMessage();
+  const saveMutation = useUpdateHopeSettings();
+
+  const [enabled, setEnabled] = useState(true);
+  const [mode, setMode] = useState<HopeMode>(HopeMode.auto);
+  const [manualText, setManualText] = useState("");
+  const [manualCitation, setManualCitation] = useState("");
+  const [initialized, setInitialized] = useState(false);
+
+  useEffect(() => {
+    const data = settingsQuery.data;
+    if (!data || initialized) return;
+    setEnabled(data.enabled);
+    setMode(data.mode);
+    setManualText(data.manualText);
+    setManualCitation(data.manualCitation);
+    setInitialized(true);
+  }, [settingsQuery.data, initialized]);
+
+  const manualTextValid = manualText.trim() !== "";
+  const manualCitationValid = manualCitation.trim() !== "";
+  const manualValid = manualTextValid && manualCitationValid;
+  const canSubmit =
+    (mode === HopeMode.auto || manualValid) && !saveMutation.isPending;
+
+  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!canSubmit) return;
+    saveMutation.mutate(
+      {
+        enabled,
+        mode,
+        manualText: manualText.trim(),
+        manualCitation: manualCitation.trim(),
+      },
+      {
+        onSuccess: () => {
+          toast.success("Mensaje de esperanza guardado", {
+            description:
+              "Los documentos generados a partir de ahora usarán esta configuración.",
+          });
+        },
+        onError: (error) => {
+          toast.error("No se pudo guardar el mensaje de esperanza", {
+            description: errorMessage(error),
+          });
+        },
+      },
+    );
+  }
+
+  const previewText =
+    mode === HopeMode.manual
+      ? manualText.trim()
+      : (dailyQuery.data?.text ?? "");
+  const previewCitation =
+    mode === HopeMode.manual
+      ? manualCitation.trim()
+      : (dailyQuery.data?.citation ?? "");
+  const previewDate =
+    dailyQuery.data?.referenceDate ?? formatColombiaDateDDMMYYYY(new Date());
+
+  if (settingsQuery.isLoading) {
+    return (
+      <Card data-ocid="settings.hope.card" className="rounded-lg shadow-none">
+        <SectionHeading
+          icon={<BookOpen className="size-4" aria-hidden="true" />}
+          title="Mensaje de esperanza"
+          description="Promesa bíblica que aparece en el pie de los documentos."
+        />
+        <CardContent
+          data-ocid="settings.hope.loading_state"
+          className="space-y-3 pt-6"
+        >
+          {Array.from({ length: 3 }, (_, i) => `hope-skeleton-${i}`).map(
+            (id) => (
+              <div key={id} className="space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-9 w-full" />
+              </div>
+            ),
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (settingsQuery.isError) {
+    return (
+      <Card data-ocid="settings.hope.card" className="rounded-lg shadow-none">
+        <SectionHeading
+          icon={<BookOpen className="size-4" aria-hidden="true" />}
+          title="Mensaje de esperanza"
+          description="Promesa bíblica que aparece en el pie de los documentos."
+        />
+        <CardContent
+          data-ocid="settings.hope.error_state"
+          className="flex flex-col items-start gap-3 pt-6"
+        >
+          <div className="flex items-center gap-2 text-sm text-destructive">
+            <AlertTriangle className="size-4" aria-hidden="true" />
+            No se pudo cargar la configuración del mensaje de esperanza.
+          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void settingsQuery.refetch()}
+            data-ocid="settings.hope.retry_button"
+          >
+            Reintentar
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card data-ocid="settings.hope.card" className="rounded-lg shadow-none">
+      <SectionHeading
+        icon={<BookOpen className="size-4" aria-hidden="true" />}
+        title="Mensaje de esperanza"
+        description="Promesa bíblica que aparece en el pie de los documentos y mensajes."
+      />
+      <CardContent className="pt-6">
+        <form
+          onSubmit={handleSubmit}
+          className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,320px)]"
+          data-ocid="settings.hope.form"
+        >
+          <div className="space-y-5">
+            <div className="flex items-start justify-between gap-4 rounded-md border border-border bg-secondary/40 px-3 py-3">
+              <div className="min-w-0 space-y-1">
+                <Label htmlFor="hope-enabled" className="text-sm font-medium">
+                  Mostrar el mensaje en los formatos
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  Actívalo para incluir la promesa en el pie de facturas,
+                  cotizaciones y órdenes.
+                </p>
+              </div>
+              <Switch
+                id="hope-enabled"
+                checked={enabled}
+                onCheckedChange={setEnabled}
+                data-ocid="settings.hope.enabled_switch"
+              />
+            </div>
+
+            <fieldset className="space-y-3">
+              <legend className="field-label">Modo del mensaje</legend>
+              <RadioGroup
+                value={mode}
+                onValueChange={(value) => setMode(value as HopeMode)}
+                className="grid gap-3 sm:grid-cols-2"
+                data-ocid="settings.hope.mode_radio"
+              >
+                <label
+                  htmlFor="hope-mode-auto"
+                  className="flex cursor-pointer items-start gap-3 rounded-md border border-border px-3 py-3 transition-colors hover:bg-secondary/40"
+                >
+                  <RadioGroupItem
+                    id="hope-mode-auto"
+                    value={HopeMode.auto}
+                    className="mt-0.5"
+                    data-ocid="settings.hope.mode_auto_radio"
+                  />
+                  <span className="min-w-0 space-y-1">
+                    <span className="block text-sm font-medium">
+                      Automático
+                    </span>
+                    <span className="block text-xs text-muted-foreground">
+                      Rota una promesa distinta cada día.
+                    </span>
+                  </span>
+                </label>
+                <label
+                  htmlFor="hope-mode-manual"
+                  className="flex cursor-pointer items-start gap-3 rounded-md border border-border px-3 py-3 transition-colors hover:bg-secondary/40"
+                >
+                  <RadioGroupItem
+                    id="hope-mode-manual"
+                    value={HopeMode.manual}
+                    className="mt-0.5"
+                    data-ocid="settings.hope.mode_manual_radio"
+                  />
+                  <span className="min-w-0 space-y-1">
+                    <span className="block text-sm font-medium">Manual</span>
+                    <span className="block text-xs text-muted-foreground">
+                      Usa siempre el texto y la cita que escribas.
+                    </span>
+                  </span>
+                </label>
+              </RadioGroup>
+            </fieldset>
+
+            {mode === HopeMode.auto ? (
+              <div
+                data-ocid="settings.hope.auto_panel"
+                className="space-y-2 rounded-md border border-border bg-secondary/30 px-3 py-3"
+              >
+                <p className="field-label">Promesa de hoy</p>
+                {dailyQuery.isLoading ? (
+                  <div
+                    data-ocid="settings.hope.auto_loading_state"
+                    className="space-y-2"
+                  >
+                    <Skeleton className="h-4 w-full" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </div>
+                ) : dailyQuery.isError ? (
+                  <div
+                    data-ocid="settings.hope.auto_error_state"
+                    className="flex flex-col items-start gap-2"
+                  >
+                    <p className="text-sm text-destructive">
+                      No se pudo cargar la promesa de hoy.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void dailyQuery.refetch()}
+                      data-ocid="settings.hope.auto_retry_button"
+                    >
+                      Reintentar
+                    </Button>
+                  </div>
+                ) : (
+                  <blockquote className="space-y-1">
+                    <p
+                      data-ocid="settings.hope.auto_text"
+                      className="text-sm italic text-foreground"
+                    >
+                      “{dailyQuery.data?.text ?? "—"}”
+                    </p>
+                    <footer
+                      data-ocid="settings.hope.auto_citation"
+                      className="text-xs font-medium text-muted-foreground"
+                    >
+                      {dailyQuery.data?.citation ?? "—"}
+                    </footer>
+                  </blockquote>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  La promesa cambia automáticamente cada día. No es editable en
+                  este modo.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label htmlFor="hope-manual-text">Texto del mensaje</Label>
+                  <Textarea
+                    id="hope-manual-text"
+                    value={manualText}
+                    onChange={(event) => setManualText(event.target.value)}
+                    placeholder="Escribe la promesa que quieres mostrar…"
+                    rows={3}
+                    aria-invalid={!manualTextValid}
+                    aria-describedby={
+                      manualTextValid ? undefined : "hope-manual-text-error"
+                    }
+                    data-ocid="settings.hope.manual_text_input"
+                  />
+                  {!manualTextValid && (
+                    <p
+                      id="hope-manual-text-error"
+                      data-ocid="settings.hope.manual_text_error"
+                      className="text-xs text-destructive"
+                    >
+                      El texto del mensaje no puede estar vacío.
+                    </p>
+                  )}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="hope-manual-citation">Cita bíblica</Label>
+                  <Input
+                    id="hope-manual-citation"
+                    value={manualCitation}
+                    onChange={(event) => setManualCitation(event.target.value)}
+                    placeholder="Juan 3:16"
+                    aria-invalid={!manualCitationValid}
+                    aria-describedby={
+                      manualCitationValid
+                        ? undefined
+                        : "hope-manual-citation-error"
+                    }
+                    data-ocid="settings.hope.manual_citation_input"
+                  />
+                  {!manualCitationValid && (
+                    <p
+                      id="hope-manual-citation-error"
+                      data-ocid="settings.hope.manual_citation_error"
+                      className="text-xs text-destructive"
+                    >
+                      La cita bíblica no puede estar vacía.
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="flex justify-end">
+              <Button
+                type="submit"
+                disabled={!canSubmit}
+                data-ocid="settings.hope.save_button"
+                className="gap-2"
+              >
+                {saveMutation.isPending ? (
+                  <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+                ) : (
+                  <Save className="size-4" aria-hidden="true" />
+                )}
+                {saveMutation.isPending ? "Guardando…" : "Guardar mensaje"}
+              </Button>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <p className="field-label">Vista previa en el pie del documento</p>
+            <div
+              data-ocid="settings.hope.preview"
+              className="rounded-md border border-dashed border-border bg-card px-4 py-4"
+            >
+              {enabled ? (
+                <div className="space-y-2 text-center">
+                  <p className="text-sm italic text-foreground">
+                    “{previewText || "—"}”
+                  </p>
+                  <p className="text-xs font-medium text-muted-foreground">
+                    {previewCitation || "—"}
+                  </p>
+                  <p className="border-t border-border pt-2 font-mono text-[0.65rem] uppercase tracking-[0.12em] text-muted-foreground">
+                    {previewDate}
+                  </p>
+                </div>
+              ) : (
+                <p
+                  data-ocid="settings.hope.preview_hidden"
+                  className="text-center text-xs text-muted-foreground"
+                >
+                  El mensaje está oculto y no aparecerá en los documentos.
+                </p>
+              )}
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Así se verá la promesa al final de cada documento generado.
+            </p>
+          </div>
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
+function UserManagementLinksCard() {
+  return (
+    <Card
+      data-ocid="settings.user_management.card"
+      className="rounded-lg shadow-none"
+    >
       <SectionHeading
         icon={<Users className="size-4" aria-hidden="true" />}
         title="Usuarios y roles"
-        description="Asigna el rol de cada persona registrada en el taller."
+        description="La gestión de usuarios y roles ahora tiene sus propias pantallas."
       />
       <CardContent className="pt-6">
         <div className="mb-4 flex items-start gap-2 rounded-md border border-primary/30 bg-primary/5 px-3 py-2.5">
@@ -511,129 +1052,20 @@ function UsersTable() {
           </p>
         </div>
 
-        {usersQuery.isLoading ? (
-          <div data-ocid="settings.users.loading_state" className="space-y-2">
-            {Array.from({ length: 3 }, (_, i) => `users-skeleton-${i}`).map(
-              (id) => (
-                <Skeleton key={id} className="h-11 w-full" />
-              ),
-            )}
-          </div>
-        ) : usersQuery.isError ? (
-          <div
-            data-ocid="settings.users.error_state"
-            className="flex flex-col items-start gap-3"
-          >
-            <div className="flex items-center gap-2 text-sm text-destructive">
-              <AlertTriangle className="size-4" aria-hidden="true" />
-              No se pudo cargar la lista de usuarios.
-            </div>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={() => void usersQuery.refetch()}
-              data-ocid="settings.users.retry_button"
-            >
-              Reintentar
-            </Button>
-          </div>
-        ) : users.length === 0 ? (
-          <div
-            data-ocid="settings.users.empty_state"
-            className="flex flex-col items-center gap-2 rounded-md border border-dashed border-border px-6 py-10 text-center"
-          >
-            <Users
-              className="size-6 text-muted-foreground"
-              aria-hidden="true"
-            />
-            <p className="font-display text-sm font-medium">
-              Aún no hay usuarios registrados
-            </p>
-            <p className="max-w-sm text-xs text-muted-foreground">
-              Cuando alguien inicie sesión por primera vez aparecerá aquí para
-              que le asignes un rol.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-hidden rounded-md border border-border">
-            <Table data-ocid="settings.users.table">
-              <TableHeader className="bg-secondary/60">
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="text-xs uppercase tracking-wider">
-                    Usuario
-                  </TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider">
-                    Principal
-                  </TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider">
-                    Rol
-                  </TableHead>
-                  <TableHead className="text-xs uppercase tracking-wider">
-                    Registro
-                  </TableHead>
-                  <TableHead className="text-right text-xs uppercase tracking-wider">
-                    Asignar rol
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {users.map((user, index) => (
-                  <TableRow
-                    key={user.principal.toString()}
-                    data-ocid={`settings.users.row.${index + 1}`}
-                  >
-                    <TableCell className="font-medium">
-                      {user.name || "Sin nombre"}
-                    </TableCell>
-                    <TableCell className="data-rail text-xs text-muted-foreground">
-                      {formatPrincipal(user.principal.toString())}
-                    </TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={roleBadgeClass(user.role)}
-                      >
-                        {ROLE_LABELS[user.role]}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="tabular text-xs text-muted-foreground">
-                      {formatDate(user.createdAt)}
-                    </TableCell>
-                    <TableCell className="text-right">
-                      <Select
-                        value={user.role}
-                        onValueChange={(value) =>
-                          roleMutation.mutate({
-                            principal: user.principal,
-                            role: value as UserRole,
-                          })
-                        }
-                        disabled={roleMutation.isPending}
-                      >
-                        <SelectTrigger
-                          size="sm"
-                          className="ml-auto w-[150px]"
-                          aria-label={`Rol de ${user.name || "usuario"}`}
-                          data-ocid={`settings.users.role_select.${index + 1}`}
-                        >
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {ROLE_ORDER.map((role) => (
-                            <SelectItem key={role} value={role}>
-                              {ROLE_LABELS[role]}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
+        <div className="flex flex-wrap gap-3">
+          <Button asChild variant="outline" className="gap-2">
+            <Link to="/configuracion/usuarios" data-ocid="settings.users.link">
+              <Users className="size-4" aria-hidden="true" />
+              Gestionar usuarios
+            </Link>
+          </Button>
+          <Button asChild variant="outline" className="gap-2">
+            <Link to="/configuracion/roles" data-ocid="settings.roles.link">
+              <ShieldCheck className="size-4" aria-hidden="true" />
+              Gestionar roles
+            </Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
@@ -650,16 +1082,21 @@ export function SettingsPage() {
           Configuración
         </h1>
         <p className="text-sm text-muted-foreground">
-          Datos fiscales del negocio, impuestos y gestión de usuarios y roles.
+          Datos fiscales del negocio, impuestos, tu perfil y tu contraseña.
         </p>
       </header>
 
       <div className="flex flex-col gap-5">
         <BusinessSettingsForm />
+        <HopeMessageCard />
+        <ServiceTermsCard />
+        <WarrantyTermsCard />
         <DriveBackupCard />
         <LocalBackupCard />
+        <RestoreBackupCard />
         <CallerProfileCard />
-        <UsersTable />
+        <ChangePasswordCard />
+        <UserManagementLinksCard />
       </div>
     </div>
   );

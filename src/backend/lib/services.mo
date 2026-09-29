@@ -1,4 +1,3 @@
-import Char "mo:core/Char";
 import List "mo:core/List";
 import Map "mo:core/Map";
 import Nat "mo:core/Nat";
@@ -9,6 +8,7 @@ import Time "mo:core/Time";
 
 import Common "../types/common";
 import Types "../types/services";
+import Search "../lib/search";
 
 module {
   public type Counters = {
@@ -23,7 +23,7 @@ module {
   // --- helpers -------------------------------------------------------------
 
   func normalize(value : Text) : Text {
-    value.trim(#predicate (func(c : Char) : Bool { c.isWhitespace() })).toLower();
+    Search.normalize(value);
   };
 
   func matches(service : Types.Service, filter : Types.ServiceFilter, needle : ?Text) : Bool {
@@ -31,7 +31,7 @@ module {
       case null { true };
       case (?n) {
         if (n == "") { true } else {
-          service.name.toLower().contains(#text n) or service.code.toLower().contains(#text n);
+          Search.containsAny([service.name, service.code], n);
         };
       };
     };
@@ -64,9 +64,9 @@ module {
 
   func compareServices(a : Types.Service, b : Types.Service, sort : Types.ServiceSort) : Order.Order {
     switch (sort) {
-      case (#name) { Text.compare(a.name.toLower(), b.name.toLower()) };
-      case (#code) { Text.compare(a.code.toLower(), b.code.toLower()) };
-      case (#category) { Text.compare(a.category.toLower(), b.category.toLower()) };
+      case (#name) { Text.compare(Search.sortKey(a.name), Search.sortKey(b.name)) };
+      case (#code) { Text.compare(Search.sortKey(a.code), Search.sortKey(b.code)) };
+      case (#category) { Text.compare(Search.sortKey(a.category), Search.sortKey(b.category)) };
       case (#laborRate) { Nat.compare(a.laborRate, b.laborRate) };
     };
   };

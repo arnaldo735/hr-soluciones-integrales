@@ -1,5 +1,10 @@
+import { DocumentPreview } from "@/components/DocumentPreview";
 import { NotifyCustomerDialog } from "@/components/NotifyCustomerDialog";
-import { WhatsAppNotifyButton } from "@/components/WhatsAppNotifyButton";
+import { WarrantyDocument } from "@/components/WarrantyDocument";
+import {
+  WhatsAppNotifyButton,
+  buildWhatsAppUrl,
+} from "@/components/WhatsAppNotifyButton";
 import { AddLaborDialog } from "@/components/order/AddLaborDialog";
 import { AddPartDialog } from "@/components/order/AddPartDialog";
 import { CancelOrderDialog } from "@/components/order/CancelOrderDialog";
@@ -8,9 +13,19 @@ import { LaborServiceLink } from "@/components/order/LaborServiceLink";
 import { LaborTechnicianSelect } from "@/components/order/LaborTechnicianSelect";
 import { OrderPhotosSection } from "@/components/order/OrderPhotosSection";
 import { OrderStatusStepper } from "@/components/order/OrderStatusStepper";
+import { ScanPartDialog } from "@/components/order/ScanPartDialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -21,8 +36,15 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
-import { useIvaSettings } from "@/hooks/use-company";
+import {
+  useBusinessSettings,
+  useCompanyProfile,
+  useIvaSettings,
+} from "@/hooks/use-company";
+import { useDailyHopeMessage } from "@/hooks/use-hope";
 import {
   ORDER_STATUS_BADGE,
   ORDER_STATUS_LABELS,
@@ -33,7 +55,23 @@ import {
   useRemoveOrderPart,
   useUpdateOrderStatus,
 } from "@/hooks/use-orders";
+import {
+  SERVICE_TERMS_DEFAULT_TEXT,
+  useServiceTermsSettings,
+} from "@/hooks/use-service-terms";
+import { useServices } from "@/hooks/use-services";
 import { useTechnicians } from "@/hooks/use-technicians";
+import {
+  WARRANTY_TERMS_DEFAULT_TEXT,
+  useWarrantyTermsSettings,
+} from "@/hooks/use-warranty-terms";
+import { usePrepareWhatsAppMessage } from "@/hooks/use-whatsapp";
+import {
+  companyContactLine,
+  companyFiscalLines,
+  companyHeaderFromProfile,
+} from "@/lib/company-header";
+import { downloadFile } from "@/lib/download";
 import {
   formatDate,
   formatDateTime,
@@ -41,21 +79,36 @@ import {
   formatNumber,
   formatTaxRate,
 } from "@/lib/format";
-import { OrderStatus } from "@/lib/types";
+import {
+  downloadWarrantyPdf,
+  drawHopeMessage,
+  hopeMessageContent,
+  loadPdfLibs,
+  pdfCompanyFromProfile,
+} from "@/lib/pdf";
+import type { HopeMessageContent } from "@/lib/pdf";
+import { OrderStatus, ServiceSort } from "@/lib/types";
 import type {
+  DocumentFormat,
+  DocumentLine,
+  DocumentMeta,
+  DocumentTotals,
   Id,
   LaborItem,
   Motorcycle,
   OrderView,
   Service,
+  WarrantyDocumentData,
 } from "@/lib/types";
 import {
   NotificationSource,
   WhatsAppContactKind,
   WhatsAppContext,
 } from "@/lib/types";
+import { warrantyAppliesToOrder } from "@/lib/warranty";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import type { jsPDF } from "jspdf";
 import {
   AlertTriangle,
   ArrowLeft,
@@ -63,18 +116,31 @@ import {
   Ban,
   Bike,
   Clock,
+  FileText,
+  Loader2,
   Mail,
+  MessageCircle,
   Package,
   Plus,
+  Printer,
+  ScanLine,
+  ShieldCheck,
   Trash2,
   UserRound,
   UserRoundPlus,
   Wrench,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+
+/** Formatos de papel del documento de garantía (A4 o tirilla 80 mm). */
+const WARRANTY_FORMATS: Array<{ value: DocumentFormat; label: string }> = [
+  { value: "a4", label: "A4" },
+  { value: "receipt80", label: "Tirilla 80 mm" },
+];
 
 function useOrderContext(customerId: Id | null, motorcycleId: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: [
       "order-context",
@@ -83,20 +149,28 @@ function useOrderContext(customerId: Id | null, motorcycleId: Id | null) {
     ],
     queryFn: async (): Promise<{
       customerName: string | null;
+      customerDocument: string | null;
       customerEmail: string | null;
       motorcycle: Motorcycle | null;
     }> => {
       if (!actor || customerId === null) {
-        return { customerName: null, customerEmail: null, motorcycle: null };
+        return {
+          customerName: null,
+          customerDocument: null,
+          customerEmail: null,
+          motorcycle: null,
+        };
       }
       const [customer, motos] = await Promise.all([
-        actor.getCustomer(customerId),
-        actor.listMotorcycles(customerId),
+        actor.getCustomer(token, customerId),
+        actor.listMotorcycles(token, customerId),
       ]);
       const motorcycle = motos.find((moto) => moto.id === motorcycleId) ?? null;
       const email = customer?.email?.trim() ?? "";
+      const document = customer?.document?.trim() ?? "";
       return {
         customerName: customer?.name ?? null,
+        customerDocument: document === "" ? null : document,
         customerEmail: email === "" ? null : email,
         motorcycle,
       };
@@ -107,6 +181,7 @@ function useOrderContext(customerId: Id | null, motorcycleId: Id | null) {
 
 function useAssignTechnician() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -115,7 +190,7 @@ function useAssignTechnician() {
       technicianId: Id;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.assignTechnician(input.id, input.technicianId);
+      return actor.assignTechnician(token, input.id, input.technicianId);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -131,6 +206,7 @@ function useAssignTechnician() {
 
 function useUnassignTechnician() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -139,7 +215,7 @@ function useUnassignTechnician() {
       technicianId: Id;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.unassignTechnician(input.id, input.technicianId);
+      return actor.unassignTechnician(token, input.id, input.technicianId);
     },
     onSuccess: (view) => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
@@ -155,6 +231,7 @@ function useUnassignTechnician() {
 
 function useUpdateLaborTechnician() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -165,6 +242,7 @@ function useUpdateLaborTechnician() {
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
       return actor.updateLaborTechnician(
+        token,
         input.id,
         input.laborId,
         input.technicianId,
@@ -186,6 +264,7 @@ function useUpdateLaborTechnician() {
  */
 function useReplaceLaborService() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -195,8 +274,8 @@ function useReplaceLaborService() {
       service: Service | null;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
-      await actor.removeLabor(input.id, input.item.id);
-      return actor.addLabor(input.id, {
+      await actor.removeLabor(token, input.id, input.item.id);
+      return actor.addLabor(token, input.id, {
         description: input.item.description,
         price: input.item.price,
         technicianId: input.item.technicianId,
@@ -210,6 +289,396 @@ function useReplaceLaborService() {
       });
     },
   });
+}
+
+/**
+ * Builds the workshop-order PDF in the selected format (A4 sheet or 80 mm
+ * tirilla) with the same content the on-screen preview shows. The blob is
+ * handed to the shared mobile-safe `downloadFile` helper so the document is
+ * saved on the device on phone and tablet, not only on desktop.
+ */
+async function buildOrderPdf(
+  format: DocumentFormat,
+  number: string,
+  company: ReturnType<typeof pdfCompanyFromProfile>,
+  meta: DocumentMeta[],
+  lines: DocumentLine[],
+  totals: DocumentTotals[],
+  footer: string,
+  hope: HopeMessageContent | null,
+): Promise<jsPDF> {
+  const { jsPDF, autoTable } = await loadPdfLibs();
+  const narrow = format === "receipt80";
+  const margin = narrow ? 3 : 14;
+  const right = narrow ? 77 : 196;
+  const doc = new jsPDF({
+    unit: "mm",
+    format: narrow ? [80, 297] : "a4",
+  });
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(narrow ? 10 : 15);
+  doc.setTextColor(30, 41, 59);
+  doc.text(company.name, margin, 14);
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(narrow ? 6.5 : 8.5);
+  doc.setTextColor(100, 116, 139);
+  const contact = [company.taxId, company.address, company.phone]
+    .filter((value): value is string => !!value && value.trim() !== "")
+    .join(narrow ? " · " : "  ·  ");
+  let cursor = 18.5;
+  if (contact !== "") {
+    const contactLines = doc.splitTextToSize(contact, right - margin);
+    doc.text(contactLines, margin, cursor);
+    cursor += contactLines.length * (narrow ? 3 : 4);
+  }
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(narrow ? 8.5 : 11);
+  doc.setTextColor(30, 41, 59);
+  doc.text("ORDEN DE TALLER", right, 14, { align: "right" });
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(narrow ? 6.5 : 9);
+  doc.setTextColor(100, 116, 139);
+  doc.text(number, right, 18.5, { align: "right" });
+
+  doc.setDrawColor(30, 41, 59);
+  doc.setLineWidth(0.4);
+  doc.line(margin, cursor + 1, right, cursor + 1);
+  cursor += 5;
+
+  if (narrow) {
+    for (const entry of meta) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(100, 116, 139);
+      doc.text(entry.label, margin, cursor);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(30, 41, 59);
+      const value = doc.splitTextToSize(entry.value, right - margin);
+      doc.text(value, margin, cursor + 3);
+      cursor += 3 + value.length * 3 + 1.5;
+    }
+  } else {
+    autoTable(doc, {
+      startY: cursor,
+      body: meta.map((entry) => [entry.label, entry.value]),
+      theme: "plain",
+      styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.5 },
+      columnStyles: {
+        0: { cellWidth: 40, textColor: [100, 116, 139] },
+        1: { fontStyle: "bold", textColor: [30, 41, 59] },
+      },
+      margin: { left: margin, right: margin },
+    });
+    cursor =
+      ((doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
+        ?.finalY ?? cursor) + 4;
+  }
+
+  autoTable(doc, {
+    startY: cursor,
+    head: [["Concepto", "Cant.", "P. unit.", "Importe"]],
+    body: lines.map((line) => [
+      line.description,
+      formatNumber(line.quantity),
+      formatMoney(BigInt(Math.round(line.unitPrice * 100))),
+      formatMoney(BigInt(Math.round(line.amount * 100))),
+    ]),
+    theme: "striped",
+    styles: {
+      font: "helvetica",
+      fontSize: narrow ? 6.5 : 8.5,
+      cellPadding: narrow ? 1.2 : 2,
+      overflow: "linebreak",
+    },
+    headStyles: { fillColor: [71, 85, 105], textColor: 255 },
+    columnStyles: {
+      1: { halign: "right" },
+      2: { halign: "right" },
+      3: { halign: "right" },
+    },
+    margin: { left: margin, right: margin },
+  });
+
+  const afterLines =
+    (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
+      ?.finalY ?? cursor;
+
+  autoTable(doc, {
+    startY: afterLines + 4,
+    body: totals.map((entry) => [entry.label, entry.value]),
+    theme: "plain",
+    styles: {
+      font: "helvetica",
+      fontSize: narrow ? 7 : 9,
+      cellPadding: 1.5,
+    },
+    columnStyles: {
+      0: { halign: "right", textColor: [100, 116, 139] },
+      1: { halign: "right", fontStyle: "bold", textColor: [30, 41, 59] },
+    },
+    margin: { left: narrow ? margin : right - 90, right: margin },
+  });
+
+  const afterTotals =
+    (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
+      ?.finalY ?? afterLines + 4;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(narrow ? 6 : 7.5);
+  doc.setTextColor(100, 116, 139);
+  const footerY = afterTotals + (narrow ? 6 : 10);
+  const footerLines = doc.splitTextToSize(footer, right - margin);
+  doc.text(footerLines, margin, footerY);
+  drawHopeMessage(doc, hope, {
+    x: margin,
+    right,
+    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    narrow,
+  });
+
+  return doc;
+}
+
+interface WarrantyWhatsAppDialogProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  customerId: Id;
+  customerName: string;
+  orderId: Id;
+  warranty: WarrantyDocumentData;
+  company: ReturnType<typeof pdfCompanyFromProfile>;
+  hope: HopeMessageContent | null;
+  termsText: string;
+}
+
+/**
+ * Diálogo de envío del documento de garantía por WhatsApp. Reutiliza el flujo
+ * compartido (consulta `prepareWhatsAppMessage`, mensaje editable y enlace
+ * `wa.me`) y, antes de abrir WhatsApp, genera y descarga el PDF de la garantía
+ * en el formato elegido para que el usuario lo adjunte en la conversación.
+ */
+function WarrantyWhatsAppDialog({
+  open,
+  onOpenChange,
+  customerId,
+  customerName,
+  orderId,
+  warranty,
+  company,
+  hope,
+  termsText,
+}: WarrantyWhatsAppDialogProps) {
+  const [message, setMessage] = useState("");
+  const [phone, setPhone] = useState<string | null>(null);
+  const [hasPhone, setHasPhone] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [format, setFormat] = useState<DocumentFormat>("a4");
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const prepare = usePrepareWhatsAppMessage();
+  const { mutate: prepareMessage } = prepare;
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setHasPhone(null);
+    setPhone(null);
+    setMessage("");
+    prepareMessage(
+      {
+        contactKind: WhatsAppContactKind.customer,
+        contactId: customerId,
+        context: WhatsAppContext.order,
+        referenceId: orderId,
+      },
+      {
+        onSuccess: (result) => {
+          setHasPhone(result.hasPhone);
+          setPhone(result.phone ?? null);
+          setMessage(result.message);
+        },
+        onError: () => {
+          setHasPhone(false);
+          setError(
+            "No se pudo preparar el mensaje de WhatsApp. Inténtalo de nuevo.",
+          );
+        },
+      },
+    );
+  }, [open, customerId, orderId, prepareMessage]);
+
+  async function handleSend() {
+    const trimmed = message.trim();
+    if (trimmed === "") {
+      setError("El mensaje no puede estar vacío.");
+      return;
+    }
+    if (!phone) {
+      setError("El contacto no tiene un teléfono registrado.");
+      return;
+    }
+    setIsGenerating(true);
+    try {
+      await downloadWarrantyPdf(warranty, company, format, hope, termsText);
+    } catch {
+      setError("No se pudo generar el PDF de la garantía. Inténtalo de nuevo.");
+      setIsGenerating(false);
+      return;
+    }
+    setIsGenerating(false);
+    window.open(
+      buildWhatsAppUrl(phone, trimmed),
+      "_blank",
+      "noopener,noreferrer",
+    );
+    onOpenChange(false);
+  }
+
+  const isPreparing = prepare.isPending || hasPhone === null;
+  const canSend = hasPhone === true && message.trim() !== "" && !isGenerating;
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        data-ocid="order_detail.warranty_whatsapp_dialog"
+        className="sm:max-w-lg"
+      >
+        <DialogHeader>
+          <DialogTitle className="font-display">
+            Enviar garantía por WhatsApp
+          </DialogTitle>
+          <DialogDescription>
+            Revisa y edita el mensaje antes de abrir WhatsApp con {customerName}
+            . El PDF de la garantía se descargará en el formato elegido para que
+            lo adjuntes en la conversación.
+          </DialogDescription>
+        </DialogHeader>
+
+        {isPreparing ? (
+          <div
+            data-ocid="order_detail.warranty_whatsapp.loading_state"
+            className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-3 text-sm text-muted-foreground"
+          >
+            <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            Preparando el mensaje…
+          </div>
+        ) : hasPhone === false ? (
+          <div
+            data-ocid="order_detail.warranty_whatsapp.no_phone_state"
+            className="flex items-start gap-2.5 rounded-md border border-status-overdue/40 bg-status-overdue/10 px-3 py-2.5 text-xs text-status-overdue"
+          >
+            <AlertTriangle
+              className="mt-0.5 size-4 shrink-0"
+              aria-hidden="true"
+            />
+            <p>
+              {customerName} no tiene un teléfono registrado. Registra el
+              teléfono del cliente antes de enviar la garantía por WhatsApp.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            <div className="space-y-1.5">
+              <Label htmlFor="warranty-whatsapp-phone">Teléfono</Label>
+              <p
+                id="warranty-whatsapp-phone"
+                data-ocid="order_detail.warranty_whatsapp.phone_value"
+                className="data-rail rounded-md border border-border bg-muted px-2.5 py-1.5 font-mono text-xs text-foreground"
+              >
+                {phone ?? "—"}
+              </p>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label>Documento adjunto</Label>
+              <div
+                data-ocid="order_detail.warranty_whatsapp.attachment_panel"
+                className="rounded-md border border-border bg-muted/30 px-3 py-2.5"
+              >
+                <p className="flex items-center gap-2 text-xs text-foreground">
+                  <FileText
+                    className="size-4 shrink-0 text-primary"
+                    aria-hidden="true"
+                  />
+                  Términos y Condiciones de Garantía · {warranty.orderNumber}
+                </p>
+                <fieldset
+                  aria-label="Formato del documento adjunto"
+                  data-ocid="order_detail.warranty_whatsapp.format_toggle"
+                  className="doc-format-toggle mt-2"
+                >
+                  {WARRANTY_FORMATS.map((option) => (
+                    <button
+                      key={option.value}
+                      type="button"
+                      data-active={format === option.value}
+                      aria-pressed={format === option.value}
+                      onClick={() => setFormat(option.value)}
+                      data-ocid={`order_detail.warranty_whatsapp.format_${option.value}`}
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </fieldset>
+              </div>
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="warranty-whatsapp-message">Mensaje</Label>
+              <Textarea
+                id="warranty-whatsapp-message"
+                value={message}
+                onChange={(event) => setMessage(event.target.value)}
+                rows={7}
+                data-ocid="order_detail.warranty_whatsapp.message_textarea"
+              />
+              <p className="text-xs text-muted-foreground">
+                Puedes editar el texto. Se abrirá WhatsApp con este mensaje
+                prellenado.
+              </p>
+            </div>
+          </div>
+        )}
+
+        {error ? (
+          <p
+            data-ocid="order_detail.warranty_whatsapp.error_state"
+            className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+          >
+            {error}
+          </p>
+        ) : null}
+
+        <DialogFooter>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            data-ocid="order_detail.warranty_whatsapp.cancel_button"
+          >
+            Cancelar
+          </Button>
+          <Button
+            type="button"
+            onClick={handleSend}
+            disabled={!canSend}
+            data-ocid="order_detail.warranty_whatsapp.send_button"
+            className="gap-2"
+          >
+            {isGenerating ? (
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+            ) : (
+              <MessageCircle className="size-4" aria-hidden="true" />
+            )}
+            {isGenerating ? "Generando PDF…" : "Abrir WhatsApp"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
 }
 
 function DetailSkeleton() {
@@ -228,17 +697,60 @@ export function OrderDetailPage() {
   const orderId = BigInt(id);
 
   const [isAddPartOpen, setIsAddPartOpen] = useState(false);
+  const [isScanPartOpen, setIsScanPartOpen] = useState(false);
   const [isAddLaborOpen, setIsAddLaborOpen] = useState(false);
   const [isCancelOpen, setIsCancelOpen] = useState(false);
   const [isDeleteOpen, setIsDeleteOpen] = useState(false);
   const [isNotifyOpen, setIsNotifyOpen] = useState(false);
+  const [isPrintOpen, setIsPrintOpen] = useState(false);
+  const [isWarrantyOpen, setIsWarrantyOpen] = useState(false);
+  const [isWarrantyWhatsAppOpen, setIsWarrantyWhatsAppOpen] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [printFormat, setPrintFormat] = useState<DocumentFormat>("a4");
+  const [warrantyFormat, setWarrantyFormat] = useState<DocumentFormat>("a4");
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [isWarrantyDownloading, setIsWarrantyDownloading] = useState(false);
+  const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [warrantyDownloadError, setWarrantyDownloadError] = useState<
+    string | null
+  >(null);
 
   const orderQuery = useOrder(orderId);
   const view = orderQuery.data ?? null;
   const order = view?.order ?? null;
 
   const { isIvaResponsible } = useIvaSettings();
+  const businessQuery = useBusinessSettings();
+  const companyQuery = useCompanyProfile();
+  const dailyHopeQuery = useDailyHopeMessage();
+  const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
+  const business = businessQuery.data ?? null;
+  const companyHeader = companyHeaderFromProfile(companyQuery.data);
+  const companyLogoUrl =
+    companyHeader?.logoUrl ?? companyQuery.data?.logoUrl ?? undefined;
+
+  const serviceTermsQuery = useServiceTermsSettings();
+  const serviceTermsFooter =
+    serviceTermsQuery.data?.text?.trim() || SERVICE_TERMS_DEFAULT_TEXT;
+
+  const warrantyTermsQuery = useWarrantyTermsSettings();
+  const warrantyTermsText =
+    warrantyTermsQuery.data?.text?.trim() || WARRANTY_TERMS_DEFAULT_TEXT;
+
+  const servicesQuery = useServices({
+    search: "",
+    category: null,
+    activeOnly: false,
+    sort: ServiceSort.name,
+    page: 1,
+    pageSize: 200,
+  });
+  const services = servicesQuery.data?.items ?? [];
+  const serviceNameById = new Map(
+    services.map((service) => [service.id.toString(), service.name]),
+  );
+  const serviceNameFor = (serviceId: bigint): string | null =>
+    serviceNameById.get(serviceId.toString()) ?? null;
 
   const contextQuery = useOrderContext(
     order?.customerId ?? null,
@@ -400,6 +912,152 @@ export function OrderDetailPage() {
   const customerName = contextQuery.data?.customerName ?? null;
   const customerEmail = contextQuery.data?.customerEmail ?? null;
 
+  const documentLines: DocumentLine[] = [
+    ...order.parts.map((part) => ({
+      description: part.description,
+      quantity: Number(part.quantity),
+      unitPrice: Number(part.unitPrice) / 100,
+      amount: (Number(part.quantity) * Number(part.unitPrice)) / 100,
+    })),
+    ...order.labor.map((item) => ({
+      description: item.description,
+      quantity: 1,
+      unitPrice: Number(item.price) / 100,
+      amount: Number(item.price) / 100,
+    })),
+  ];
+
+  const documentMeta: DocumentMeta[] = [
+    {
+      label: "Cliente",
+      value: customerName ?? `Cliente #${order.customerId.toString()}`,
+    },
+    {
+      label: "Motocicleta",
+      value: motorcycle
+        ? `${motorcycle.brand} ${motorcycle.model} ${motorcycle.year}`
+        : `Moto #${order.motorcycleId.toString()}`,
+    },
+    {
+      label: "Placa",
+      value: motorcycle?.plate ?? "—",
+      rail: true,
+    },
+    {
+      label: "Kilometraje",
+      value: `${formatNumber(order.intakeMileage)} km`,
+      rail: true,
+    },
+    {
+      label: "Estado",
+      value: ORDER_STATUS_LABELS[order.status],
+    },
+    {
+      label: "Ingreso",
+      value: formatDateTime(order.createdAt),
+    },
+  ];
+
+  const documentTotals: DocumentTotals[] = [
+    { label: "Repuestos", value: formatMoney(totals.partsSubtotal) },
+    { label: "Mano de obra", value: formatMoney(totals.laborSubtotal) },
+    { label: "Subtotal", value: formatMoney(totals.subtotal) },
+    ...(isIvaResponsible
+      ? [
+          {
+            label: `Impuesto (${formatTaxRate(totals.taxRate)})`,
+            value: formatMoney(totals.tax),
+          },
+        ]
+      : []),
+    { label: "Total", value: formatMoney(totals.total), emphasis: true },
+  ];
+
+  const orderFooter = serviceTermsFooter;
+  const orderNumber = order.orderNumber;
+
+  // El documento de garantía se activa cuando alguna línea de mano de obra está
+  // vinculada a un servicio de catálogo de motor o cabeza de fuerza. El nombre
+  // se resuelve desde el catálogo cargado en la página.
+  const warrantyApplies = warrantyAppliesToOrder(order.labor, serviceNameFor);
+
+  const responsibleTechnician =
+    order.labor
+      .map((item) =>
+        item.technicianId === undefined
+          ? null
+          : (technicianById.get(item.technicianId.toString()) ?? null),
+      )
+      .find((technician) => technician !== null) ??
+    assignedTechnicians[0] ??
+    null;
+
+  const warrantyData: WarrantyDocumentData | null = warrantyApplies
+    ? {
+        orderNumber,
+        customerName: customerName ?? `Cliente #${order.customerId.toString()}`,
+        customerDocument: contextQuery.data?.customerDocument ?? "",
+        motorcycleBrand: motorcycle?.brand ?? "",
+        motorcycleModel: motorcycle?.model ?? "",
+        motorcycleYear: motorcycle?.year ?? 0n,
+        motorcyclePlate: motorcycle?.plate ?? "",
+        serviceDate: order.createdAt,
+        technicianCode: responsibleTechnician?.code ?? "",
+        technicianName: responsibleTechnician?.name ?? "",
+      }
+    : null;
+
+  const warrantyCompany = pdfCompanyFromProfile(companyQuery.data);
+
+  async function handleDownloadPdf(nextFormat: DocumentFormat) {
+    setDownloadError(null);
+    setIsDownloading(true);
+    try {
+      const doc = await buildOrderPdf(
+        nextFormat,
+        orderNumber,
+        pdfCompanyFromProfile(companyQuery.data),
+        documentMeta,
+        documentLines,
+        documentTotals,
+        orderFooter,
+        hopeMessage,
+      );
+      await downloadFile({
+        filename: `Orden-${orderNumber}.pdf`,
+        mimeType: "application/pdf",
+        data: doc.output("blob"),
+      });
+    } catch {
+      setDownloadError(
+        "No se pudo guardar el PDF en este dispositivo. Intenta de nuevo.",
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }
+
+  async function handleDownloadWarrantyPdf(nextFormat: DocumentFormat) {
+    if (!warrantyData) return;
+    setWarrantyDownloadError(null);
+    setIsWarrantyDownloading(true);
+    try {
+      await downloadWarrantyPdf(
+        warrantyData,
+        warrantyCompany,
+        nextFormat,
+        hopeMessage,
+        warrantyTermsText,
+      );
+    } catch {
+      setWarrantyDownloadError(
+        "No se pudo guardar el PDF de la garantía en este dispositivo. Intenta de nuevo.",
+      );
+    } finally {
+      setIsWarrantyDownloading(false);
+    }
+  }
+
   return (
     <div
       data-ocid="order_detail.page"
@@ -430,6 +1088,17 @@ export function OrderDetailPage() {
             type="button"
             variant="outline"
             size="sm"
+            onClick={() => setIsPrintOpen(true)}
+            data-ocid="order_detail.print_button"
+            className="gap-1.5"
+          >
+            <Printer className="size-4" aria-hidden="true" />
+            Imprimir
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
             onClick={() => setIsNotifyOpen(true)}
             data-ocid="order_detail.notify_button"
             className="gap-1.5"
@@ -449,6 +1118,19 @@ export function OrderDetailPage() {
             size="sm"
             ocid="order_detail.whatsapp_button"
           />
+          {warrantyApplies ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setIsWarrantyOpen(true)}
+              data-ocid="order_detail.warranty_button"
+              className="gap-1.5"
+            >
+              <ShieldCheck className="size-4" aria-hidden="true" />
+              Términos y Condiciones de Garantía
+            </Button>
+          ) : null}
           <Button
             type="button"
             variant="outline"
@@ -629,6 +1311,17 @@ export function OrderDetailPage() {
                 <Package className="size-4 text-primary" aria-hidden="true" />
                 Repuestos
               </CardTitle>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={() => setIsScanPartOpen(true)}
+                data-ocid="order_detail.scan_part_button"
+                className="gap-1.5"
+              >
+                <ScanLine className="size-4" aria-hidden="true" />
+                Escanear
+              </Button>
               <Button
                 type="button"
                 size="sm"
@@ -1057,10 +1750,187 @@ export function OrderDetailPage() {
         </div>
       </div>
 
+      <Dialog open={isPrintOpen} onOpenChange={setIsPrintOpen}>
+        <DialogContent
+          data-ocid="order_detail.print_dialog"
+          className="max-h-[90vh] overflow-y-auto sm:max-w-3xl"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              Imprimir orden de taller
+            </DialogTitle>
+            <DialogDescription>
+              Imprime la orden {order.orderNumber} en hoja A4 o en tirilla de 80
+              mm, o descárgala como PDF.
+            </DialogDescription>
+          </DialogHeader>
+
+          <DocumentPreview
+            title="Orden de taller"
+            number={order.orderNumber}
+            companyName={
+              companyHeader?.legalName ??
+              business?.name ??
+              "HR SOLUCIONES INTEGRALES"
+            }
+            companyLogoUrl={companyLogoUrl}
+            companyContact={
+              companyHeader
+                ? companyContactLine(companyHeader)
+                : business
+                  ? [business.address, business.phone]
+                      .filter((part) => part.trim() !== "")
+                      .join(" · ")
+                  : undefined
+            }
+            companyFiscal={
+              companyHeader ? companyFiscalLines(companyHeader) : undefined
+            }
+            meta={documentMeta}
+            lines={documentLines}
+            totals={documentTotals}
+            footer={orderFooter}
+            hopeMessage={hopeMessage}
+            format={printFormat}
+            ocid="order_detail.document"
+            onFormatChange={setPrintFormat}
+            onDownloadPdf={handleDownloadPdf}
+            isDownloading={isDownloading}
+          />
+          {downloadError ? (
+            <div
+              data-ocid="order_detail.download_error"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5"
+            >
+              <p className="flex items-start gap-2 text-xs text-destructive">
+                <AlertTriangle
+                  className="mt-0.5 size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
+                {downloadError}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleDownloadPdf(printFormat)}
+                data-ocid="order_detail.download_retry_button"
+              >
+                Reintentar
+              </Button>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isWarrantyOpen} onOpenChange={setIsWarrantyOpen}>
+        <DialogContent
+          data-ocid="order_detail.warranty_dialog"
+          className="max-h-[90vh] overflow-y-auto sm:max-w-3xl"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              Términos y Condiciones de Garantía
+            </DialogTitle>
+            <DialogDescription>
+              Documento de garantía de la orden {order.orderNumber}.
+              Previsualiza en hoja A4 o tirilla de 80 mm, imprime, descarga el
+              PDF o envíalo por WhatsApp al cliente.
+            </DialogDescription>
+          </DialogHeader>
+
+          <WarrantyDocument
+            data={warrantyData}
+            companyName={
+              companyHeader?.legalName ??
+              business?.name ??
+              "HR SOLUCIONES INTEGRALES"
+            }
+            companyLogoUrl={companyLogoUrl}
+            companyContact={
+              companyHeader
+                ? companyContactLine(companyHeader)
+                : business
+                  ? [business.address, business.phone]
+                      .filter((part) => part.trim() !== "")
+                      .join(" · ")
+                  : undefined
+            }
+            companyFiscal={
+              companyHeader ? companyFiscalLines(companyHeader) : undefined
+            }
+            format={warrantyFormat}
+            termsText={warrantyTermsText}
+            ocid="order_detail.warranty_document"
+            onFormatChange={setWarrantyFormat}
+            onDownloadPdf={handleDownloadWarrantyPdf}
+            isDownloading={isWarrantyDownloading}
+          />
+
+          {warrantyDownloadError ? (
+            <div
+              data-ocid="order_detail.warranty_download_error"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5"
+            >
+              <p className="flex items-start gap-2 text-xs text-destructive">
+                <AlertTriangle
+                  className="mt-0.5 size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
+                {warrantyDownloadError}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleDownloadWarrantyPdf(warrantyFormat)}
+                data-ocid="order_detail.warranty_download_retry_button"
+              >
+                Reintentar
+              </Button>
+            </div>
+          ) : null}
+
+          <div className="no-print flex flex-wrap items-center justify-end gap-2 border-t border-border pt-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsWarrantyWhatsAppOpen(true)}
+              data-ocid="order_detail.warranty_whatsapp_button"
+              className="gap-1.5"
+            >
+              <MessageCircle className="size-4" aria-hidden="true" />
+              Enviar por WhatsApp
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {warrantyData ? (
+        <WarrantyWhatsAppDialog
+          open={isWarrantyWhatsAppOpen}
+          onOpenChange={setIsWarrantyWhatsAppOpen}
+          customerId={order.customerId}
+          customerName={
+            customerName ?? `Cliente #${order.customerId.toString()}`
+          }
+          orderId={order.id}
+          warranty={warrantyData}
+          company={warrantyCompany}
+          hope={hopeMessage}
+          termsText={warrantyTermsText}
+        />
+      ) : null}
+
       <AddPartDialog
         orderId={order.id}
         open={isAddPartOpen}
         onOpenChange={setIsAddPartOpen}
+      />
+      <ScanPartDialog
+        orderId={order.id}
+        open={isScanPartOpen}
+        onOpenChange={setIsScanPartOpen}
       />
       <AddLaborDialog
         orderId={order.id}

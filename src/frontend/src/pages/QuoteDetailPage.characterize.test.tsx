@@ -114,6 +114,7 @@ function part(overrides: Partial<PartView> = {}): PartView {
     createdAt: 1_700_000_000_000_000_000n,
     unit: "pza",
     totalStock: 8n,
+    barcode: "",
     category: "Frenos",
     salePrice: 25000n,
     brand: "Genérico",

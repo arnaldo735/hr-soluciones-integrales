@@ -22,6 +22,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import {
   type ContactImportRow,
@@ -80,7 +81,12 @@ function supplierToCsvRow(supplier: Supplier): Record<string, string> {
 const SUPPLIERS_QUERY_KEY = ["suppliers"] as const;
 const PAYABLES_QUERY_KEY = ["payables"] as const;
 const PURCHASES_QUERY_KEY = ["purchases"] as const;
-const PART_SEARCH_LIMIT = 20n;
+/**
+ * The purchase-line part picker shows every match in a scrollable panel, so it
+ * requests a page large enough to cover the whole catalog instead of a small
+ * fixed cap that would hide valid repuestos.
+ */
+const PART_SEARCH_LIMIT = 1000n;
 
 /** Delays a fast-changing value so the part search hits the backend calmly. */
 function useDebouncedValue<T>(value: T, delayMs: number): T {
@@ -96,11 +102,15 @@ function useDebouncedValue<T>(value: T, delayMs: number): T {
 
 function useSuppliers(search: string) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: [...SUPPLIERS_QUERY_KEY, search],
     queryFn: async (): Promise<Supplier[]> => {
       if (!actor) return [];
-      return actor.listSuppliers(search.trim() === "" ? null : search.trim());
+      return actor.listSuppliers(
+        token,
+        search.trim() === "" ? null : search.trim(),
+      );
     },
     enabled: !!actor && !isFetching,
   });
@@ -108,11 +118,12 @@ function useSuppliers(search: string) {
 
 function usePayables() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: PAYABLES_QUERY_KEY,
     queryFn: async (): Promise<Payable[]> => {
       if (!actor) return [];
-      return actor.listPayables();
+      return actor.listPayables(token);
     },
     enabled: !!actor && !isFetching,
   });
@@ -120,6 +131,7 @@ function usePayables() {
 
 function useSaveSupplier() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
@@ -127,8 +139,8 @@ function useSaveSupplier() {
       values: SupplierInput;
     }): Promise<Supplier> => {
       if (!actor) throw new Error("Backend no disponible");
-      if (input.id === null) return actor.createSupplier(input.values);
-      return actor.updateSupplier(input.id, input.values);
+      if (input.id === null) return actor.createSupplier(token, input.values);
+      return actor.updateSupplier(token, input.id, input.values);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: SUPPLIERS_QUERY_KEY });
@@ -144,12 +156,14 @@ function payableFor(payables: Payable[], supplierId: bigint): Payable | null {
 /** Searches the parts catalog so purchase lines pick a real repuesto. */
 function usePartSearch(term: string) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const trimmed = term.trim();
   return useQuery({
     queryKey: ["parts", "purchase-search", trimmed],
     queryFn: async (): Promise<PartView[]> => {
       if (!actor) return [];
       const page = await actor.listParts(
+        token,
         { search: trimmed === "" ? undefined : trimmed },
         PartSort.name,
         0n,
@@ -164,6 +178,7 @@ function usePartSearch(term: string) {
 
 function useCreatePurchase() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: {
@@ -171,7 +186,7 @@ function useCreatePurchase() {
       items: PurchaseItemInput[];
     }): Promise<Purchase> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createPurchase({
+      return actor.createPurchase(token, {
         supplierId: input.supplierId,
         items: input.items,
       });
@@ -869,6 +884,7 @@ function TableSkeleton() {
 export function SuppliersPage() {
   const navigate = useNavigate();
   const { actor } = useBackend();
+  const { token } = useAuth();
   const rawSearch = useSearch({ strict: false }) as Record<string, unknown>;
   const urlTerm = typeof rawSearch.q === "string" ? rawSearch.q : "";
 
@@ -947,7 +963,7 @@ export function SuppliersPage() {
     if (!actor) return;
     setIsExporting(true);
     try {
-      const all = await actor.listSuppliers(null);
+      const all = await actor.listSuppliers(token, null);
       await downloadXlsx(
         "proveedores",
         "Proveedores",
@@ -984,7 +1000,7 @@ export function SuppliersPage() {
         toast.error("El archivo no contiene filas válidas.");
         return;
       }
-      const existing = await actor.listSuppliers(null);
+      const existing = await actor.listSuppliers(token, null);
       setImportResult(null);
       setImportFailed(false);
       setImportRows(buildContactImportRows("supplier", parsed, existing));

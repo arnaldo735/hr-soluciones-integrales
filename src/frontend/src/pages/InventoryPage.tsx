@@ -31,6 +31,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import {
   useExportInventoryCsv,
@@ -202,6 +203,7 @@ function StockCell({ part }: { part: PartView }) {
 
 interface PartFormState {
   sku: string;
+  barcode: string;
   name: string;
   category: string;
   brand: string;
@@ -213,6 +215,7 @@ interface PartFormState {
 
 const EMPTY_FORM: PartFormState = {
   sku: "",
+  barcode: "",
   name: "",
   category: "",
   brand: "",
@@ -257,6 +260,7 @@ function parseAmount(value: string | undefined): bigint {
 function partToCsvRow(part: PartView): CsvRow {
   return {
     sku: part.sku,
+    codigo_barras: part.barcode,
     nombre: part.name,
     categoria: part.category,
     marca: part.brand,
@@ -276,6 +280,7 @@ function partToCsvRow(part: PartView): CsvRow {
 function inventoryCsvRowToCsvRow(row: InventoryCsvRow): CsvRow {
   return {
     sku: row.sku,
+    codigo_barras: row.barcode,
     nombre: row.name,
     categoria: row.category,
     marca: row.brand,
@@ -297,6 +302,7 @@ function csvRowToImportRow(row: CsvRow, index: number): InventoryImportRow {
   return {
     rowNumber: BigInt(index + 1),
     sku: (row.sku ?? "").trim(),
+    barcode: (row.codigo_barras ?? "").trim(),
     name: (row.nombre ?? "").trim(),
     category: (row.categoria ?? "").trim(),
     brand: (row.marca ?? "").trim(),
@@ -320,6 +326,7 @@ function PartFormDialog({
   isAdmin: boolean;
 }) {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   const [form, setForm] = useState<PartFormState>(EMPTY_FORM);
   const [error, setError] = useState<string | null>(null);
@@ -331,6 +338,7 @@ function PartFormDialog({
       part
         ? {
             sku: part.sku,
+            barcode: part.barcode,
             name: part.name,
             category: part.category,
             brand: part.brand,
@@ -346,7 +354,9 @@ function PartFormDialog({
   const mutation = useMutation({
     mutationFn: async (input: PartInput) => {
       if (!actor) throw new Error("Backend no disponible");
-      return part ? actor.updatePart(part.id, input) : actor.createPart(input);
+      return part
+        ? actor.updatePart(token, part.id, input)
+        : actor.createPart(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["parts"] });
@@ -372,6 +382,7 @@ function PartFormDialog({
     setError(null);
     mutation.mutate({
       sku: form.sku.trim(),
+      barcode: form.barcode.trim(),
       name: form.name.trim(),
       category: form.category.trim(),
       brand: form.brand.trim(),
@@ -411,6 +422,17 @@ function PartFormDialog({
                 className="data-rail"
                 data-ocid="inventory.sku_input"
                 required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="part-barcode">Código de barras</Label>
+              <Input
+                id="part-barcode"
+                value={form.barcode}
+                onChange={(event) => update("barcode", event.target.value)}
+                placeholder="7701234567890"
+                className="data-rail"
+                data-ocid="inventory.barcode_input"
               />
             </div>
             <div className="space-y-1.5">
@@ -636,6 +658,7 @@ function ZeroInventoryDialog({
 
 export function InventoryPage() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const { isAdmin } = useRole();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -696,10 +719,11 @@ export function InventoryPage() {
   // filter/sort/page change produces exactly one new cache entry and one
   // request, and React Query cancels the obsolete in-flight request.
   const partsQuery = useQuery({
-    queryKey: ["parts", partsQueryKey(search)],
+    queryKey: ["parts", partsQueryKey(search), token],
     queryFn: async () => {
       if (!actor) throw new Error("Backend no disponible");
       return actor.listPartsDir(
+        token,
         {
           search: search.q || undefined,
           category: search.categoria || undefined,
@@ -718,10 +742,10 @@ export function InventoryPage() {
   // The backend computes the distinct category and brand values in one call,
   // so the option lists no longer require reading a broad page of the catalog.
   const facetsQuery = useQuery({
-    queryKey: ["parts", "facets"],
+    queryKey: ["parts", "facets", token],
     queryFn: async () => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.listPartFacets();
+      return actor.listPartFacets(token);
     },
     enabled: !!actor && !isFetching,
     // The facet lists only change when the catalog changes, so they are kept
@@ -821,7 +845,7 @@ export function InventoryPage() {
     }
     setImportFailed(false);
     try {
-      const result = await actor.importInventoryCsv(payload);
+      const result = await actor.importInventoryCsv(token, payload);
       setImportResult(result);
       void queryClient.invalidateQueries({ queryKey: ["parts"] });
       void queryClient.invalidateQueries({ queryKey: ["part"] });
@@ -945,7 +969,7 @@ export function InventoryPage() {
             <Input
               value={term}
               onChange={(event) => setTerm(event.target.value)}
-              placeholder="Buscar por nombre o SKU…"
+              placeholder="Buscar por nombre, SKU o código de barras…"
               aria-label="Buscar repuestos"
               className="pl-9"
               data-ocid="inventory.search_input"
@@ -1156,6 +1180,9 @@ export function InventoryPage() {
                   onSort={handleSort}
                 />
                 <TableHead className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
+                  Código de barras
+                </TableHead>
+                <TableHead className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
                   Categoría
                 </TableHead>
                 <TableHead className="font-mono text-[11px] uppercase tracking-[0.12em] text-muted-foreground">
@@ -1203,6 +1230,9 @@ export function InventoryPage() {
                     <span className="block truncate font-medium">
                       {part.name}
                     </span>
+                  </TableCell>
+                  <TableCell className="data-rail text-muted-foreground">
+                    {part.barcode || "—"}
                   </TableCell>
                   <TableCell className="text-muted-foreground">
                     {part.category || "—"}

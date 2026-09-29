@@ -8,18 +8,27 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Accepted behavior: the administrator's local backup download.
  *
  * The card offers "Descargar copia local" next to the Google Drive backup. On
- * click it calls the backend `downloadLocalBackup`, downloads the returned JSON
- * under the backend's own file name (which carries the generation date and
- * time), shows a loading state with the button disabled while the mutation is
- * pending, and confirms success or shows a Spanish error message.
+ * click it asks the backend for the manifest and then for each section in
+ * bounded pages, assembles the root JSON object, and downloads it under the
+ * backend's own file name (which carries the generation date and time). It
+ * shows a loading state with the button disabled while the copy is being
+ * generated, and confirms success or shows a Spanish error message.
+ *
+ * The accepted change replaces the single `downloadLocalBackup` call with the
+ * chunked `getLocalBackupManifest` + `getBackupSection` pair. These tests mock
+ * those two methods, so they pin the frontend's assembly contract: the root
+ * keys and `generatedAt` come from the manifest, collection sections are
+ * concatenated page by page, and single-record sections are taken whole.
  */
 
-const downloadLocalBackupMock = vi.fn();
+const getLocalBackupManifestMock = vi.fn();
+const getBackupSectionMock = vi.fn();
 
 vi.mock("@/hooks/use-backend", () => ({
   useBackend: () => ({
     actor: {
-      downloadLocalBackup: downloadLocalBackupMock,
+      getLocalBackupManifest: getLocalBackupManifestMock,
+      getBackupSection: getBackupSectionMock,
     },
     isFetching: false,
   }),
@@ -27,19 +36,58 @@ vi.mock("@/hooks/use-backend", () => ({
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
-function localBackup(overrides: Record<string, unknown> = {}) {
+const GENERATED_AT = 1_700_000_000_000_000_000n;
+const FILE_NAME = "copia-local-hr-2026-09-22-1530.json";
+
+/** The root keys the manifest advertises, in the order the backend emits them. */
+const SECTION_KEYS = [
+  "customers",
+  "orders",
+  "parts",
+  "businessSettings",
+] as const;
+
+function manifest(overrides: Record<string, unknown> = {}) {
   return {
-    fileName: "copia-local-hr-2026-09-22-1530.json",
-    generatedAt: 1_700_000_000_000_000_000n,
-    json: JSON.stringify({
-      generatedAt: 1_700_000_000_000_000_000,
-      customers: [{ id: 1, name: "Ada Lovelace" }],
-      orders: [],
-      parts: [],
-      businessSettings: { name: "HR SOLUCIONES INTEGRALES" },
-    }),
+    fileName: FILE_NAME,
+    generatedAt: GENERATED_AT,
+    sections: [...SECTION_KEYS],
+    totalSections: BigInt(SECTION_KEYS.length),
+    maxPageSize: 200n,
     ...overrides,
   };
+}
+
+/** One `BackupSectionChunk` as the generated bindings shape it. */
+function chunk(
+  index: number,
+  json: string,
+  overrides: Record<string, unknown> = {},
+) {
+  return {
+    key: SECTION_KEYS[index],
+    index: BigInt(index),
+    json,
+    offset: 0n,
+    limit: 200n,
+    total: 0n,
+    done: true,
+    ...overrides,
+  };
+}
+
+/**
+ * Wires the two backend methods to a fixed set of section values. Collection
+ * values are serialized as JSON arrays and single-record values as objects.
+ */
+function mockSections(values: Record<string, unknown>) {
+  getLocalBackupManifestMock.mockResolvedValue(manifest());
+  getBackupSectionMock.mockImplementation(
+    async (index: bigint, _offset: bigint, _limit: bigint) => {
+      const key = SECTION_KEYS[Number(index)];
+      return chunk(Number(index), JSON.stringify(values[key]));
+    },
+  );
 }
 
 /** Reads a jsdom `Blob` back to text through `FileReader`. */
@@ -82,7 +130,8 @@ function stubDownload() {
 
 describe("LocalBackupCard", () => {
   beforeEach(() => {
-    downloadLocalBackupMock.mockReset();
+    getLocalBackupManifestMock.mockReset();
+    getBackupSectionMock.mockReset();
   });
 
   it("offers the local download action", async () => {
@@ -94,8 +143,13 @@ describe("LocalBackupCard", () => {
     expect(screen.getByText("Copia de seguridad local")).toBeInTheDocument();
   });
 
-  it("calls the backend and downloads the JSON under the backend file name", async () => {
-    downloadLocalBackupMock.mockResolvedValue(localBackup());
+  it("downloads the assembled JSON under the backend file name", async () => {
+    mockSections({
+      customers: [{ id: 1, name: "Ada Lovelace" }],
+      orders: [],
+      parts: [],
+      businessSettings: { name: "HR SOLUCIONES INTEGRALES" },
+    });
     const download = stubDownload();
 
     try {
@@ -105,17 +159,21 @@ describe("LocalBackupCard", () => {
       );
 
       await waitFor(() =>
-        expect(downloadLocalBackupMock).toHaveBeenCalledTimes(1),
-      );
-      await waitFor(() =>
         expect(download.createObjectURL).toHaveBeenCalledTimes(1),
       );
 
-      // The downloaded blob is the backend JSON, typed as JSON. jsdom's Blob
+      // The downloaded blob is the assembled JSON, typed as JSON. jsdom's Blob
       // has no `text()`, so the bytes are read through FileReader.
       const blob = download.createObjectURL.mock.calls[0][0];
       expect(blob.type).toBe("application/json");
-      expect(await readBlobText(blob)).toContain("Ada Lovelace");
+      const parsed = JSON.parse(await readBlobText(blob)) as Record<
+        string,
+        unknown
+      >;
+      expect(parsed.customers).toEqual([{ id: 1, name: "Ada Lovelace" }]);
+      expect(parsed.businessSettings).toEqual({
+        name: "HR SOLUCIONES INTEGRALES",
+      });
 
       // The anchor is clicked once and the object URL is released.
       expect(download.clickSpy).toHaveBeenCalledTimes(1);
@@ -125,8 +183,103 @@ describe("LocalBackupCard", () => {
     }
   });
 
+  it("keeps the manifest's root keys and generatedAt in the downloaded JSON", async () => {
+    mockSections({
+      customers: [],
+      orders: [],
+      parts: [],
+      businessSettings: { name: "Taller" },
+    });
+    const download = stubDownload();
+
+    try {
+      renderWithProviders(<LocalBackupCard />);
+      await userEvent.click(
+        await screen.findByTestId("settings.local_backup.download_button"),
+      );
+      await waitFor(() =>
+        expect(download.createObjectURL).toHaveBeenCalledTimes(1),
+      );
+
+      const parsed = JSON.parse(
+        await readBlobText(download.createObjectURL.mock.calls[0][0]),
+      ) as Record<string, unknown>;
+      // The root object carries exactly the manifest's sections plus the
+      // generation timestamp, so the file keeps the shape `serializeBackup`
+      // produced.
+      expect(Object.keys(parsed).sort()).toEqual(
+        [...SECTION_KEYS, "generatedAt"].sort(),
+      );
+      expect(parsed.generatedAt).toBe(Number(GENERATED_AT));
+    } finally {
+      download.restore();
+    }
+  });
+
+  it("concatenates a paginated collection section page by page", async () => {
+    getLocalBackupManifestMock.mockResolvedValue(manifest());
+    // The customers section arrives in two pages; the rest are single pages.
+    getBackupSectionMock.mockImplementation(
+      async (index: bigint, offset: bigint, _limit: bigint) => {
+        const key = SECTION_KEYS[Number(index)];
+        if (key === "customers") {
+          if (offset === 0n) {
+            return chunk(
+              Number(index),
+              JSON.stringify([{ id: 1 }, { id: 2 }]),
+              {
+                offset: 0n,
+                limit: 2n,
+                total: 3n,
+                done: false,
+              },
+            );
+          }
+          return chunk(Number(index), JSON.stringify([{ id: 3 }]), {
+            offset: 2n,
+            limit: 2n,
+            total: 3n,
+            done: true,
+          });
+        }
+        return chunk(Number(index), JSON.stringify([]));
+      },
+    );
+    const download = stubDownload();
+
+    try {
+      renderWithProviders(<LocalBackupCard />);
+      await userEvent.click(
+        await screen.findByTestId("settings.local_backup.download_button"),
+      );
+      await waitFor(() =>
+        expect(download.createObjectURL).toHaveBeenCalledTimes(1),
+      );
+
+      const parsed = JSON.parse(
+        await readBlobText(download.createObjectURL.mock.calls[0][0]),
+      ) as Record<string, unknown>;
+      // Both pages are concatenated into one array, in order.
+      expect(parsed.customers).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
+
+      // The second page was requested at the offset the first page reported.
+      const customerCalls = getBackupSectionMock.mock.calls.filter(
+        (call) => call[0] === 0n,
+      );
+      expect(customerCalls).toHaveLength(2);
+      expect(customerCalls[1][1]).toBe(2n);
+    } finally {
+      download.restore();
+    }
+  });
+
   it("uses the backend file name, which carries the generation date and time", async () => {
-    downloadLocalBackupMock.mockResolvedValue(localBackup());
+    mockSections({
+      customers: [],
+      orders: [],
+      parts: [],
+      businessSettings: {},
+    });
     const download = stubDownload();
     let downloadedName = "";
     download.clickSpy.mockImplementation(function (this: HTMLAnchorElement) {
@@ -140,8 +293,8 @@ describe("LocalBackupCard", () => {
       );
 
       await waitFor(() => expect(download.clickSpy).toHaveBeenCalledTimes(1));
-      // The name comes from the backend and includes the date and time.
-      expect(downloadedName).toBe("copia-local-hr-2026-09-22-1530.json");
+      // The name comes from the manifest and includes the date and time.
+      expect(downloadedName).toBe(FILE_NAME);
       expect(downloadedName).toMatch(/\d{4}-\d{2}-\d{2}-\d{4}\.json$/);
     } finally {
       download.restore();
@@ -150,7 +303,7 @@ describe("LocalBackupCard", () => {
 
   it("shows a loading state and disables the button while the copy is generated", async () => {
     // A promise that never settles keeps the mutation pending.
-    downloadLocalBackupMock.mockReturnValue(new Promise(() => {}));
+    getLocalBackupManifestMock.mockReturnValue(new Promise(() => {}));
     renderWithProviders(<LocalBackupCard />);
 
     const button = await screen.findByTestId(
@@ -159,7 +312,7 @@ describe("LocalBackupCard", () => {
     await userEvent.click(button);
 
     await waitFor(() =>
-      expect(downloadLocalBackupMock).toHaveBeenCalledTimes(1),
+      expect(getLocalBackupManifestMock).toHaveBeenCalledTimes(1),
     );
     // The button is disabled and relabelled so a duplicate download is blocked.
     await waitFor(() =>
@@ -176,7 +329,12 @@ describe("LocalBackupCard", () => {
   });
 
   it("confirms the download with the file name and generation time", async () => {
-    downloadLocalBackupMock.mockResolvedValue(localBackup());
+    mockSections({
+      customers: [],
+      orders: [],
+      parts: [],
+      businessSettings: {},
+    });
     const download = stubDownload();
 
     try {
@@ -189,16 +347,14 @@ describe("LocalBackupCard", () => {
         await screen.findByTestId("settings.local_backup.success_state"),
       ).toBeInTheDocument();
       expect(screen.getByText("Copia local descargada")).toBeInTheDocument();
-      expect(
-        screen.getByText("copia-local-hr-2026-09-22-1530.json"),
-      ).toBeInTheDocument();
+      expect(screen.getByText(FILE_NAME)).toBeInTheDocument();
     } finally {
       download.restore();
     }
   });
 
   it("shows a Spanish error message and a retry when the download fails", async () => {
-    downloadLocalBackupMock.mockRejectedValue(
+    getLocalBackupManifestMock.mockRejectedValue(
       new Error("No se pudo generar la copia local."),
     );
     renderWithProviders(<LocalBackupCard />);
@@ -223,7 +379,7 @@ describe("LocalBackupCard", () => {
   });
 
   it("falls back to a Spanish message when the failure carries no message", async () => {
-    downloadLocalBackupMock.mockRejectedValue({});
+    getLocalBackupManifestMock.mockRejectedValue({});
     renderWithProviders(<LocalBackupCard />);
 
     await userEvent.click(
@@ -236,5 +392,33 @@ describe("LocalBackupCard", () => {
     expect(
       screen.getByText("No se pudo completar la operación con Google Drive."),
     ).toBeInTheDocument();
+  });
+
+  it("retries the download from the error state", async () => {
+    getLocalBackupManifestMock.mockRejectedValueOnce(new Error("falló"));
+    getLocalBackupManifestMock.mockResolvedValueOnce(manifest());
+    getBackupSectionMock.mockImplementation(async (index: bigint) =>
+      chunk(Number(index), JSON.stringify([])),
+    );
+    const download = stubDownload();
+
+    try {
+      renderWithProviders(<LocalBackupCard />);
+      await userEvent.click(
+        await screen.findByTestId("settings.local_backup.download_button"),
+      );
+      await screen.findByTestId("settings.local_backup.error_state");
+
+      await userEvent.click(
+        screen.getByTestId("settings.local_backup.retry_button"),
+      );
+
+      expect(
+        await screen.findByTestId("settings.local_backup.success_state"),
+      ).toBeInTheDocument();
+      expect(download.createObjectURL).toHaveBeenCalledTimes(1);
+    } finally {
+      download.restore();
+    }
   });
 });

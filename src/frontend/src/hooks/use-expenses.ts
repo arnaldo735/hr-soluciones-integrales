@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import type {
   Expense,
@@ -25,6 +26,7 @@ export interface ExpenseListParams {
 
 export function useExpenses(params: ExpenseListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const offset = BigInt((params.page - 1) * params.pageSize);
   const limit = BigInt(params.pageSize);
   const search = params.search.trim();
@@ -49,7 +51,7 @@ export function useExpenses(params: ExpenseListParams) {
         from: params.from ?? undefined,
         to: params.to ?? undefined,
       };
-      return actor.listExpenses(filter, offset, limit);
+      return actor.listExpenses(token, filter, offset, limit);
     },
     enabled: !!actor && !isFetching,
   });
@@ -57,12 +59,13 @@ export function useExpenses(params: ExpenseListParams) {
 
 export function useExpense(id: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["expense", id?.toString() ?? "none"],
     queryFn: async (): Promise<Expense | null> => {
       if (!actor || id === null) return null;
-      return actor.getExpense(id);
+      return actor.getExpense(token, id);
     },
     enabled: !!actor && !isFetching && id !== null,
   });
@@ -70,6 +73,7 @@ export function useExpense(id: Id | null) {
 
 export function useExpenseSummary(filter: ExpenseFilter) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: [
@@ -80,7 +84,7 @@ export function useExpenseSummary(filter: ExpenseFilter) {
     ],
     queryFn: async (): Promise<ExpenseSummary | null> => {
       if (!actor) return null;
-      return actor.getExpenseSummary(filter);
+      return actor.getExpenseSummary(token, filter);
     },
     enabled: !!actor && !isFetching,
   });
@@ -88,12 +92,13 @@ export function useExpenseSummary(filter: ExpenseFilter) {
 
 export function useCreateExpense() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: ExpenseInput): Promise<Expense> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createExpense(input);
+      return actor.createExpense(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -104,6 +109,7 @@ export function useCreateExpense() {
 
 export function useUpdateExpense() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -115,7 +121,7 @@ export function useUpdateExpense() {
       input: ExpenseInput;
     }): Promise<Expense> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateExpense(id, input);
+      return actor.updateExpense(token, id, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -126,12 +132,13 @@ export function useUpdateExpense() {
 
 export function useDeleteExpense() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: Id): Promise<boolean> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.deleteExpense(id);
+      return actor.deleteExpense(token, id);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["expenses"] });
@@ -161,6 +168,7 @@ export interface ExpenseCategoryListParams {
  */
 export function useExpenseCategories(params: ExpenseCategoryListParams) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const search = params.search.trim();
 
   return useQuery({
@@ -170,7 +178,7 @@ export function useExpenseCategories(params: ExpenseCategoryListParams) {
       const filter: ExpenseCategoryFilter = {
         search: search.length > 0 ? search : undefined,
       };
-      return actor.listExpenseCategories(filter);
+      return actor.listExpenseCategories(token, filter);
     },
     enabled: !!actor && !isFetching,
   });
@@ -178,12 +186,13 @@ export function useExpenseCategories(params: ExpenseCategoryListParams) {
 
 export function useExpenseCategory(id: Id | null) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["expense-category", id?.toString() ?? "none"],
     queryFn: async (): Promise<ExpenseCategory | null> => {
       if (!actor || id === null) return null;
-      return actor.getExpenseCategory(id);
+      return actor.getExpenseCategory(token, id);
     },
     enabled: !!actor && !isFetching && id !== null,
   });
@@ -191,6 +200,7 @@ export function useExpenseCategory(id: Id | null) {
 
 export function useCreateExpenseCategory() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -198,7 +208,7 @@ export function useCreateExpenseCategory() {
       input: ExpenseCategoryInput,
     ): Promise<ExpenseCategory> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.createExpenseCategory(input);
+      return actor.createExpenseCategory(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["expense-categories"] });
@@ -208,6 +218,7 @@ export function useCreateExpenseCategory() {
 
 export function useUpdateExpenseCategory() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -219,7 +230,7 @@ export function useUpdateExpenseCategory() {
       input: ExpenseCategoryInput;
     }): Promise<ExpenseCategory> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateExpenseCategory(id, input);
+      return actor.updateExpenseCategory(token, id, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["expense-categories"] });
@@ -233,12 +244,13 @@ export function useUpdateExpenseCategory() {
 
 export function useDeleteExpenseCategory() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (id: Id): Promise<boolean> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.deleteExpenseCategory(id);
+      return actor.deleteExpenseCategory(token, id);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["expense-categories"] });

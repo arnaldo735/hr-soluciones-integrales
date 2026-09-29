@@ -1,4 +1,3 @@
-import type { LocalBackup } from "@/backend";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -7,7 +6,11 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { backupErrorMessage, useDownloadLocalBackup } from "@/hooks/use-backup";
+import {
+  type LocalBackup,
+  backupErrorMessage,
+  useDownloadLocalBackup,
+} from "@/hooks/use-backup";
 import { downloadFile } from "@/lib/download";
 import { formatDateTime } from "@/lib/format";
 import {

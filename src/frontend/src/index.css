@@ -127,9 +127,55 @@
     --sheet-foreground: 0.2 0.012 80;
     --sheet-border: 0.88 0.006 85;
     --sheet-muted: 0.5 0.012 82;
+    /* Mensaje de esperanza bíblica — bloque devocional del pie de documento.
+       Una "estampa" serena sobre el papel: tinte verde muy suave, riel verde
+       de 2px (la firma del sistema), promesa en cursiva y cita en ámbar. */
+    --hope-surface: 0.965 0.02 152;
+    --hope-border: 0.82 0.05 152;
+    --hope-rule: 0.5 0.13 152;
+    --hope-promise: 0.28 0.03 152;
+    --hope-citation: 0.46 0.11 70;
+    --hope-quote: 0.7 0.1 152;
+    /* Términos y Condiciones de Garantía — aviso IMPORTANTE en tarjeta ámbar
+       sobre el papel; mismos valores en ambos modos porque el impreso es claro. */
+    --warranty-notice-surface: 0.965 0.06 85;
+    --warranty-notice-border: 0.78 0.13 70;
+    --warranty-notice-rule: 0.62 0.16 65;
+    --warranty-notice-title: 0.45 0.13 55;
+    --warranty-notice-body: 0.32 0.06 55;
     --calendar-grid: 0.9 0.006 85;
     --calendar-today: 0.5 0.13 152;
     --calendar-weekend: 0.94 0.006 85;
+
+    /* Acceso y usuarios — login, roles y estado de cuenta.
+       `auth-backdrop` is the branded login backdrop (graphite steel with a
+       green cast); `auth-panel` is the centered login card, one step lighter
+       than a normal card so it lifts off the backdrop. Role families reuse
+       the mechanic identity: admin = taller green, mechanic = tool amber,
+       guest = steel grey, custom = blue 240. */
+    --auth-backdrop: 0.205 0.02 150;
+    --auth-backdrop-foreground: 0.93 0.01 150;
+    --auth-panel: 0.995 0.003 85;
+    --auth-panel-foreground: 0.2 0.012 80;
+    --auth-panel-border: 0.9 0.006 85;
+    --auth-grid: 0.32 0.02 150;
+
+    --role-admin: 0.5 0.13 152;
+    --role-admin-foreground: 0.99 0.01 152;
+    --role-mechanic: 0.68 0.15 70;
+    --role-mechanic-foreground: 0.2 0.02 70;
+    --role-guest: 0.55 0.012 82;
+    --role-guest-foreground: 0.99 0.003 82;
+    --role-custom: 0.55 0.12 240;
+    --role-custom-foreground: 0.99 0.005 240;
+
+    --account-active: 0.55 0.14 148;
+    --account-active-foreground: 0.99 0.01 148;
+    --account-inactive: 0.6 0.03 30;
+    --account-inactive-foreground: 0.99 0.004 30;
+
+    --temp-password: 0.66 0.15 78;
+    --temp-password-foreground: 0.2 0.02 78;
 
     /* Print geometry — single source of truth shared by the on-screen
        preview and the @page rules, so preview equals print. */
@@ -249,9 +295,49 @@
     --sheet-foreground: 0.2 0.012 80;
     --sheet-border: 0.88 0.006 85;
     --sheet-muted: 0.5 0.012 82;
+    /* Mensaje de esperanza bíblica — el papel siempre es claro, así que el
+       bloque conserva los mismos valores en ambos modos. */
+    --hope-surface: 0.965 0.02 152;
+    --hope-border: 0.82 0.05 152;
+    --hope-rule: 0.5 0.13 152;
+    --hope-promise: 0.28 0.03 152;
+    --hope-citation: 0.46 0.11 70;
+    --hope-quote: 0.7 0.1 152;
+    /* Términos y Condiciones de Garantía — el papel siempre es claro, así que
+       el aviso conserva los mismos valores en ambos modos. */
+    --warranty-notice-surface: 0.965 0.06 85;
+    --warranty-notice-border: 0.78 0.13 70;
+    --warranty-notice-rule: 0.62 0.16 65;
+    --warranty-notice-title: 0.45 0.13 55;
+    --warranty-notice-body: 0.32 0.06 55;
     --calendar-grid: 0.3 0.014 85;
     --calendar-today: 0.78 0.16 152;
     --calendar-weekend: 0.205 0.012 85;
+
+    /* Acceso y usuarios — login, roles y estado de cuenta. */
+    --auth-backdrop: 0.14 0.022 150;
+    --auth-backdrop-foreground: 0.93 0.01 150;
+    --auth-panel: 0.205 0.013 85;
+    --auth-panel-foreground: 0.94 0.008 85;
+    --auth-panel-border: 0.3 0.014 85;
+    --auth-grid: 0.3 0.02 150;
+
+    --role-admin: 0.78 0.16 152;
+    --role-admin-foreground: 0.16 0.012 152;
+    --role-mechanic: 0.8 0.15 72;
+    --role-mechanic-foreground: 0.18 0.02 72;
+    --role-guest: 0.62 0.012 82;
+    --role-guest-foreground: 0.16 0.004 82;
+    --role-custom: 0.7 0.13 240;
+    --role-custom-foreground: 0.16 0.012 240;
+
+    --account-active: 0.72 0.16 148;
+    --account-active-foreground: 0.16 0.012 148;
+    --account-inactive: 0.6 0.02 30;
+    --account-inactive-foreground: 0.96 0.004 30;
+
+    --temp-password: 0.78 0.16 75;
+    --temp-password-foreground: 0.18 0.02 75;
 
     /* Print geometry — same values in both modes; the sheet is always paper. */
     --doc-a4-width: 210mm;
@@ -508,6 +594,15 @@
     min-height: 297mm;
     padding: var(--doc-a4-margin);
   }
+  /* Phones: the A4 sheet is wider than the viewport, so scale the whole sheet
+     down to fit the available width instead of forcing horizontal scroll.
+     `zoom` keeps the mm-based layout intact (unlike transform, it reflows the
+     box), and the print rules below reset it so paper output stays 1:1. */
+  @media screen and (max-width: 640px) {
+    .doc-preview-a4 {
+      zoom: 0.42;
+    }
+  }
   /* Tirilla POS 80mm: continuous roll, 3mm side margins → 74mm of content.
      Mono-friendly, never wider than the roll. */
   .doc-preview-80mm {
@@ -520,6 +615,40 @@
   }
   .doc-preview-80mm .doc-title {
     font-size: 12px;
+  }
+  /* Tirilla 80mm: el encabezado se apila y se centra (logo, razón social,
+     contacto y bloque fiscal), y el título/número también queda centrado.
+     Cada dato es su propia fila con su propio espacio: sin alturas fijas ni
+     posicionamiento absoluto, de modo que ningún dato se encima con otro.
+     El A4 conserva su encabezado a dos columnas sin cambios. */
+  .doc-preview-80mm .doc-header {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3mm;
+    text-align: center;
+  }
+  .doc-preview-80mm .doc-header-identity {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 2mm;
+    width: 100%;
+    min-width: 0;
+    text-align: center;
+  }
+  .doc-preview-80mm .doc-header-identity > div {
+    width: 100%;
+    min-width: 0;
+  }
+  .doc-preview-80mm .doc-header-identity .doc-title,
+  .doc-preview-80mm .doc-header-identity .doc-meta {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+  .doc-preview-80mm .doc-header-title {
+    width: 100%;
+    text-align: center;
   }
   .doc-preview-80mm .data-rail,
   .doc-preview-80mm .tabular {
@@ -538,6 +667,159 @@
   .doc-meta {
     color: oklch(var(--sheet-muted));
   }
+
+  /* Mensaje de esperanza bíblica — bloque devocional del pie de documento.
+     Compartido por DocumentPreview (pantalla) y lib/pdf.ts (A4 y tirilla 80mm):
+     caja con fondo suave y riel verde de 2px, promesa en cursiva y un punto
+     mayor que el pie, cita en ámbar y comillas decorativas de apertura. */
+  .doc-hope {
+    position: relative;
+    border: 1px solid oklch(var(--hope-border));
+    border-left-width: 2px;
+    border-left-color: oklch(var(--hope-rule));
+    border-radius: 3px;
+    background-color: oklch(var(--hope-surface));
+    padding: 4mm 4.5mm 4mm 6mm;
+    text-align: center;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  /* Comillas decorativas de apertura — marca de agua de la esquina. */
+  .doc-hope::before {
+    content: "\201C";
+    position: absolute;
+    top: 0.5mm;
+    left: 1.5mm;
+    font-family: var(--font-display);
+    font-size: 34px;
+    line-height: 1;
+    color: oklch(var(--hope-quote) / 0.45);
+    pointer-events: none;
+  }
+  /* Promesa: cursiva, un punto mayor que el pie, en verde tinta. */
+  .doc-hope-text {
+    font-style: italic;
+    font-size: 11px;
+    line-height: 1.5;
+    color: oklch(var(--hope-promise));
+  }
+  /* Cita bíblica: ámbar, negrita, alineada bajo la promesa. */
+  .doc-hope-citation {
+    margin-top: 1.5mm;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: oklch(var(--hope-citation));
+  }
+  /* A4: la promesa respira un punto más que el pie (10px) y la cita queda
+     un punto por debajo, manteniendo la jerarquía promesa > cita. */
+  .doc-preview-a4 .doc-hope-text {
+    font-size: 12px;
+  }
+  .doc-preview-a4 .doc-hope-citation {
+    font-size: 10px;
+  }
+  /* Tirilla 80mm: la caja se ajusta al ancho del rollo, sin desbordar; la
+     promesa baja a 10px para conservar legibilidad en el rollo. */
+  .doc-preview-80mm .doc-hope {
+    padding: 2.5mm 2.5mm 2.5mm 4mm;
+  }
+  .doc-preview-80mm .doc-hope::before {
+    font-size: 22px;
+    left: 1mm;
+  }
+  .doc-preview-80mm .doc-hope-text {
+    font-size: 10px;
+  }
+  .doc-preview-80mm .doc-hope-citation {
+    font-size: 9px;
+  }
+
+  /* Términos y Condiciones de Garantía — documento de la orden de trabajo.
+     Compartido por WarrantyDocument (pantalla) y lib/pdf.ts (A4 y tirilla
+     80mm): bloque de identificación, 8 cláusulas numeradas y aviso IMPORTANTE
+     en tarjeta ámbar. Reutiliza el lenguaje visual del bloque de esperanza. */
+  .doc-warranty-identity {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .doc-warranty-clauses {
+    display: flex;
+    flex-direction: column;
+    gap: 3mm;
+  }
+  .doc-warranty-clause {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .doc-warranty-clause-title {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+    color: oklch(var(--sheet-foreground));
+  }
+  .doc-warranty-clause-body {
+    margin-top: 0.5mm;
+    font-size: 10px;
+    line-height: 1.45;
+    color: oklch(var(--sheet-muted));
+    text-align: justify;
+  }
+  .doc-warranty-important {
+    position: relative;
+    margin-top: 4mm;
+    border: 1px solid oklch(var(--warranty-notice-border));
+    border-left-width: 2px;
+    border-left-color: oklch(var(--warranty-notice-rule));
+    border-radius: 3px;
+    background-color: oklch(var(--warranty-notice-surface));
+    padding: 3.5mm 4mm 3.5mm 5mm;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .doc-warranty-important-title {
+    font-family: var(--font-display);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    color: oklch(var(--warranty-notice-title));
+  }
+  .doc-warranty-important-body {
+    margin-top: 1mm;
+    font-size: 10px;
+    line-height: 1.45;
+    color: oklch(var(--warranty-notice-body));
+  }
+  /* A4: las cláusulas respiran un punto más que en el rollo. */
+  .doc-preview-a4 .doc-warranty-clause-title {
+    font-size: 12px;
+  }
+  .doc-preview-a4 .doc-warranty-clause-body,
+  .doc-preview-a4 .doc-warranty-important-body {
+    font-size: 11px;
+  }
+  /* Tirilla 80mm: tipografía y espaciado reducidos para el rollo. */
+  .doc-preview-80mm .doc-warranty-clauses {
+    gap: 2mm;
+  }
+  .doc-preview-80mm .doc-warranty-clause-title {
+    font-size: 10px;
+  }
+  .doc-preview-80mm .doc-warranty-clause-body {
+    font-size: 9px;
+    text-align: left;
+  }
+  .doc-preview-80mm .doc-warranty-important {
+    padding: 2.5mm 2.5mm 2.5mm 3.5mm;
+  }
+  .doc-preview-80mm .doc-warranty-important-title {
+    font-size: 10px;
+  }
+  .doc-preview-80mm .doc-warranty-important-body {
+    font-size: 9px;
+  }
+
   /* Format toggle used by DocumentPreview and the import/export dialogs.
      The active format drives the matching @page rule in print. */
   .doc-format-toggle {
@@ -792,6 +1074,70 @@
     @apply data-rail font-medium text-foreground;
   }
 
+  /* Printable company header — the complete identity block shared by every
+     document (OT, cotización, factura, compra, recibo POS A4 y tirilla 80 mm).
+     Rendered inside `.doc-preview`, so it inherits the sheet's paper colors. */
+  .company-doc-header {
+    @apply flex items-start justify-between gap-4;
+  }
+  .company-doc-header .doc-title {
+    @apply font-display font-bold tracking-tight;
+  }
+
+  /* Barcode scanner — camera viewport, reticle, confirmation flash and the
+     manual-entry fallback. The viewport keeps a 4:3 frame so the reticle sits
+     over the code regardless of the camera's native aspect ratio. */
+  .barcode-scanner {
+    @apply space-y-3 rounded-lg border border-border bg-card p-4;
+  }
+  .barcode-scanner-head {
+    @apply space-y-1;
+  }
+  .barcode-scanner-hint {
+    @apply text-xs text-muted-foreground;
+  }
+  .barcode-scanner-viewport {
+    @apply relative aspect-[4/3] w-full overflow-hidden rounded-md border border-border bg-secondary;
+  }
+  .barcode-scanner-viewport[data-state="scanning"] {
+    @apply border-primary/50;
+  }
+  .barcode-scanner-viewport[data-state="error"] {
+    @apply border-destructive/40;
+  }
+  .barcode-scanner-video {
+    @apply size-full object-cover;
+  }
+  .barcode-scanner-reticle {
+    @apply pointer-events-none absolute left-1/2 top-1/2 h-1/3 w-3/4 -translate-x-1/2 -translate-y-1/2 rounded-md border-2 border-primary/70;
+    box-shadow: 0 0 0 9999px oklch(var(--foreground) / 0.28);
+  }
+  .barcode-scanner-viewport[data-state="idle"] .barcode-scanner-reticle,
+  .barcode-scanner-viewport[data-state="error"] .barcode-scanner-reticle {
+    @apply hidden;
+  }
+  .barcode-scanner-placeholder {
+    @apply absolute inset-0 flex flex-col items-center justify-center gap-2 text-xs text-muted-foreground;
+  }
+  .barcode-scanner-flash {
+    @apply absolute inset-0 flex flex-col items-center justify-center gap-1 bg-success/85 font-display text-sm font-semibold text-success-foreground;
+  }
+  .barcode-scanner-actions {
+    @apply flex flex-wrap items-center justify-between gap-2;
+  }
+  .barcode-scanner-formats {
+    @apply font-mono text-[10px] uppercase tracking-wider text-muted-foreground;
+  }
+  .barcode-scanner-note {
+    @apply rounded-sm border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground;
+  }
+  .barcode-scanner-error {
+    @apply flex items-start gap-2 rounded-sm border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs font-medium text-destructive;
+  }
+  .barcode-scanner-manual {
+    @apply space-y-1.5 border-t border-border pt-3;
+  }
+
   /* Operation panel — flow shortcut groups. Each flow (Taller, Catálogo,
      Ventas, Compras, Administración) is a labeled band of shortcut cards;
      every card carries a 2px colored left rail and a live metric in mono. */
@@ -863,6 +1209,189 @@
   }
   .flow-shortcut-caption {
     @apply text-xs text-muted-foreground;
+  }
+
+  /* ==========================================================================
+     Acceso y usuarios — login, roles y estado de cuenta.
+     The login screen is the workshop's front door: a centered nameplate-style
+     card on a graphite-green backdrop with the same hairline grid texture used
+     by the panel nameplate, so the entry point reads as part of the machine.
+     ========================================================================== */
+
+  /* Branded login backdrop — graphite steel with a taller-green cast and the
+     hairline grid, so the card floats on a calibrated surface, not a gradient. */
+  .auth-backdrop {
+    position: relative;
+    background-color: oklch(var(--auth-backdrop));
+    color: oklch(var(--auth-backdrop-foreground));
+    background-image: linear-gradient(
+        oklch(var(--auth-grid) / 0.5) 1px,
+        transparent 1px
+      ),
+      linear-gradient(90deg, oklch(var(--auth-grid) / 0.5) 1px, transparent 1px);
+    background-size: 28px 28px;
+  }
+  .auth-backdrop::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background: radial-gradient(
+      120% 90% at 50% 0%,
+      oklch(var(--primary) / 0.18) 0%,
+      transparent 62%
+    );
+  }
+
+  /* Centered login card — elevated panel with a 2px primary top rail. */
+  .auth-card {
+    @apply relative w-full max-w-md rounded-lg border bg-auth-panel p-6 text-auth-panel-foreground shadow-elevated sm:p-8;
+    border-color: oklch(var(--auth-panel-border));
+    border-top-width: 2px;
+    border-top-color: oklch(var(--primary));
+  }
+  .auth-card-mark {
+    @apply mx-auto flex size-14 items-center justify-center rounded-md bg-gradient-primary font-display text-xl font-bold tracking-tight text-primary-foreground;
+  }
+  .auth-card-title {
+    @apply mt-4 text-center font-display text-xl font-bold tracking-tight;
+  }
+  .auth-card-subtitle {
+    @apply mt-1 text-center text-sm text-muted-foreground;
+  }
+  .auth-card-form {
+    @apply mt-6 space-y-4;
+  }
+  .auth-card-footer {
+    @apply mt-6 border-t pt-4 text-center text-xs text-muted-foreground;
+    border-color: oklch(var(--auth-panel-border));
+  }
+
+  /* Form field + error state — shared by login and user forms. */
+  .field-label {
+    @apply text-xs font-semibold uppercase tracking-wider text-muted-foreground;
+  }
+  .field-error {
+    @apply mt-1.5 flex items-center gap-1.5 text-xs font-medium text-destructive;
+  }
+  .field[data-invalid="true"] input,
+  .field[data-invalid="true"] textarea {
+    @apply border-destructive/60;
+  }
+  .field[data-invalid="true"] input:focus-visible,
+  .field[data-invalid="true"] textarea:focus-visible {
+    @apply ring-destructive/40;
+  }
+  .field-hint {
+    @apply mt-1.5 text-xs text-muted-foreground;
+  }
+
+  /* Inline form alert — invalid credentials, deactivated account. */
+  .auth-alert {
+    @apply flex items-start gap-2 rounded-sm border px-3 py-2 text-sm;
+  }
+  .auth-alert[data-tone="error"] {
+    @apply border-destructive/30 bg-destructive/10 text-destructive;
+  }
+  .auth-alert[data-tone="warning"] {
+    @apply border-warning/30 bg-warning/10 text-warning;
+  }
+  .auth-alert[data-tone="info"] {
+    @apply border-info/30 bg-info/10 text-info;
+  }
+
+  /* Role badges — Administrador, Mecánico, Invitado, custom roles. */
+  .badge-role {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium leading-none;
+  }
+  .badge-role[data-role="admin"] {
+    background-color: oklch(var(--role-admin) / 0.16);
+    color: oklch(var(--role-admin));
+  }
+  .badge-role[data-role="mechanic"] {
+    background-color: oklch(var(--role-mechanic) / 0.18);
+    color: oklch(var(--role-mechanic));
+  }
+  .badge-role[data-role="guest"] {
+    background-color: oklch(var(--role-guest) / 0.18);
+    color: oklch(var(--role-guest));
+  }
+  .badge-role[data-role="custom"] {
+    background-color: oklch(var(--role-custom) / 0.16);
+    color: oklch(var(--role-custom));
+  }
+
+  /* Account status pills — activo / inactivo. */
+  .badge-account {
+    @apply inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium leading-none;
+  }
+  .badge-account[data-status="active"] {
+    background-color: oklch(var(--account-active) / 0.16);
+    color: oklch(var(--account-active));
+  }
+  .badge-account[data-status="inactive"] {
+    background-color: oklch(var(--account-inactive) / 0.18);
+    color: oklch(var(--account-inactive));
+  }
+
+  /* Temporary-password reveal panel — shown once after create/reset. */
+  .temp-password-panel {
+    @apply rounded-md border p-4;
+    border-color: oklch(var(--temp-password) / 0.35);
+    background-color: oklch(var(--temp-password) / 0.08);
+  }
+  .temp-password-label {
+    @apply flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider;
+    color: oklch(var(--temp-password));
+  }
+  .temp-password-value {
+    @apply mt-2 rounded-sm border bg-background px-3 py-2 font-mono text-lg font-semibold tracking-widest;
+    border-color: oklch(var(--temp-password) / 0.35);
+  }
+  .temp-password-note {
+    @apply mt-2 text-xs text-muted-foreground;
+  }
+
+  /* User management table — search + role filter rail above the DataTable. */
+  .users-toolbar {
+    @apply flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between;
+  }
+  .users-toolbar-search {
+    @apply relative w-full sm:max-w-xs;
+  }
+  .users-toolbar-search svg {
+    @apply pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground;
+  }
+  .users-toolbar-search input {
+    @apply pl-8;
+  }
+  .users-toolbar-actions {
+    @apply flex flex-wrap items-center gap-2;
+  }
+  .users-username {
+    @apply data-rail text-sm text-muted-foreground;
+  }
+  .users-count {
+    @apply font-mono text-xs tabular-nums text-muted-foreground;
+  }
+
+  /* Password strength / match hint under a password field. */
+  .password-meter {
+    @apply mt-2 flex items-center gap-1.5;
+  }
+  .password-meter-segment {
+    @apply h-1 flex-1 rounded-full bg-muted;
+  }
+  .password-meter-segment[data-filled="true"] {
+    background-color: oklch(var(--primary));
+  }
+  .password-meter[data-tone="weak"]
+    .password-meter-segment[data-filled="true"] {
+    background-color: oklch(var(--destructive));
+  }
+  .password-meter[data-tone="fair"]
+    .password-meter-segment[data-filled="true"] {
+    background-color: oklch(var(--accent));
   }
 }
 
@@ -939,6 +1468,11 @@
     page-break-after: auto;
   }
 
+  /* Undo the phone-only screen scaling so the printed A4 sheet is 1:1. */
+  .doc-preview-a4 {
+    zoom: 1 !important;
+  }
+
   /* 80mm tirilla: the @page rule below owns the roll width and margins, so
      the sheet itself only needs to fill it without side padding. */
   .doc-preview-80mm {
@@ -948,6 +1482,33 @@
     padding: 0 !important;
     overflow: visible !important;
     font-size: 10px !important;
+  }
+
+  /* Tirilla 80mm impresa: el encabezado centrado se mantiene en papel, con
+     cada dato en su propia fila y su propio espacio (sin solapamiento). */
+  .doc-preview-80mm .doc-header {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 3mm !important;
+    text-align: center !important;
+  }
+  .doc-preview-80mm .doc-header-identity {
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    gap: 2mm !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    text-align: center !important;
+  }
+  .doc-preview-80mm .doc-header-identity > div {
+    width: 100% !important;
+    min-width: 0 !important;
+  }
+  .doc-preview-80mm .doc-header-title {
+    width: 100% !important;
+    text-align: center !important;
   }
 
   /* Keep rows, totals blocks, and signature blocks intact across pages. */
@@ -1003,6 +1564,43 @@
   .report-sheet .bg-secondary,
   .report-sheet .bg-card {
     background-color: transparent !important;
+  }
+
+  /* Mensaje de esperanza bíblica: el bloque conserva su fondo suave y su borde
+     de color en papel — literales porque el impreso no depende del tema. */
+  .doc-preview .doc-hope {
+    background-color: #eef7f0 !important;
+    border-color: #b7ddc4 !important;
+    border-left-color: #1f7a45 !important;
+  }
+  .doc-preview .doc-hope::before {
+    color: #6aa87f !important;
+  }
+  .doc-preview .doc-hope-text {
+    color: #1c3a28 !important;
+  }
+  .doc-preview .doc-hope-citation {
+    color: #8a5a12 !important;
+  }
+
+  /* Términos y Condiciones de Garantía: el aviso IMPORTANTE conserva su tarjeta
+     ámbar en papel — literales porque el impreso no depende del tema. */
+  .doc-preview .doc-warranty-clause-title {
+    color: #111111 !important;
+  }
+  .doc-preview .doc-warranty-clause-body {
+    color: #4b5563 !important;
+  }
+  .doc-preview .doc-warranty-important {
+    background-color: #fef3c7 !important;
+    border-color: #d97706 !important;
+    border-left-color: #d97706 !important;
+  }
+  .doc-preview .doc-warranty-important-title {
+    color: #92400e !important;
+  }
+  .doc-preview .doc-warranty-important-body {
+    color: #451a03 !important;
   }
 
   .doc-preview .bg-gradient-primary,

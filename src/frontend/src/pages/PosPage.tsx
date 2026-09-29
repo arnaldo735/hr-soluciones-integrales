@@ -1,3 +1,4 @@
+import { BarcodeScanner } from "@/components/BarcodeScanner";
 import { CustomerFormDialog } from "@/components/CustomerFormDialog";
 import { DocumentPreview } from "@/components/DocumentPreview";
 import { NotifyCustomerDialog } from "@/components/NotifyCustomerDialog";
@@ -14,18 +15,29 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useBackend } from "@/hooks/use-backend";
 import {
   useBusinessSettings,
   useCompanyProfile,
   useIvaSettings,
 } from "@/hooks/use-company";
 import { useCustomers } from "@/hooks/use-customers";
-import { findPartBySku, useParts } from "@/hooks/use-orders";
-import { useCreatePosSale } from "@/hooks/use-pos";
+import { useDailyHopeMessage } from "@/hooks/use-hope";
+import { useParts } from "@/hooks/use-orders";
+import { useCreatePosSale, useFindPartByCode } from "@/hooks/use-pos";
+import {
+  SERVICE_TERMS_DEFAULT_TEXT,
+  useServiceTermsSettings,
+} from "@/hooks/use-service-terms";
+import {
+  companyContactLine,
+  companyFiscalLines,
+  companyHeaderFromProfile,
+} from "@/lib/company-header";
 import { downloadFile } from "@/lib/download";
 import { formatMoney, formatNumber, formatTaxRate } from "@/lib/format";
 import { loadPdfLibs, pdfCompanyFromProfile } from "@/lib/pdf";
+import { drawHopeMessage, hopeMessageContent } from "@/lib/pdf";
+import type { HopeMessageContent } from "@/lib/pdf";
 import type {
   CreditPlanInput,
   DocumentFormat,
@@ -50,6 +62,7 @@ import {
   AlertTriangle,
   Barcode,
   CalendarClock,
+  Camera,
   CheckCircle2,
   Mail,
   Minus,
@@ -198,8 +211,8 @@ function CartRow({
         </button>
       </div>
 
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center rounded-sm border border-input">
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-2">
+        <div className="flex shrink-0 items-center rounded-sm border border-input">
           <button
             type="button"
             aria-label={`Disminuir cantidad de ${line.name}`}
@@ -231,7 +244,7 @@ function CartRow({
           </button>
         </div>
 
-        <div className="flex items-center gap-1">
+        <div className="flex shrink-0 items-center gap-1">
           <Label
             htmlFor={`pos-discount-${index}`}
             className="text-[11px] text-muted-foreground"
@@ -249,11 +262,11 @@ function CartRow({
             onChange={(event) =>
               onDiscount(line.partId, parseAmount(event.target.value))
             }
-            className="data-rail h-7 w-20 text-right text-sm"
+            className="data-rail h-7 w-16 text-right text-sm sm:w-20"
           />
         </div>
 
-        <span className="data-rail ml-auto text-sm font-semibold">
+        <span className="data-rail ml-auto shrink-0 text-sm font-semibold">
           {formatMoney(BigInt(lineAmount))}
         </span>
       </div>
@@ -285,6 +298,7 @@ async function buildReceiptPdf(
   lines: DocumentLine[],
   totals: DocumentTotals[],
   footer: string,
+  hope: HopeMessageContent | null,
 ): Promise<jsPDF> {
   const { jsPDF, autoTable } = await loadPdfLibs();
   const narrow = format === "receipt80";
@@ -408,11 +422,15 @@ async function buildReceiptPdf(
   doc.setFont("helvetica", "normal");
   doc.setFontSize(narrow ? 6 : 7.5);
   doc.setTextColor(100, 116, 139);
-  doc.text(
-    doc.splitTextToSize(footer, right - margin),
-    margin,
-    afterTotals + (narrow ? 6 : 10),
-  );
+  const footerY = afterTotals + (narrow ? 6 : 10);
+  const footerLines = doc.splitTextToSize(footer, right - margin);
+  doc.text(footerLines, margin, footerY);
+  drawHopeMessage(doc, hope, {
+    x: margin,
+    right,
+    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    narrow,
+  });
 
   return doc;
 }
@@ -438,23 +456,50 @@ export function PosPage() {
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [scanPending, setScanPending] = useState(false);
+  const [scannerOpen, setScannerOpen] = useState(false);
   const barcodeRef = useRef<HTMLInputElement>(null);
-
-  const { actor } = useBackend();
 
   const debouncedPartSearch = useDebouncedValue(search, 250);
   const partsQuery = useParts(debouncedPartSearch);
+  // The term the user is typing has not reached the debounced value yet, so the
+  // picker must keep showing its loading state instead of stale results or a
+  // premature "sin resultados" message. Clearing the field shows the prompt
+  // immediately, without waiting for the debounce to catch up.
+  const isPartSearchPending =
+    search.trim() !== "" &&
+    (search.trim() !== debouncedPartSearch.trim() || partsQuery.isFetching);
   const debouncedCustomerSearch = useDebouncedValue(customerSearch, 250);
   const customersQuery = useCustomers(debouncedCustomerSearch);
+  // Same guard as the product search: while the live term has not reached the
+  // debounced value, or the query is refetching, the picker must show its
+  // loading state instead of the previous term's results or a premature
+  // "sin resultados" message. Clearing the field resolves immediately.
+  const isCustomerSearchPending =
+    customerSearch.trim() !== "" &&
+    (customerSearch.trim() !== debouncedCustomerSearch.trim() ||
+      customersQuery.isFetching);
   const businessQuery = useBusinessSettings();
   const companyQuery = useCompanyProfile();
+  const dailyHopeQuery = useDailyHopeMessage();
+  const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
+  const serviceTermsQuery = useServiceTermsSettings();
   const { isIvaResponsible, taxRate: effectiveTaxRate } = useIvaSettings();
   const createSale = useCreatePosSale();
+  const findPartByCode = useFindPartByCode();
 
   const parts = partsQuery.data?.items ?? [];
   const customers = customersQuery.data ?? [];
   const business = businessQuery.data ?? null;
-  const companyLogoUrl = companyQuery.data?.logoUrl ?? undefined;
+
+  // Complete company identity for the printable receipt: logo, razón social,
+  // NIT con dígito de verificación, régimen, responsabilidad, dirección,
+  // ciudad, teléfono, correo y web. Unconfigured fields are omitted cleanly.
+  const companyHeader = companyHeaderFromProfile(companyQuery.data);
+  const receiptCompanyName =
+    companyHeader?.legalName ?? business?.name ?? "HR SOLUCIONES INTEGRALES";
+  const receiptCompanyLogoUrl = companyHeader?.logoUrl;
+  const receiptCompanyContact = companyContactLine(companyHeader);
+  const receiptCompanyFiscal = companyFiscalLines(companyHeader);
 
   // Cliente seleccionado para la venta; "none" es la venta de mostrador.
   const selectedCustomer =
@@ -566,15 +611,11 @@ export function PosPage() {
     event.preventDefault();
     const code = barcode.trim();
     if (code === "" || scanPending) return;
-    if (!actor) {
-      toast.error("Backend no disponible. Intenta de nuevo.");
-      return;
-    }
     setScanPending(true);
     try {
-      const match = await findPartBySku(actor, code);
+      const match = await findPartByCode.mutateAsync(code);
       if (!match) {
-        toast.error(`No se encontró ningún producto con el código ${code}`);
+        toast.error(`Producto no encontrado para el código ${code}`);
         return;
       }
       addPart(match);
@@ -585,6 +626,17 @@ export function PosPage() {
     } finally {
       setScanPending(false);
     }
+  };
+
+  // A camera scan resolves through the same backend lookup as manual entry, so
+  // both paths add the exact product or report "producto no encontrado".
+  const handleScanDetected = (part: PartView) => {
+    addPart(part);
+    toast.success(`${part.name} agregado al carrito`);
+  };
+
+  const handleScanNotFound = (code: string) => {
+    toast.error(`Producto no encontrado para el código ${code}`);
   };
 
   const updateQuantity = (partId: bigint, quantity: number) => {
@@ -738,7 +790,12 @@ export function PosPage() {
       ]
     : [];
 
-  const receiptFooter = "Gracias por su compra. Conserve este comprobante.";
+  // Pie de página editable "Términos y condiciones del Servicio". Mientras la
+  // configuración carga, o cuando el administrador la dejó vacía, se usa el
+  // texto de recepción por defecto para que el comprobante nunca quede sin pie.
+  const serviceTermsText = serviceTermsQuery.data?.text?.trim() ?? "";
+  const receiptFooter =
+    serviceTermsText !== "" ? serviceTermsText : SERVICE_TERMS_DEFAULT_TEXT;
 
   async function handleDownloadReceipt(nextFormat: DocumentFormat) {
     if (!completedSale) return;
@@ -753,6 +810,7 @@ export function PosPage() {
         receiptLines,
         receiptTotals,
         receiptFooter,
+        hopeMessage,
       );
       await downloadFile({
         filename: `Comprobante-${completedSale.saleNumber}.pdf`,
@@ -772,7 +830,7 @@ export function PosPage() {
     return (
       <div
         data-ocid="pos.page"
-        className="mx-auto w-full max-w-3xl animate-fade-in space-y-5"
+        className="mx-auto w-full min-w-0 max-w-3xl animate-fade-in space-y-5"
       >
         <PageHeader
           eyebrow="Ventas"
@@ -818,19 +876,15 @@ export function PosPage() {
           <DocumentPreview
             title="Comprobante"
             number={completedSale.saleNumber}
-            companyName={business?.name ?? "HR SOLUCIONES INTEGRALES"}
-            companyLogoUrl={companyLogoUrl}
-            companyContact={
-              business
-                ? [business.address, business.phone]
-                    .filter((value) => value.length > 0)
-                    .join(" · ")
-                : undefined
-            }
+            companyName={receiptCompanyName}
+            companyLogoUrl={receiptCompanyLogoUrl}
+            companyContact={receiptCompanyContact}
+            companyFiscal={receiptCompanyFiscal}
             meta={receiptMeta}
             lines={receiptLines}
             totals={receiptTotals}
             footer={receiptFooter}
+            hopeMessage={hopeMessage}
             format="a4"
             ocid="pos.receipt_a4"
             onDownloadPdf={handleDownloadReceipt}
@@ -839,12 +893,15 @@ export function PosPage() {
           <DocumentPreview
             title="Comprobante"
             number={completedSale.saleNumber}
-            companyName={business?.name ?? "HR SOLUCIONES INTEGRALES"}
-            companyLogoUrl={companyLogoUrl}
+            companyName={receiptCompanyName}
+            companyLogoUrl={receiptCompanyLogoUrl}
+            companyContact={receiptCompanyContact}
+            companyFiscal={receiptCompanyFiscal}
             meta={receiptMeta}
             lines={receiptLines}
             totals={receiptTotals}
-            footer="Gracias por su compra."
+            footer={receiptFooter}
+            hopeMessage={hopeMessage}
             format="receipt80"
             ocid="pos.receipt_80mm"
             onDownloadPdf={handleDownloadReceipt}
@@ -899,35 +956,59 @@ export function PosPage() {
         }
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,420px)]">
         {/* --- Product search column ------------------------------------- */}
         <section
           data-ocid="pos.product_panel"
-          className="counter-panel flex min-h-[520px] flex-col"
+          className="counter-panel flex min-w-0 flex-col lg:min-h-[520px]"
         >
           <div className="space-y-3 border-b border-border p-4">
             <form onSubmit={handleBarcode} className="space-y-1.5">
               <Label htmlFor="pos-barcode" className="text-xs">
                 Código de barras
               </Label>
-              <div className="relative">
-                <ScanLine
-                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
-                <Input
-                  id="pos-barcode"
-                  ref={barcodeRef}
-                  value={barcode}
-                  onChange={(event) => setBarcode(event.target.value)}
-                  placeholder="Escanea o escribe el SKU y presiona Enter"
-                  autoComplete="off"
-                  aria-label="Código de barras"
-                  data-ocid="pos.barcode_input"
-                  className="counter-scan pl-9"
-                />
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-0 flex-1 basis-48">
+                  <ScanLine
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    id="pos-barcode"
+                    ref={barcodeRef}
+                    value={barcode}
+                    onChange={(event) => setBarcode(event.target.value)}
+                    placeholder="Escanea o escribe el SKU y presiona Enter"
+                    autoComplete="off"
+                    aria-label="Código de barras"
+                    data-ocid="pos.barcode_input"
+                    className="counter-scan pl-9"
+                  />
+                </div>
+                <Button
+                  type="button"
+                  variant={scannerOpen ? "default" : "outline"}
+                  onClick={() => setScannerOpen((open) => !open)}
+                  aria-expanded={scannerOpen}
+                  data-ocid="pos.scan_button"
+                  className="shrink-0 gap-2"
+                >
+                  <Camera className="size-4" aria-hidden="true" />
+                  {scannerOpen ? "Cerrar escáner" : "Escanear"}
+                </Button>
               </div>
             </form>
+
+            {scannerOpen ? (
+              <BarcodeScanner
+                ocid="pos.scanner"
+                title="Escanear código de barras"
+                hint="Apunta la cámara al código del producto o ingrésalo manualmente. Se agrega al carrito."
+                onDetected={handleScanDetected}
+                onNotFound={handleScanNotFound}
+                className="rounded-md border border-border bg-muted/20 p-3"
+              />
+            ) : null}
 
             <div className="space-y-1.5">
               <Label htmlFor="pos-search" className="text-xs">
@@ -952,7 +1033,24 @@ export function PosPage() {
           </div>
 
           <div className="scroll-slim flex-1 overflow-y-auto">
-            {partsQuery.isLoading ? (
+            {search.trim() === "" ? (
+              <div
+                data-ocid="pos.search_prompt_state"
+                className="flex flex-col items-center gap-2 px-6 py-16 text-center"
+              >
+                <Search
+                  className="size-6 text-muted-foreground"
+                  aria-hidden="true"
+                />
+                <p className="font-display text-sm font-semibold">
+                  Busca un producto
+                </p>
+                <p className="max-w-xs text-xs text-muted-foreground">
+                  Escribe el nombre, la marca o el SKU para ver coincidencias, o
+                  escanea el código de barras para agregarlo al carrito.
+                </p>
+              </div>
+            ) : isPartSearchPending ? (
               <div data-ocid="pos.loading_state" className="space-y-2 p-4">
                 {Array.from({ length: 6 }, (_, i) => `pos-skeleton-${i}`).map(
                   (id) => (
@@ -997,14 +1095,10 @@ export function PosPage() {
                   aria-hidden="true"
                 />
                 <p className="font-display text-sm font-semibold">
-                  {debouncedPartSearch.trim() === ""
-                    ? "Sin productos"
-                    : "Sin resultados"}
+                  Sin resultados
                 </p>
                 <p className="max-w-xs text-xs text-muted-foreground">
-                  {debouncedPartSearch.trim() === ""
-                    ? "No hay productos en el catálogo. Registra el repuesto para venderlo."
-                    : `Ningún producto coincide con “${debouncedPartSearch.trim()}”. Ajusta el término o regístralo en el catálogo.`}
+                  {`Ningún producto coincide con “${debouncedPartSearch.trim()}”. Ajusta el término o regístralo en el catálogo.`}
                 </p>
               </div>
             ) : (
@@ -1060,7 +1154,7 @@ export function PosPage() {
         {/* --- Cart column ----------------------------------------------- */}
         <section
           data-ocid="pos.cart_panel"
-          className="counter-panel flex min-h-[520px] flex-col"
+          className="counter-panel flex min-w-0 flex-col lg:min-h-[520px]"
         >
           <header className="flex items-center justify-between gap-2 border-b border-border px-4 py-3">
             <div className="flex items-center gap-2">
@@ -1118,8 +1212,8 @@ export function PosPage() {
                 <UserRound className="size-3.5" aria-hidden="true" />
                 Cliente {isCredit ? "(obligatorio a crédito)" : "(opcional)"}
               </Label>
-              <div className="flex items-center gap-2">
-                <div className="relative min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="relative min-w-0 flex-1 basis-48">
                   <Search
                     className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
                     aria-hidden="true"
@@ -1167,13 +1261,28 @@ export function PosPage() {
                   ))}
                 </SelectContent>
               </Select>
-              {customerSearch.trim() !== "" && customers.length === 0 ? (
+              {debouncedCustomerSearch.trim() !== "" &&
+              isCustomerSearchPending ? (
+                <div
+                  data-ocid="pos.customer_search_loading_state"
+                  className="space-y-2"
+                >
+                  {Array.from(
+                    { length: 3 },
+                    (_, i) => `pos-customer-skeleton-${i}`,
+                  ).map((id) => (
+                    <Skeleton key={id} className="h-9 w-full" />
+                  ))}
+                </div>
+              ) : debouncedCustomerSearch.trim() !== "" &&
+                !customersQuery.isError &&
+                customers.length === 0 ? (
                 <p
                   data-ocid="pos.customer_search_empty_state"
                   className="text-xs text-muted-foreground"
                 >
-                  Sin clientes que coincidan con “{customerSearch.trim()}”.
-                  Puedes crear uno nuevo.
+                  Sin clientes que coincidan con “
+                  {debouncedCustomerSearch.trim()}”. Puedes crear uno nuevo.
                 </p>
               ) : null}
               {selectedCustomer ? (
@@ -1317,11 +1426,14 @@ export function PosPage() {
                 ) : null}
 
                 {creditReady ? (
-                  <div data-ocid="pos.installment_preview">
+                  <div
+                    data-ocid="pos.installment_preview"
+                    className="scroll-slim overflow-x-auto"
+                  >
                     <p className="mb-2 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                       Plan de cuotas
                     </p>
-                    <table className="installment-table">
+                    <table className="installment-table min-w-[320px]">
                       <thead>
                         <tr>
                           <th scope="col">Cuota</th>
@@ -1407,7 +1519,7 @@ export function PosPage() {
                 <dt className="font-display text-sm font-semibold">Total</dt>
                 <dd
                   data-ocid="pos.total_value"
-                  className="counter-total text-primary"
+                  className="counter-total text-2xl text-primary sm:text-3xl"
                 >
                   {formatMoney(BigInt(totals.total))}
                 </dd>

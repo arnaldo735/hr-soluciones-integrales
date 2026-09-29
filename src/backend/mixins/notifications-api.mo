@@ -11,6 +11,7 @@ import BillingTypes "../types/billing";
 import AppointmentTypes "../types/appointments";
 import ServiceTypes "../types/services";
 import CompanyTypes "../types/company";
+import HopeTypes "../types/hope";
 import NotificationsLib "../lib/notifications";
 
 mixin (
@@ -22,6 +23,7 @@ mixin (
   appointments : Map.Map<Common.Id, AppointmentTypes.Appointment>,
   services : Map.Map<Common.Id, ServiceTypes.Service>,
   company : { var profile : CompanyTypes.CompanyProfile },
+  hope : { var settings : HopeTypes.HopeSettings },
 ) {
   func notificationsState() : NotificationsLib.State = {
     customers;
@@ -32,6 +34,7 @@ mixin (
     appointments;
     services;
     company;
+    hope;
   };
 
   // Envía un correo de notificación al cliente. El destinatario se toma del

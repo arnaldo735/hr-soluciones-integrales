@@ -1,3 +1,4 @@
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { effectiveTaxRate, isIvaResponsible } from "@/lib/format";
 import type {
@@ -8,16 +9,18 @@ import type {
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 /** Company profile shown on printed documents and invoices. */
-export function useCompanyProfile() {
+export function useCompanyProfile(options?: { enabled?: boolean }) {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  const enabled = options?.enabled ?? true;
 
   return useQuery({
     queryKey: ["company-profile"],
     queryFn: async (): Promise<CompanyProfile | null> => {
       if (!actor) return null;
-      return actor.getCompanyProfile();
+      return actor.getCompanyProfile(token);
     },
-    enabled: !!actor && !isFetching,
+    enabled: enabled && !!actor && !isFetching,
     // Shared by the panel, POS and every printed document; fetched once per
     // session and refreshed only when the profile is updated.
     staleTime: Number.POSITIVE_INFINITY,
@@ -26,12 +29,13 @@ export function useCompanyProfile() {
 
 export function useUpdateCompanyProfile() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: async (input: CompanyProfileInput): Promise<CompanyProfile> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateCompanyProfile(input);
+      return actor.updateCompanyProfile(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["company-profile"] });
@@ -43,12 +47,13 @@ export function useUpdateCompanyProfile() {
 /** Operational business settings (name, tax id, address, tax rate). */
 export function useBusinessSettings() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
 
   return useQuery({
     queryKey: ["business-settings"],
     queryFn: async (): Promise<BusinessSettings | null> => {
       if (!actor) return null;
-      return actor.getBusinessSettings();
+      return actor.getBusinessSettings(token);
     },
     enabled: !!actor && !isFetching,
     // Shared by POS and the printed documents; fetched once per session and
@@ -82,6 +87,7 @@ export function useIvaSettings() {
 
 export function useUpdateBusinessSettings() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
 
   return useMutation({
@@ -89,7 +95,7 @@ export function useUpdateBusinessSettings() {
       settings: BusinessSettings,
     ): Promise<BusinessSettings> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.updateBusinessSettings(settings);
+      return actor.updateBusinessSettings(token, settings);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["business-settings"] });

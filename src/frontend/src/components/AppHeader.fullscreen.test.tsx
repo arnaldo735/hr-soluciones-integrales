@@ -109,6 +109,8 @@ describe("AppHeader fullscreen control", () => {
       isAdmin: true,
       isLoading: false,
       isError: false,
+      modules: null,
+      roleName: "Administrador",
       refetch: vi.fn(),
     });
   });

@@ -68,7 +68,9 @@ vi.mock("@caffeineai/object-storage", () => ({
   },
 }));
 
-// `uploadImage` builds the storage client from the deployment config.
+// `uploadImage` builds the storage client from the deployment config. The
+// `useInternetIdentity` surface is required because `renderWithProviders`
+// mounts the real `AuthProvider`, which reads it on every render.
 vi.mock("@caffeineai/core-infrastructure", () => ({
   loadConfig: () =>
     Promise.resolve({
@@ -78,6 +80,14 @@ vi.mock("@caffeineai/core-infrastructure", () => ({
       backend_canister_id: "aaaaa-aa",
       project_id: "project-1",
     }),
+  useInternetIdentity: () => ({
+    isAuthenticated: false,
+    isInitializing: false,
+    isLoggingIn: false,
+    login: vi.fn(),
+    clear: vi.fn(),
+    identity: undefined,
+  }),
 }));
 
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));

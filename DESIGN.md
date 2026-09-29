@@ -388,3 +388,166 @@ Each flow is a `.flow-group` band: `.flow-group-head` (`.flow-group-icon` + `.fl
 ## Signature Detail (addendum)
 
 The **centered nameplate** — a green-railed company header whose `.data-rail` fiscal fields (NIT, teléfono, correo, dirección) sit on a hairline grid, turning the panel's first impression into the workshop's engraved machine plate, echoed below by tone-railed flow shortcut cards that read as a switchboard of the business.
+
+---
+
+# Addendum — Acceso con contraseña y gestión de usuarios y roles
+
+## Scope
+
+Two new surfaces: the **password sign-in screen** (replacing the Internet Identity gate as the primary door, II kept as an alternative admin entry) and the **admin user/role management** screens inside `/configuracion`. No redesign and no route churn — same "Taller Nocturno" tokens, typography, and components. New tokens are limited to the auth, role, account-status and temp-password families below.
+
+## New Tokens (extend, do not replace)
+
+| Token family | Light | Dark | Role |
+| --- | --- | --- | --- |
+| `auth-backdrop` | 0.205 0.02 150 | 0.14 0.022 150 | Branded login backdrop — graphite steel with a taller-green cast |
+| `auth-panel` | 0.995 0.003 85 | 0.205 0.013 85 | Centered login card surface (one step off the backdrop) |
+| `auth-panel-border` | 0.9 0.006 85 | 0.3 0.014 85 | Login card hairline border |
+| `auth-grid` | 0.32 0.02 150 | 0.3 0.02 150 | Hairline grid + top glow on the backdrop |
+| `role-admin` | 0.5 0.13 152 | 0.78 0.16 152 | Administrador badge — taller green |
+| `role-mechanic` | 0.68 0.15 70 | 0.8 0.15 72 | Mecánico badge — tool amber |
+| `role-guest` | 0.55 0.012 82 | 0.62 0.012 82 | Invitado badge — steel grey |
+| `role-custom` | 0.55 0.12 240 | 0.7 0.13 240 | Custom role badge — blue 240 |
+| `account-active` | 0.55 0.14 148 | 0.72 0.16 148 | Active account pill |
+| `account-inactive` | 0.6 0.03 30 | 0.6 0.02 30 | Deactivated account pill |
+| `temp-password` | 0.66 0.15 78 | 0.78 0.16 75 | One-time temporary-password reveal panel |
+
+- Utilities added in `@layer utilities`: `.auth-backdrop`, `.auth-card`, `.auth-card-mark/-title/-subtitle/-form/-footer`, `.field-label`, `.field[data-invalid]`, `.field-error`, `.field-hint`, `.auth-alert[data-tone]`, `.badge-role[data-role]`, `.badge-account[data-status]`, `.temp-password-panel/-label/-value/-note`, `.users-toolbar`, `.users-toolbar-search`, `.users-username`, `.users-count`, `.password-meter`.
+- Tailwind theme keys added: `auth.*`, `role.*`, `account.*`, `temp-password.*`; keyframes `auth-card-in`, `reveal-in`.
+- No existing token is renamed or removed; `--destructive` stays the error color.
+
+## Sign-In Screen (ingreso con contraseña)
+
+- **Backdrop** — `.auth-backdrop` fills the viewport: graphite-steel-green base, 28px hairline grid, and a soft `primary/18` radial glow from the top. The app shell (sidebar/header) must not render on this screen.
+- **Card** — `.auth-card` centered (max-w-md, `rounded-lg`), `bg-auth-panel`, 1px `auth-panel-border`, 2px `primary` **top rail**, `shadow-elevated`, `animate-auth-card-in`.
+- **Mark** — `.auth-card-mark` (56px, `bg-gradient-primary`) is the same green mark as the company nameplate, reinforcing that this is the workshop's front door.
+- **Copy** — title `Iniciar sesión` (`.auth-card-title`), subtitle `Ingrese con su usuario y contraseña` (`.auth-card-subtitle`).
+- **Fields** — `Usuario de acceso` and `Contraseña`, both `.field-label`; password field carries a show/hide toggle (`Eye`/`EyeOff`, `aria-label` in Spanish). Submit is full-width primary `Ingresar`; while pending, disabled with a `Loader2` spinner and `Ingresando…`.
+- **Errors** — `.auth-alert[data-tone="error"]` for `Usuario o contraseña incorrectos.`; `.auth-alert[data-tone="warning"]` with a `Ban`/`TriangleAlert` icon for deactivated accounts (`Su cuenta está desactivada. Contacte al administrador.`). Never reveal which of the two credentials failed.
+- **Alternative entry** — a quiet `.auth-card-footer` link `Ingresar como administrador con Internet Identity` keeps the existing II flow reachable without competing with the password form.
+- **Motion** — one `animate-auth-card-in` on mount; no ambient motion.
+
+## User Management (gestión de usuarios)
+
+- **Toolbar** — `.users-toolbar`: `.users-toolbar-search` (Search icon, placeholder `Buscar por nombre o usuario`, 300ms debounce) on the left; `.users-toolbar-actions` on the right with a role `Select` filter and the primary `Crear usuario` (`UserPlus`). A `.users-count` shows `N usuarios`.
+- **Table** — reuse `DataTable`: sticky header `bg-muted/50`, uppercase 11px labels, zebra `bg-muted/20`, 40px rows, 12px cell padding, `.scroll-slim` on mobile.
+
+| Column | Treatment |
+| --- | --- |
+| Nombre | `text-sm font-medium`, truncate with title tooltip |
+| Usuario de acceso | `.users-username` (`.data-rail` mono) |
+| Rol | `.badge-role` + `data-role` (`admin`/`mechanic`/`guest`/`custom`) |
+| Estado | `.badge-account` + `data-status` (`active`/`inactive`) |
+| Acciones | `.row-actions` cluster: editar rol, restablecer contraseña, activar/desactivar, eliminar |
+
+- **Row actions** — `Pencil` (edit role), `KeyRound` (reset password), `UserCheck`/`UserX` (toggle active), `Trash2` with `data-variant="destructive"` (delete). Delete always opens a confirmation dialog and is disabled on the caller's own admin row.
+- **Create/edit dialog** — `Dialog` with `shadow-elevated`: `Nombre`, `Usuario de acceso` (validates uniqueness with `.field-error`), rol `Select`, and `Contraseña temporal`. Footer `Cancelar` (outline) + `Guardar` (primary).
+- **States** — loading `Skeleton` rows matching column count; error `bg-destructive/10 text-destructive` panel + `Reintentar`; empty centered `text-sm text-muted-foreground` echoing active filters + `Limpiar filtros`.
+
+## Role Badges & Custom Roles
+
+- Four badge tones only: `admin` green 152, `mechanic` amber 70, `guest` steel grey, `custom` blue 240. Custom roles always render as `custom` — the role **name** carries the identity, the badge color stays within the four-tone system.
+- Role editor: name field + a module checklist (`Checkbox` per módulo permitido) grouped by the six existing flows; renaming/editing is inline, deletion is blocked while any user holds the role (`.auth-alert[data-tone="info"]` explains why).
+
+## Temporary-Password Reveal Panel
+
+- `.temp-password-panel` — `temp-password/8` tint, `temp-password/35` border, 6px radius, `animate-reveal-in`.
+- `.temp-password-label` with a `KeyRound` icon: `Contraseña temporal`; `.temp-password-value` renders the password in `.data-rail` mono `text-lg tracking-widest` on a `bg-background` inset.
+- Copy button (`Copy` icon) + `.temp-password-note`: `Esta contraseña se muestra una sola vez. Entréguela al usuario y pídale cambiarla al ingresar.`
+- The panel appears only immediately after create or reset; it is never re-openable from the table.
+
+## Structural Zones (addendum)
+
+| Zone | Background | Border | Notes |
+| --- | --- | --- | --- |
+| Login backdrop | `auth-backdrop` | — | 28px hairline grid + top `primary` glow; no app shell |
+| Login card | `auth-panel` | `auth-panel-border` + 2px primary top rail | `shadow-elevated`, max-w-md, centered |
+| Users toolbar | `bg-background` | — | Search left, role filter + primary action right |
+| Users table | `bg-card` | `border` | Sticky `bg-muted/50` header, zebra `bg-muted/20` |
+| Role/status badges | tinted `role-*` / `account-*` | — | Pill, `text-xs font-medium` |
+| Temp-password panel | `temp-password/8` | `temp-password/35` | One-time reveal, `animate-reveal-in` |
+
+## Constraints (addendum)
+
+- Passwords are never rendered in plain text outside the one-time reveal panel; no password is ever returned by the backend in cleartext
+- Deactivated accounts cannot sign in; the message must not disclose whether the username exists
+- The admin's own account can never be deleted; role and status changes on self are disabled
+- Role gating must be enforced in the backend, not only hidden in the UI
+- Spanish (Colombia) copy throughout; no email affordances — temporary passwords are handed over in person
+- No access/audit log surface, no password-recovery-by-email surface
+- Semantic tokens only — no raw hex, `rgb()`, or arbitrary color classes
+
+## Signature Detail (addendum)
+
+The **green-railed login card on the hairline-grid backdrop** — the same 2px primary rail and engraved-grid texture as the company nameplate, so signing in feels like walking up to the workshop's own machine plate rather than a generic auth form; echoed in the table by four-tone role badges and one-time amber temp-password panels.
+
+---
+
+# Addendum — Mensaje de esperanza bíblica en documentos imprimibles
+
+## Scope
+
+Visual treatment of the "mensaje de esperanza bíblica" block in the footer of printable documents: screen preview (`.doc-preview`), PDF A4, and 80mm POS receipt. **Tokens and CSS only** — no component or PDF code changes. The existing hope-message logic (Automático/Manual, daily rotation) is untouched. The block renders nothing and leaves no space when there is no active message.
+
+## Direction
+
+A quiet **estampa devocional** at the foot of the ledger: a soft green-tinted card with a 2px green left rail (the system's signature rail), the promise in italic and one step larger than the surrounding `.doc-meta` footer, and the citation in tool-amber bold — a reverent pause in an otherwise industrial document.
+
+## New Tokens (extend, do not replace)
+
+| Token family | Light | Dark | Role |
+| --- | --- | --- | --- |
+| `hope-surface` | 0.965 0.02 152 | 0.965 0.02 152 | Soft green box background (paper is always light) |
+| `hope-border` | 0.82 0.05 152 | 0.82 0.05 152 | Box hairline border |
+| `hope-rule` | 0.5 0.13 152 | 0.5 0.13 152 | 2px left rail (taller green) |
+| `hope-promise` | 0.28 0.03 152 | 0.28 0.03 152 | Promise text — deep green ink |
+| `hope-citation` | 0.46 0.11 70 | 0.46 0.11 70 | Citation — tool amber, bold |
+| `hope-quote` | 0.7 0.1 152 | 0.7 0.1 152 | Decorative opening quote mark |
+
+- Utilities in `@layer utilities`: `.doc-hope`, `.doc-hope::before` (decorative `“`), `.doc-hope-text`, `.doc-hope-citation`, plus `.doc-preview-a4` / `.doc-preview-80mm` size overrides.
+- Tailwind theme key added: `hope.*` (surface, border, rule, promise, citation, quote).
+- Paper literals in `@media print` (must not depend on theme): surface `#eef7f0`, border `#b7ddc4`, rail `#1f7a45`, quote `#6aa87f`, promise `#1c3a28`, citation `#8a5a12`.
+- No existing token is renamed or removed.
+
+## Block Spec (A4)
+
+| Property | Value |
+| --- | --- |
+| Box | `.doc-hope` — `border-radius: 3px`, 1px `hope-border`, 2px `hope-rule` left rail, `hope-surface` fill |
+| Padding | `4mm 4.5mm 4mm 6mm` (extra left for the quote mark) |
+| Promise | `.doc-hope-text` — `italic`, `12px` (A4) vs 10px `.doc-meta`, `line-height: 1.5`, `hope-promise` |
+| Citation | `.doc-hope-citation` — `bold`, `10px`, `letter-spacing: 0.02em`, `hope-citation`, `margin-top: 1.5mm` |
+| Quote mark | `.doc-hope::before` — `“` in `font-display`, `34px`, `hope-quote/45%`, top-left corner |
+| Pagination | `page-break-inside: avoid` / `break-inside: avoid` |
+
+## Block Spec (Tirilla 80mm)
+
+| Property | Value |
+| --- | --- |
+| Box | `.doc-preview-80mm .doc-hope` — padding `2.5mm 2.5mm 2.5mm 4mm`, never wider than the roll |
+| Promise | `10px` italic (vs 10px roll base, one step above `.doc-meta`) |
+| Citation | `9px` bold amber |
+| Quote mark | `22px`, `left: 1mm` |
+
+## Structural Zones (addendum)
+
+| Zone | Background | Border | Notes |
+| --- | --- | --- | --- |
+| Hope block (screen) | `hope-surface` | `hope-border` + 2px `hope-rule` rail | Inside `.doc-preview`; always light paper |
+| Hope block (print) | `#eef7f0` | `#b7ddc4` + 2px `#1f7a45` rail | Literal paper colors; survives print neutralization |
+| Document footer | `bg-sheet` | — | `.doc-meta` muted fields sit around the block |
+
+## Constraints (addendum)
+
+- Tokens/CSS only — do **not** change DocumentPreview, lib/pdf.ts, or the hope-message data logic
+- No space and no placeholder reserved when the message is inactive (null)
+- Block appears in every document that already includes it: orden de taller, cotización, factura, factura de compra, comprobante POS, informe de turno y ficha de cliente/proveedor
+- Must not overflow the 80mm roll; box adapts to the roll width
+- Paper is always light; the block keeps its tint in both themes and in print
+- Semantic tokens only in components — no raw hex, `rgb()`, or arbitrary color classes
+- Spanish (Colombia) copy throughout
+
+## Signature Detail (addendum)
+
+The **green-railed estampa** — a soft-tinted devotional card whose 2px taller-green left rail echoes the system's signature rail, with a large faded `“` in the corner and an amber bold citation, turning the document footer into a calm, deliberate benediction rather than a line of grey legal text.

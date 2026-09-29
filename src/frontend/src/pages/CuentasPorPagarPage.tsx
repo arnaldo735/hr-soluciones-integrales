@@ -26,6 +26,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { formatDate, formatMoney, formatNumber } from "@/lib/format";
 import type { Payable, Payment, PaymentInput, Purchase } from "@/lib/types";
@@ -83,11 +84,12 @@ const STATUS_BADGE_CLASS: Record<PayableStatus, string> = {
 /** Saldos pendientes con proveedores, derivados de las compras registradas. */
 function usePayables() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: PAYABLES_QUERY_KEY,
     queryFn: async (): Promise<Payable[]> => {
       if (!actor) return [];
-      return actor.listPayables();
+      return actor.listPayables(token);
     },
     enabled: !!actor && !isFetching,
   });
@@ -96,11 +98,12 @@ function usePayables() {
 /** Todas las compras, para resolver la referencia de compra de cada cuenta. */
 function usePurchases() {
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   return useQuery({
     queryKey: PURCHASES_QUERY_KEY,
     queryFn: async (): Promise<Purchase[]> => {
       if (!actor) return [];
-      return actor.listPurchases(null);
+      return actor.listPurchases(token, null);
     },
     enabled: !!actor && !isFetching,
   });
@@ -108,11 +111,12 @@ function usePurchases() {
 
 function useRegisterPayment() {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: async (input: PaymentInput): Promise<Payment> => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.registerPayment(input);
+      return actor.registerPayment(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: PAYABLES_QUERY_KEY });

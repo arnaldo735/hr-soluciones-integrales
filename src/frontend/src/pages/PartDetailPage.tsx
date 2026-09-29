@@ -27,6 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Textarea } from "@/components/ui/textarea";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { useRole } from "@/hooks/use-role";
 import {
@@ -36,7 +37,13 @@ import {
   formatNumber,
   formatPrincipal,
 } from "@/lib/format";
-import type { AdjustmentInput, Lot, Movement, PartView } from "@/lib/types";
+import type {
+  AdjustmentInput,
+  Lot,
+  Movement,
+  PartInput,
+  PartView,
+} from "@/lib/types";
 import { AdjustmentDirection, MovementKind } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -45,14 +52,16 @@ import {
   AlertTriangle,
   ArrowLeft,
   ArrowRightLeft,
+  Barcode,
   Boxes,
   ChevronLeft,
   ChevronRight,
   Layers,
   PackageMinus,
   PackagePlus,
+  Pencil,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 
 const MOVEMENT_LABELS: Record<MovementKind, string> = {
@@ -125,6 +134,7 @@ function AdjustmentDialog({
   lots: Lot[];
 }) {
   const { actor } = useBackend();
+  const { token } = useAuth();
   const queryClient = useQueryClient();
   const [direction, setDirection] = useState<AdjustmentDirection>(
     AdjustmentDirection.in,
@@ -137,7 +147,7 @@ function AdjustmentDialog({
   const mutation = useMutation({
     mutationFn: async (input: AdjustmentInput) => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.adjustStock(input);
+      return actor.adjustStock(token, input);
     },
     onSuccess: () => {
       void queryClient.invalidateQueries({
@@ -467,38 +477,310 @@ function MovementsTable({ movements }: { movements: Movement[] }) {
   );
 }
 
+interface PartEditFormState {
+  sku: string;
+  barcode: string;
+  name: string;
+  category: string;
+  brand: string;
+  unit: string;
+  salePrice: string;
+  costPrice: string;
+  lowStockThreshold: string;
+}
+
+/** Backend money is integer cents; the form edits decimal amounts. */
+function toCents(value: string): bigint {
+  const parsed = Number.parseFloat(value.replace(",", "."));
+  if (!Number.isFinite(parsed) || parsed < 0) return 0n;
+  return BigInt(Math.round(parsed * 100));
+}
+
+function fromCents(value: bigint | undefined): string {
+  if (value === undefined) return "";
+  return (Number(value) / 100).toFixed(2);
+}
+
+function toWhole(value: string): bigint {
+  const parsed = Number.parseInt(value, 10);
+  if (!Number.isFinite(parsed) || parsed < 0) return 0n;
+  return BigInt(parsed);
+}
+
+function formFromPart(part: PartView): PartEditFormState {
+  return {
+    sku: part.sku,
+    barcode: part.barcode,
+    name: part.name,
+    category: part.category,
+    brand: part.brand,
+    unit: part.unit,
+    salePrice: fromCents(part.salePrice),
+    costPrice: fromCents(part.costPrice),
+    lowStockThreshold: part.lowStockThreshold.toString(),
+  };
+}
+
+/**
+ * Edits the catalog data of a part, including its barcode. The barcode is
+ * saved through the same `updatePart` call as the SKU, so both stay searchable.
+ */
+function EditPartDialog({
+  open,
+  onOpenChange,
+  part,
+  isAdmin,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  part: PartView;
+  isAdmin: boolean;
+}) {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+  const [form, setForm] = useState<PartEditFormState>(() => formFromPart(part));
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setError(null);
+    setForm(formFromPart(part));
+  }, [open, part]);
+
+  const mutation = useMutation({
+    mutationFn: async (input: PartInput) => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.updatePart(token, part.id, input);
+    },
+    onSuccess: () => {
+      void queryClient.invalidateQueries({ queryKey: ["part"] });
+      void queryClient.invalidateQueries({ queryKey: ["parts"] });
+      toast.success("Repuesto actualizado");
+      onOpenChange(false);
+    },
+    onError: () => {
+      setError("No se pudo guardar el repuesto. Intenta de nuevo.");
+    },
+  });
+
+  const update = (field: keyof PartEditFormState, value: string) => {
+    setForm((current) => ({ ...current, [field]: value }));
+  };
+
+  const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!form.sku.trim() || !form.name.trim()) {
+      setError("El SKU y el nombre son obligatorios.");
+      return;
+    }
+    setError(null);
+    mutation.mutate({
+      sku: form.sku.trim(),
+      barcode: form.barcode.trim(),
+      name: form.name.trim(),
+      category: form.category.trim(),
+      brand: form.brand.trim(),
+      unit: form.unit.trim() || "pza",
+      salePrice: toCents(form.salePrice),
+      costPrice: toCents(form.costPrice),
+      lowStockThreshold: toWhole(form.lowStockThreshold),
+    });
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        data-ocid="part_detail.edit_dialog"
+        className="max-h-[90vh] overflow-y-auto sm:max-w-2xl"
+      >
+        <DialogHeader>
+          <DialogTitle className="font-display">Editar repuesto</DialogTitle>
+          <DialogDescription>
+            Actualiza los datos del catálogo, incluido el código de barras. Los
+            cambios aplican de inmediato.
+          </DialogDescription>
+        </DialogHeader>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-part-sku">SKU / Código</Label>
+              <Input
+                id="edit-part-sku"
+                value={form.sku}
+                onChange={(event) => update("sku", event.target.value)}
+                placeholder="REP-0001"
+                className="data-rail"
+                data-ocid="part_detail.sku_input"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-part-barcode">Código de barras</Label>
+              <Input
+                id="edit-part-barcode"
+                value={form.barcode}
+                onChange={(event) => update("barcode", event.target.value)}
+                placeholder="7701234567890"
+                className="data-rail"
+                data-ocid="part_detail.barcode_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-part-name">Nombre</Label>
+              <Input
+                id="edit-part-name"
+                value={form.name}
+                onChange={(event) => update("name", event.target.value)}
+                placeholder="Balata de freno delantera"
+                data-ocid="part_detail.name_input"
+                required
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-part-category">Categoría</Label>
+              <Input
+                id="edit-part-category"
+                value={form.category}
+                onChange={(event) => update("category", event.target.value)}
+                placeholder="Frenos"
+                data-ocid="part_detail.category_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-part-brand">Marca</Label>
+              <Input
+                id="edit-part-brand"
+                value={form.brand}
+                onChange={(event) => update("brand", event.target.value)}
+                placeholder="Brembo"
+                data-ocid="part_detail.brand_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-part-unit">Unidad</Label>
+              <Input
+                id="edit-part-unit"
+                value={form.unit}
+                onChange={(event) => update("unit", event.target.value)}
+                placeholder="pza"
+                data-ocid="part_detail.unit_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-part-threshold">Umbral de stock bajo</Label>
+              <Input
+                id="edit-part-threshold"
+                type="number"
+                min="0"
+                step="1"
+                value={form.lowStockThreshold}
+                onChange={(event) =>
+                  update("lowStockThreshold", event.target.value)
+                }
+                className="data-rail"
+                data-ocid="part_detail.threshold_input"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="edit-part-sale">Precio de venta (COP)</Label>
+              <Input
+                id="edit-part-sale"
+                type="number"
+                min="0"
+                step="0.01"
+                value={form.salePrice}
+                onChange={(event) => update("salePrice", event.target.value)}
+                placeholder="0.00"
+                className="data-rail"
+                data-ocid="part_detail.sale_price_input"
+              />
+            </div>
+            {isAdmin ? (
+              <div className="space-y-1.5">
+                <Label htmlFor="edit-part-cost">Precio de costo (COP)</Label>
+                <Input
+                  id="edit-part-cost"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  value={form.costPrice}
+                  onChange={(event) => update("costPrice", event.target.value)}
+                  placeholder="0.00"
+                  className="data-rail"
+                  data-ocid="part_detail.cost_price_input"
+                />
+              </div>
+            ) : null}
+          </div>
+
+          {error ? (
+            <p
+              data-ocid="part_detail.edit_error"
+              className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive"
+            >
+              {error}
+            </p>
+          ) : null}
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              data-ocid="part_detail.edit_cancel_button"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="submit"
+              disabled={mutation.isPending}
+              data-ocid="part_detail.edit_submit_button"
+            >
+              {mutation.isPending ? "Guardando…" : "Guardar cambios"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export function PartDetailPage() {
   const { id } = useParams({ strict: false }) as { id: string };
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const { isAdmin } = useRole();
   const [adjustOpen, setAdjustOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [movementPage, setMovementPage] = useState(1);
 
   const partId = BigInt(id);
 
   const partQuery = useQuery({
-    queryKey: ["part", id],
+    queryKey: ["part", id, token],
     queryFn: async () => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.getPart(partId);
+      return actor.getPart(token, partId);
     },
     enabled: !!actor && !isFetching,
   });
 
   const lotsQuery = useQuery({
-    queryKey: ["lots", id],
+    queryKey: ["lots", id, token],
     queryFn: async () => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.listLots(partId);
+      return actor.listLots(token, partId);
     },
     enabled: !!actor && !isFetching,
   });
 
   const movementsQuery = useQuery({
-    queryKey: ["movements", id],
+    queryKey: ["movements", id, token],
     queryFn: async () => {
       if (!actor) throw new Error("Backend no disponible");
-      return actor.listMovements(partId);
+      return actor.listMovements(token, partId);
     },
     enabled: !!actor && !isFetching,
   });
@@ -604,6 +886,15 @@ export function PartDetailPage() {
               <span className="data-rail rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium">
                 {part.sku}
               </span>
+              {part.barcode ? (
+                <span
+                  data-ocid="part_detail.barcode_badge"
+                  className="data-rail inline-flex items-center gap-1 rounded-md border border-border bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground"
+                >
+                  <Barcode className="size-3" aria-hidden="true" />
+                  {part.barcode}
+                </span>
+              ) : null}
               {part.lowStock ? (
                 <Badge
                   variant="outline"
@@ -623,15 +914,27 @@ export function PartDetailPage() {
                 "Sin categoría"}
             </p>
           </div>
-          <Button
-            type="button"
-            onClick={() => setAdjustOpen(true)}
-            data-ocid="part_detail.adjust_button"
-            className="gap-2"
-          >
-            <ArrowRightLeft className="size-4" aria-hidden="true" />
-            Ajustar existencia
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setEditOpen(true)}
+              data-ocid="part_detail.edit_button"
+              className="gap-2"
+            >
+              <Pencil className="size-4" aria-hidden="true" />
+              Editar repuesto
+            </Button>
+            <Button
+              type="button"
+              onClick={() => setAdjustOpen(true)}
+              data-ocid="part_detail.adjust_button"
+              className="gap-2"
+            >
+              <ArrowRightLeft className="size-4" aria-hidden="true" />
+              Ajustar existencia
+            </Button>
+          </div>
         </div>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
@@ -745,6 +1048,13 @@ export function PartDetailPage() {
         onOpenChange={setAdjustOpen}
         part={part}
         lots={lots}
+      />
+
+      <EditPartDialog
+        open={editOpen}
+        onOpenChange={setEditOpen}
+        part={part}
+        isAdmin={isAdmin}
       />
     </div>
   );

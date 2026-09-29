@@ -33,6 +33,7 @@ import {
   useUpdateAppointment,
   useUpdateAppointmentStatus,
 } from "@/hooks/use-appointments";
+import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
 import { useCustomers } from "@/hooks/use-customers";
 import { useTechnicians } from "@/hooks/use-technicians";
@@ -258,6 +259,7 @@ function AppointmentFormDialog({
   }
 
   const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
   const selectedCustomerId =
     form.customerId === "" ? null : BigInt(form.customerId);
 
@@ -270,10 +272,10 @@ function AppointmentFormDialog({
     null;
 
   const motorcyclesQuery = useQuery({
-    queryKey: ["appointment-form-motorcycles", form.customerId],
+    queryKey: ["appointment-form-motorcycles", form.customerId, token],
     queryFn: async (): Promise<Motorcycle[]> => {
       if (!actor || selectedCustomerId === null) return [];
-      return actor.listMotorcycles(selectedCustomerId);
+      return actor.listMotorcycles(token, selectedCustomerId);
     },
     enabled: open && !!actor && !isFetching && selectedCustomerId !== null,
     // A customer's motorcycles are stable, so the list is reused while the
