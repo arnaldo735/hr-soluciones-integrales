@@ -208,6 +208,10 @@ module {
       statusHistory = [{ from = null; to = #received; performedBy; at = now }];
       cancelReason = null;
       cancelledAt = null;
+      previousMileage = null;
+      oilChangeInterval = null;
+      advance = null;
+      payments = [];
       createdAt = now;
       updatedAt = now;
     };
@@ -221,6 +225,8 @@ module {
         taxRate = CompanyTypes.effectiveTaxRate(state.company.profile, state.company.profile.taxRate);
         tax = 0;
         total = 0;
+        paidAmount = 0;
+        balance = 0;
       };
     };
   };

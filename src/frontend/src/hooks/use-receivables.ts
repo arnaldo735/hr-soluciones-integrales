@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { invalidateCashData } from "@/hooks/use-cash";
 import type {
   Receivable,
   ReceivableFilter,
@@ -67,6 +68,9 @@ export function useRegisterReceivablePayment() {
       void queryClient.invalidateQueries({ queryKey: ["receivables"] });
       void queryClient.invalidateQueries({ queryKey: ["receivable-summary"] });
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      // A receivable payment writes a movement into the Caja y Bancos ledger,
+      // so the balances, movements and accounting surfaces must refetch.
+      invalidateCashData(queryClient);
     },
   });
 }

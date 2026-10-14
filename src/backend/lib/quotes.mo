@@ -15,6 +15,8 @@ import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
 import ServiceTypes "../types/services";
 import InventoryTypes "../types/inventory";
+import CashTypes "../types/cash";
+import BillingLib "../lib/billing";
 import Search "../lib/search";
 
 module {
@@ -28,6 +30,9 @@ module {
     var nextLaborId : Nat;
     var nextInvoiceId : Nat;
     var nextInvoiceNumber : Nat;
+    var nextCashMovementId : Nat;
+    var nextShiftId : Nat;
+    var nextCashRegisterId : Nat;
   };
 
   public type State = {
@@ -40,6 +45,12 @@ module {
     invoices : Map.Map<Common.Id, BillingTypes.Invoice>;
     businessSettings : { var settings : BillingTypes.BusinessSettings };
     company : { var profile : CompanyTypes.CompanyProfile };
+    // Estado de Caja y Bancos: convertir una cotización aceptada en factura
+    // registra su cobro como ingreso con origen `#invoice` en el turno abierto
+    // de la cuenta correspondiente al medio de pago.
+    cashRegisters : Map.Map<Common.Id, CashTypes.CashRegister>;
+    shifts : Map.Map<Common.Id, CashTypes.Shift>;
+    cashMovements : Map.Map<Common.Id, CashTypes.CashMovement>;
     counters : Counters;
   };
 
@@ -79,10 +90,6 @@ module {
 
   func orderNumberFor(n : Nat) : Text {
     "OT-" # padNumber(n);
-  };
-
-  func invoiceNumberFor(n : Nat) : Text {
-    "F-" # padNumber(n);
   };
 
   func partName(state : State, partId : Common.Id) : Text {
@@ -199,7 +206,13 @@ module {
   public func createQuote(state : State, input : Types.QuoteInput, performedBy : Principal) : Types.QuoteView {
     ignore performedBy;
     ignore state.customers.get(input.customerId) ?? Runtime.trap("Cliente no encontrado");
-    ignore state.motorcycles.get(input.motorcycleId) ?? Runtime.trap("Moto no encontrada");
+    // La moto es opcional: solo se valida cuando el cliente la especifica.
+    switch (input.motorcycleId) {
+      case (?motorcycleId) {
+        ignore state.motorcycles.get(motorcycleId) ?? Runtime.trap("Moto no encontrada");
+      };
+      case null {};
+    };
     let id = state.counters.nextQuoteId;
     state.counters.nextQuoteId := id + 1;
     let number = state.counters.nextQuoteNumber;
@@ -227,7 +240,13 @@ module {
     ignore performedBy;
     let existing = findQuote(state, id);
     ignore state.customers.get(input.customerId) ?? Runtime.trap("Cliente no encontrado");
-    ignore state.motorcycles.get(input.motorcycleId) ?? Runtime.trap("Moto no encontrada");
+    // La moto es opcional: solo se valida cuando el cliente la especifica.
+    switch (input.motorcycleId) {
+      case (?motorcycleId) {
+        ignore state.motorcycles.get(motorcycleId) ?? Runtime.trap("Moto no encontrada");
+      };
+      case null {};
+    };
     let updated : Types.Quote = {
       existing with
       customerId = input.customerId;
@@ -280,6 +299,9 @@ module {
     if (quote.status != #accepted) {
       Runtime.trap("Solo se puede convertir una cotización aceptada");
     };
+    // La orden de trabajo exige una moto; una cotización sin moto no puede
+    // convertirse sin inventar datos.
+    let motorcycleId = quote.motorcycleId ?? Runtime.trap("La cotización no tiene moto asignada");
     let orderId = state.counters.nextOrderId;
     state.counters.nextOrderId := orderId + 1;
     let now = Time.now();
@@ -310,7 +332,7 @@ module {
       id = orderId;
       orderNumber = orderNumberFor(orderId);
       customerId = quote.customerId;
-      motorcycleId = quote.motorcycleId;
+      motorcycleId = motorcycleId;
       intakeMileage = 0;
       problem = "Orden generada desde cotización " # quote.quoteNumber;
       status = #received;
@@ -321,6 +343,10 @@ module {
       statusHistory = [{ from = null; to = #received; performedBy; at = now }];
       cancelReason = null;
       cancelledAt = null;
+      previousMileage = null;
+      oilChangeInterval = null;
+      advance = null;
+      payments = [];
       createdAt = now;
       updatedAt = now;
     };
@@ -339,12 +365,11 @@ module {
     let tax = (subtotal * taxRate) / 100;
     {
       order;
-      totals = { partsSubtotal; laborSubtotal; subtotal; taxRate; tax; total = subtotal + tax };
+      totals = { partsSubtotal; laborSubtotal; subtotal; taxRate; tax; total = subtotal + tax; paidAmount = 0; balance = subtotal + tax };
     };
   };
 
   public func convertQuoteToInvoice(state : State, id : Common.Id, paymentMethod : BillingTypes.PaymentMethod, performedBy : Principal) : BillingTypes.Invoice {
-    ignore performedBy;
     let quote = findQuote(state, id);
     if (quote.status != #accepted) {
       Runtime.trap("Solo se puede convertir una cotización aceptada");
@@ -370,19 +395,6 @@ module {
         unitCost = 0;
       });
     };
-    let invoiceLines = lines.toArray();
-    var subtotal = 0;
-    for (line in invoiceLines.values()) {
-      subtotal += line.amount;
-    };
-    let discount = quote.discount;
-    let taxableBase = if (discount >= subtotal) { 0 } else { subtotal - discount };
-    let taxRate = effectiveTaxRate(state);
-    let tax = (taxableBase * taxRate) / 100;
-    let invoiceId = state.counters.nextInvoiceId;
-    state.counters.nextInvoiceId := invoiceId + 1;
-    let number = state.counters.nextInvoiceNumber;
-    state.counters.nextInvoiceNumber := number + 1;
     let customerName = switch (state.customers.get(quote.customerId)) {
       case (?customer) { customer.name };
       case null { "" };
@@ -395,30 +407,35 @@ module {
       case (?customer) { customer.address };
       case null { null };
     };
-    let invoice : BillingTypes.Invoice = {
-      id = invoiceId;
-      number = invoiceNumberFor(number);
-      origin = #quote;
-      orderId = null;
-      posSaleId = null;
-      customerId = ?quote.customerId;
-      customerName;
-      customerTaxId;
-      customerAddress;
-      lines = invoiceLines;
-      subtotal;
-      discount;
-      taxRate;
-      tax;
-      total = taxableBase + tax;
-      paymentMethod;
-      paymentCondition = #cash;
-      paymentStatus = #pending;
-      installments = null;
-      issuedAt = Time.now();
-    };
-    state.invoices.add(invoiceId, invoice);
-    invoice;
+    // La factura se persiste por el mismo camino que OT y POS: una factura de
+    // contado nace `#paid` y su cobro se registra de inmediato en Caja y Bancos
+    // como ingreso `#invoice` por el saldo a cobrar, abriendo turno si hace
+    // falta. Así la conversión de una cotización aceptada refleja su cobro.
+    BillingLib.persistInvoice(
+      {
+        invoices = state.invoices;
+        businessSettings = state.businessSettings;
+        company = state.company;
+        cashRegisters = state.cashRegisters;
+        shifts = state.shifts;
+        cashMovements = state.cashMovements;
+        counters = state.counters;
+      },
+      #quote,
+      null,
+      null,
+      ?quote.customerId,
+      customerName,
+      customerTaxId,
+      customerAddress,
+      lines.toArray(),
+      quote.discount,
+      null,
+      paymentMethod,
+      #cash,
+      null,
+      performedBy,
+    );
   };
 
   public func computeTotals(state : State, quote : Types.Quote) : Types.QuoteTotals {

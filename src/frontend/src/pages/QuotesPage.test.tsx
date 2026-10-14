@@ -179,6 +179,24 @@ describe("QuotesPage", () => {
     expect(await screen.findByTestId("quotes.empty_state")).toBeInTheDocument();
   });
 
+  // --- Accepted behavior: quotes without a motorcycle -----------------------
+  //
+  // The accepted change makes the motorcycle optional, so the list must render
+  // a quote that has no motorcycle without breaking. The row shows the "—"
+  // placeholder and the page still lists the quote's number and customer.
+
+  it("lists a quote that has no motorcycle without breaking", async () => {
+    listQuotesMock.mockResolvedValue(
+      quotePage([quoteView({ motorcycleId: undefined })]),
+    );
+    renderWithProviders(<QuotesPage />);
+
+    expect(await screen.findByText("COT-0009")).toBeInTheDocument();
+    expect(await screen.findByText("Ada Lovelace")).toBeInTheDocument();
+    // The motorcycle cell falls back to the em-dash placeholder.
+    expect(screen.getByText("—")).toBeInTheDocument();
+  });
+
   // --- Characterization: the existing email notify journey ------------------
   //
   // The accepted change adds a WhatsApp action beside the email action. This
@@ -236,7 +254,9 @@ describe("QuotesPage", () => {
     renderWithProviders(<QuotesPage />);
 
     await waitFor(() => expect(listQuotesMock).toHaveBeenCalled());
+    // The session token is the leading argument; the filter is second.
     expect(listQuotesMock).toHaveBeenLastCalledWith(
+      null,
       { status: undefined, search: undefined },
       QuoteSort.createdAt,
       0n,

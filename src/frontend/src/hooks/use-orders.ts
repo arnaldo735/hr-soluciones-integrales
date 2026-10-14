@@ -1,19 +1,25 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { invalidateCashData } from "@/hooks/use-cash";
 import type {
   Customer,
   Id,
   LaborInput,
   Lot,
+  Money,
   Motorcycle,
+  OrderAdvanceReceipt,
   OrderFilter,
   OrderPage,
   OrderPartInput,
+  OrderPayment,
+  OrderPaymentInput,
   OrderPhotoInput,
   OrderStatus,
   OrderView,
   PartPage,
   PartView,
+  PaymentMethod,
 } from "@/lib/types";
 import { OrderStatus as OrderStatusEnum, PartSort } from "@/lib/types";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -230,6 +236,25 @@ export function useParts(search: string) {
 }
 
 /**
+ * Loads a single catalog part by id. Used when an item chosen elsewhere (for
+ * example the factura item search) is carried to a document as a query param
+ * and must be resolved back to its full catalog record before appending.
+ */
+export function usePart(id: Id | null) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ["part", id?.toString() ?? "none"],
+    queryFn: async (): Promise<PartView | null> => {
+      if (!actor || id === null) return null;
+      return actor.getPart(token, id);
+    },
+    enabled: !!actor && !isFetching && id !== null,
+  });
+}
+
+/**
  * Resolves a scanned or manually typed code to a catalog part through the
  * backend `findPartByCode`, which matches both the barcode and the SKU. Used by
  * the workshop-order barcode flow so a scan adds the exact product to the line.
@@ -277,6 +302,8 @@ export function useCreateOrder() {
       intakeMileage: bigint;
       technicianIds: Id[];
       problem: string;
+      previousMileage?: bigint;
+      oilChangeInterval?: bigint;
     }): Promise<OrderView> => {
       if (!actor) throw new Error("Backend no disponible");
       return actor.createOrder(token, input);
@@ -284,6 +311,144 @@ export function useCreateOrder() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["orders"] });
     },
+  });
+}
+
+/**
+ * Updates the oil-change interval (km) of a workshop order and recalculates the
+ * next oil change from the recorded intake mileage. The order detail and the
+ * order list are both refreshed so the new interval is reflected everywhere.
+ */
+export function useUpdateOilChangeInterval() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      id: Id;
+      oilChangeInterval: bigint;
+    }): Promise<OrderView> => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.updateOilChangeInterval(token, input.id, {
+        oilChangeInterval: input.oilChangeInterval,
+      });
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()],
+      });
+    },
+  });
+}
+
+/**
+ * Registers, updates or clears the advance payment (anticipo) of a workshop
+ * order. Passing `null` in `amount` or `method` clears that field; passing both
+ * as `null` removes the advance entirely. The order detail, the order list and
+ * the Caja y Bancos ledger are refreshed because the advance is recorded as a
+ * cash movement.
+ */
+export function useSetOrderAdvance() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      id: Id;
+      amount: Money | null;
+      method: PaymentMethod | null;
+    }): Promise<OrderView> => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.setOrderAdvance(token, input.id, {
+        amount: input.amount ?? undefined,
+        method: input.method ?? undefined,
+      });
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()],
+      });
+      // The advance is recorded as a cash movement, so the open shifts, the
+      // balances and the accounting surfaces must refetch. `invalidateCashData`
+      // invalidates the whole ["cash"] family (which includes useOpenShifts,
+      // the source of the Caja y Bancos balance panel) plus accounting-summary,
+      // accounting-report and ledger-entries.
+      invalidateCashData(queryClient);
+    },
+  });
+}
+
+/**
+ * Registers a partial payment (abono) on a workshop order. The backend records
+ * it as an income movement in Caja/Bancos tied to the order, so the order
+ * detail, the order list and the cash ledger are all refreshed.
+ */
+export function useAddOrderPayment() {
+  const { actor } = useBackend();
+  const { token } = useAuth();
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (input: {
+      id: Id;
+      payment: OrderPaymentInput;
+    }): Promise<OrderView> => {
+      if (!actor) throw new Error("Backend no disponible");
+      return actor.addOrderPayment(token, input.id, input.payment);
+    },
+    onSuccess: (view) => {
+      void queryClient.invalidateQueries({ queryKey: ["orders"] });
+      void queryClient.invalidateQueries({
+        queryKey: ["order", view.order.id.toString()],
+      });
+      void queryClient.invalidateQueries({
+        queryKey: ["order-payments", view.order.id.toString()],
+      });
+      // The abono is recorded as a cash movement, so the open shifts, the
+      // balances and the accounting surfaces must refetch. `invalidateCashData`
+      // invalidates the whole ["cash"] family (which includes useOpenShifts,
+      // the source of the Caja y Bancos balance panel) plus accounting-summary,
+      // accounting-report and ledger-entries.
+      invalidateCashData(queryClient);
+    },
+  });
+}
+
+/** Lists the partial payments (abonos) registered on a workshop order. */
+export function useOrderPayments(id: Id | null) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ["order-payments", id?.toString() ?? "none"],
+    queryFn: async (): Promise<OrderPayment[]> => {
+      if (!actor || id === null) return [];
+      return actor.listOrderPayments(token, id);
+    },
+    enabled: !!actor && !isFetching && id !== null,
+  });
+}
+
+/**
+ * Loads the printable advance receipt of a workshop order. The receipt carries
+ * the company-facing snapshot (cliente, moto, anticipo, abonos, total y saldo)
+ * so the preview and the PDF never diverge from the backend state.
+ */
+export function useOrderAdvanceReceipt(id: Id | null) {
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+
+  return useQuery({
+    queryKey: ["order-advance-receipt", id?.toString() ?? "none"],
+    queryFn: async (): Promise<OrderAdvanceReceipt | null> => {
+      if (!actor || id === null) return null;
+      return actor.getOrderAdvanceReceipt(token, id);
+    },
+    enabled: !!actor && !isFetching && id !== null,
   });
 }
 

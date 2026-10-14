@@ -79,6 +79,7 @@ vi.mock("@tanstack/react-router", () => ({
     </a>
   ),
   useParams: () => ({ id: "42" }),
+  useSearch: () => ({}),
 }));
 
 vi.mock("@/components/order/AddPartDialog", () => ({
@@ -137,6 +138,7 @@ function orderView(overrides: Partial<OrderView["order"]> = {}): OrderView {
       createdAt: 1_700_000_000_000_000_000n,
       updatedAt: 1_700_000_000_000_000_000n,
       photos: [],
+      payments: [],
       ...overrides,
     },
     totals: {
@@ -146,6 +148,8 @@ function orderView(overrides: Partial<OrderView["order"]> = {}): OrderView {
       taxRate: 16n,
       tax: 12800n,
       total: 92800n,
+      paidAmount: 0n,
+      balance: 92800n,
     },
   };
 }

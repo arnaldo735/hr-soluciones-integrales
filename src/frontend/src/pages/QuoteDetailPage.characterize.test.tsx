@@ -72,6 +72,7 @@ vi.mock("@tanstack/react-router", () => ({
   // No id means the "nueva" (new quote) route.
   useParams: () => ({}),
   useNavigate: () => vi.fn(),
+  useSearch: () => ({}),
 }));
 
 vi.mock("sonner", () => ({
@@ -238,32 +239,30 @@ describe("QuoteDetailPage new-quote form (characterization)", () => {
     await screen.findByText("Nueva cotización");
 
     // A part line: 1 × $ 250.00 from the catalog's sale price.
-    await userEvent.click(screen.getByTestId("quote_detail.add_part_button"));
-    await userEvent.click(
-      screen.getByTestId("quote_detail.part_pick_button.1"),
-    );
     await userEvent.type(
-      screen.getByTestId("quote_detail.part_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "balata",
     );
     await userEvent.click(
-      await screen.findByTestId("quote_detail.part_search.item.1"),
+      await screen.findByTestId("quote_detail.item_search.item.1"),
     );
 
-    // A service line: 1 × $ 300.00 from the catalog's labor rate.
-    await userEvent.click(
-      screen.getByTestId("quote_detail.add_service_button"),
-    );
-    await userEvent.click(
-      screen.getByTestId("quote_detail.service_pick_button.1"),
-    );
+    // A service line: 1 × $ 300.00 from the catalog's labor rate. Only the
+    // service matches this term, so the first result is the service.
+    listPartsMock.mockResolvedValue({
+      items: [],
+      total: 0n,
+      offset: 0n,
+      limit: 1000n,
+    });
     await userEvent.type(
-      screen.getByTestId("quote_detail.service_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "aceite",
     );
-    await userEvent.click(
-      await screen.findByTestId("quote_detail.service_search.item.1"),
-    );
+    // Wait for the service result to render before selecting it, so the click
+    // cannot land on a stale part result from the previous term.
+    const serviceResult = await screen.findByText("Cambio de aceite");
+    await userEvent.click(serviceResult.closest("button") as HTMLElement);
 
     const totals = within(screen.getByTestId("quote_detail.totals.panel"));
     // Repuestos $ 250.00 + Servicios $ 300.00 = Subtotal $ 550.00.
@@ -281,16 +280,12 @@ describe("QuoteDetailPage new-quote form (characterization)", () => {
     await screen.findByText("Nueva cotización");
 
     // A single part line: 1 × $ 250.00.
-    await userEvent.click(screen.getByTestId("quote_detail.add_part_button"));
-    await userEvent.click(
-      screen.getByTestId("quote_detail.part_pick_button.1"),
-    );
     await userEvent.type(
-      screen.getByTestId("quote_detail.part_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "balata",
     );
     await userEvent.click(
-      await screen.findByTestId("quote_detail.part_search.item.1"),
+      await screen.findByTestId("quote_detail.item_search.item.1"),
     );
 
     // A $ 50.00 discount leaves a $ 200.00 taxable base.
@@ -352,16 +347,12 @@ describe("QuoteDetailPage new-quote form (characterization)", () => {
       await screen.findByTestId("quote_detail.customer_search.item.1"),
     );
 
-    await userEvent.click(screen.getByTestId("quote_detail.add_part_button"));
-    await userEvent.click(
-      screen.getByTestId("quote_detail.part_pick_button.1"),
-    );
     await userEvent.type(
-      screen.getByTestId("quote_detail.part_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "balata",
     );
     await userEvent.click(
-      await screen.findByTestId("quote_detail.part_search.item.1"),
+      await screen.findByTestId("quote_detail.item_search.item.1"),
     );
 
     await userEvent.type(
@@ -375,7 +366,9 @@ describe("QuoteDetailPage new-quote form (characterization)", () => {
     await userEvent.click(screen.getByTestId("quote_detail.save_button"));
 
     await waitFor(() => expect(createQuoteMock).toHaveBeenCalledTimes(1));
-    const input = createQuoteMock.mock.calls[0][0];
+    // The session token is the leading argument; the input is the second.
+    const [token, input] = createQuoteMock.mock.calls[0];
+    expect(token).toBeNull();
     expect(input.notes).toBe("Vigencia 15 días");
     // $ 50.00 is sent as 5000 integer cents.
     expect(input.discount).toBe(5000n);

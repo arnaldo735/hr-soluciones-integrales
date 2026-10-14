@@ -48,6 +48,11 @@ vi.mock("@/hooks/use-backend", () => ({
   }),
 }));
 
+vi.mock("@tanstack/react-router", () => ({
+  useNavigate: () => vi.fn(),
+  useSearch: () => ({}),
+}));
+
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 function part(overrides: Partial<PartView> = {}): PartView {

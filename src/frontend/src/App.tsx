@@ -191,6 +191,11 @@ const CajaBancosPage = lazyPage(() =>
     default: m.CajaBancosPage,
   })),
 );
+const CashRegistersPage = lazyPage(() =>
+  import("@/pages/CashRegistersPage").then((m) => ({
+    default: m.CashRegistersPage,
+  })),
+);
 
 /**
  * Destino del callback OAuth de Google Drive. Lee `code` y `state` de la URL,
@@ -352,6 +357,20 @@ const newOrderRoute = createRoute({
 const orderDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/ordenes/$id",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    addPartId?: string;
+    addServiceId?: string;
+    addQuantity?: string;
+  } => ({
+    addPartId:
+      typeof search.addPartId === "string" ? search.addPartId : undefined,
+    addServiceId:
+      typeof search.addServiceId === "string" ? search.addServiceId : undefined,
+    addQuantity:
+      typeof search.addQuantity === "string" ? search.addQuantity : undefined,
+  }),
   component: OrderDetailPage,
 });
 
@@ -428,6 +447,20 @@ const supplierDetailRoute = createRoute({
 const quotesRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/cotizaciones",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    addPartId?: string;
+    addServiceId?: string;
+    addQuantity?: string;
+  } => ({
+    addPartId:
+      typeof search.addPartId === "string" ? search.addPartId : undefined,
+    addServiceId:
+      typeof search.addServiceId === "string" ? search.addServiceId : undefined,
+    addQuantity:
+      typeof search.addQuantity === "string" ? search.addQuantity : undefined,
+  }),
   component: QuotesPage,
 });
 
@@ -440,6 +473,20 @@ const newQuoteRoute = createRoute({
 const quoteDetailRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/cotizaciones/$id",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    addPartId?: string;
+    addServiceId?: string;
+    addQuantity?: string;
+  } => ({
+    addPartId:
+      typeof search.addPartId === "string" ? search.addPartId : undefined,
+    addServiceId:
+      typeof search.addServiceId === "string" ? search.addServiceId : undefined,
+    addQuantity:
+      typeof search.addQuantity === "string" ? search.addQuantity : undefined,
+  }),
   component: QuoteDetailPage,
 });
 
@@ -458,6 +505,20 @@ const invoiceDetailRoute = createRoute({
 const posRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/pos",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    addPartId?: string;
+    addServiceId?: string;
+    addQuantity?: string;
+  } => ({
+    addPartId:
+      typeof search.addPartId === "string" ? search.addPartId : undefined,
+    addServiceId:
+      typeof search.addServiceId === "string" ? search.addServiceId : undefined,
+    addQuantity:
+      typeof search.addQuantity === "string" ? search.addQuantity : undefined,
+  }),
   component: PosPage,
 });
 
@@ -556,6 +617,12 @@ const cajaRoute = createRoute({
   component: adminOnly(CajaBancosPage),
 });
 
+const cashRegistersRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/caja/registros",
+  component: adminOnly(CashRegistersPage),
+});
+
 const routeTree = rootRoute.addChildren([
   dashboardRoute,
   ordersRoute,
@@ -593,6 +660,7 @@ const routeTree = rootRoute.addChildren([
   receivablesRoute,
   payablesRoute,
   cajaRoute,
+  cashRegistersRoute,
 ]);
 
 const router = createRouter({ routeTree });

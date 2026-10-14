@@ -36,7 +36,12 @@ import {
 } from "@/hooks/use-company";
 import { useCustomers } from "@/hooks/use-customers";
 import { useDailyHopeMessage } from "@/hooks/use-hope";
-import { errorMessage, useMotorcycles, useParts } from "@/hooks/use-orders";
+import {
+  errorMessage,
+  useMotorcycles,
+  usePart,
+  useParts,
+} from "@/hooks/use-orders";
 import {
   QUOTE_STATUS_LABELS,
   useConvertQuoteToInvoice,
@@ -47,11 +52,7 @@ import {
   useUpdateQuote,
   useUpdateQuoteStatus,
 } from "@/hooks/use-quotes";
-import {
-  SERVICE_TERMS_DEFAULT_TEXT,
-  useServiceTermsSettings,
-} from "@/hooks/use-service-terms";
-import { useServices } from "@/hooks/use-services";
+import { useService, useServices } from "@/hooks/use-services";
 import {
   companyContactLine,
   companyFiscalLines,
@@ -95,7 +96,12 @@ import {
   WhatsAppContext,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from "@tanstack/react-router";
 import type { jsPDF } from "jspdf";
 import {
   AlertTriangle,
@@ -107,7 +113,6 @@ import {
   FileText,
   Mail,
   Package,
-  Plus,
   Printer,
   Receipt,
   Save,
@@ -118,7 +123,7 @@ import {
   Wrench,
   X,
 } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const QUOTE_STATUS_TONE: Record<QuoteStatus, StatusTone> = {
@@ -262,91 +267,103 @@ function PickerPrompt({ ocid, children }: { ocid: string; children: string }) {
   );
 }
 
-function PartLinesEditor({
-  lines,
-  onChange,
-  onScanPart,
+/** A combined search result: a catalog part or a catalog service. */
+type UnifiedResult =
+  | { kind: "part"; part: PartView }
+  | { kind: "service"; service: Service };
+
+/**
+ * Unified one-step item search. A single box queries the parts and services
+ * catalogs at once and lists the combined matches, each labelled with its type
+ * (Repuesto / Servicio), its code/SKU and its catalog price. The quantity is
+ * chosen before appending: the "Cantidad" field next to the box is applied to
+ * the line when a result is tapped, so the user never has to fix the quantity
+ * afterwards. Tapping a result adds it to the quote with the chosen quantity
+ * and its catalog price, then clears the term, resets the quantity to 1 and
+ * returns the focus to the box so the next item can be typed without extra
+ * clicks.
+ */
+function UnifiedItemSearch({
+  onAddPart,
+  onAddService,
 }: {
-  lines: PartDraft[];
-  onChange: (lines: PartDraft[]) => void;
-  onScanPart: (part: PartView) => void;
+  onAddPart: (part: PartView, quantity: number) => void;
+  onAddService: (service: Service, quantity: number) => void;
 }) {
   const [search, setSearch] = useState("");
-  const [activePartKey, setActivePartKey] = useState<string | null>(null);
+  const [quantity, setQuantity] = useState("1");
   const [scanOpen, setScanOpen] = useState(false);
   const [scanNotFound, setScanNotFound] = useState<string | null>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
   const debouncedSearch = useDebouncedValue(search, 250);
+  // The live term gates rendering so the list empties the instant the box is
+  // cleared on select, without waiting for the 250 ms debounce to catch up.
+  const liveTerm = search.trim();
   const term = debouncedSearch.trim();
   const partsQuery = useParts(debouncedSearch);
-  const parts = term.length > 0 ? (partsQuery.data?.items ?? []) : [];
+  const servicesQuery = useServices({
+    search: debouncedSearch,
+    category: null,
+    activeOnly: true,
+    sort: ServiceSort.name,
+    page: 1,
+    pageSize: SERVICE_PICKER_PAGE_SIZE,
+    enabled: term.length > 0,
+  });
 
-  const update = (key: string, patch: Partial<PartDraft>) => {
-    onChange(
-      lines.map((line) => (line.key === key ? { ...line, ...patch } : line)),
-    );
-  };
+  const parts =
+    liveTerm.length > 0 && term.length > 0
+      ? (partsQuery.data?.items ?? [])
+      : [];
+  const services =
+    liveTerm.length > 0 && term.length > 0
+      ? (servicesQuery.data?.items ?? [])
+      : [];
+  const results: UnifiedResult[] = [
+    ...parts.map((part): UnifiedResult => ({ kind: "part", part })),
+    ...services.map((service): UnifiedResult => ({ kind: "service", service })),
+  ];
 
-  const selectPart = (key: string, part: PartView) => {
-    update(key, {
-      partId: part.id,
-      description: part.name,
-      unitPrice: centsToInput(part.salePrice),
-    });
-  };
+  const isLoading = partsQuery.isLoading || servicesQuery.isLoading;
+  const isError = partsQuery.isError || servicesQuery.isError;
 
-  const clearPart = (key: string) => {
-    update(key, { partId: null });
-  };
+  // The quantity chosen before appending. A blank or invalid entry falls back
+  // to 1 so a tap always adds a valid line.
+  const chosenQuantity =
+    parseQuantity(quantity) > 0 ? parseQuantity(quantity) : 1;
 
-  const addLine = () => {
-    onChange([
-      ...lines,
-      {
-        key: nextKey("part"),
-        partId: null,
-        description: "",
-        quantity: "1",
-        unitPrice: "0.00",
-      },
-    ]);
-  };
-
-  const removeLine = (key: string) => {
-    onChange(lines.filter((line) => line.key !== key));
+  const handleSelect = (result: UnifiedResult) => {
+    if (result.kind === "part") {
+      onAddPart(result.part, chosenQuantity);
+    } else {
+      onAddService(result.service, chosenQuantity);
+    }
+    // Clear the term so the result list empties, reset the quantity to 1 for
+    // the next item, then refocus the box so it can be typed right away.
+    setSearch("");
+    setQuantity("1");
+    inputRef.current?.focus();
   };
 
   return (
     <Card className="gap-0 rounded-lg py-0 shadow-none">
       <CardHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
         <CardTitle className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
-          <Package className="size-4 text-primary" aria-hidden="true" />
-          Repuestos
+          <Search className="size-4 text-primary" aria-hidden="true" />
+          Agregar repuestos y servicios
         </CardTitle>
-        <div className="flex items-center gap-2">
-          <Button
-            type="button"
-            size="sm"
-            variant={scanOpen ? "default" : "outline"}
-            onClick={() => setScanOpen((open) => !open)}
-            aria-expanded={scanOpen}
-            data-ocid="quote_detail.scan_button"
-            className="gap-1.5"
-          >
-            <ScanLine className="size-4" aria-hidden="true" />
-            {scanOpen ? "Cerrar escáner" : "Escanear"}
-          </Button>
-          <Button
-            type="button"
-            size="sm"
-            variant="outline"
-            onClick={addLine}
-            data-ocid="quote_detail.add_part_button"
-            className="gap-1.5"
-          >
-            <Plus className="size-4" aria-hidden="true" />
-            Agregar
-          </Button>
-        </div>
+        <Button
+          type="button"
+          size="sm"
+          variant={scanOpen ? "default" : "outline"}
+          onClick={() => setScanOpen((open) => !open)}
+          aria-expanded={scanOpen}
+          data-ocid="quote_detail.scan_button"
+          className="gap-1.5"
+        >
+          <ScanLine className="size-4" aria-hidden="true" />
+          {scanOpen ? "Cerrar escáner" : "Escanear"}
+        </Button>
       </CardHeader>
       <CardContent className="space-y-3 px-5 py-5">
         {scanOpen ? (
@@ -356,7 +373,7 @@ function PartLinesEditor({
             hint="Apunta la cámara al código del repuesto o ingrésalo manualmente. Se agrega como una nueva línea."
             onDetected={(part) => {
               setScanNotFound(null);
-              onScanPart(part);
+              onAddPart(part, chosenQuantity);
             }}
             onNotFound={(code) => setScanNotFound(code)}
             className="rounded-md border border-border bg-muted/20 p-3"
@@ -375,90 +392,180 @@ function PartLinesEditor({
             <span className="data-rail">{scanNotFound}</span>.
           </p>
         ) : null}
-        <PickerSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por SKU o nombre…"
-          ariaLabel="Buscar repuesto por SKU o nombre"
-          ocid="quote_detail.part_search_input"
-        />
-        {term.length === 0 ? (
-          <PickerPrompt ocid="quote_detail.part_search.prompt_state">
-            Escribe el SKU o el nombre del repuesto para ver coincidencias.
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="relative flex-1">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              ref={inputRef}
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar repuesto o servicio por código o nombre…"
+              aria-label="Buscar repuesto o servicio por código o nombre"
+              data-ocid="quote_detail.item_search_input"
+              className="h-9 pl-8 text-sm"
+            />
+          </div>
+          <div className="w-full space-y-1.5 sm:w-24">
+            <Label
+              htmlFor="quote-item-quantity"
+              className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Cantidad
+            </Label>
+            <Input
+              id="quote-item-quantity"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              aria-label="Cantidad a agregar"
+              data-ocid="quote_detail.item_quantity_input"
+              className="data-rail h-9"
+            />
+          </div>
+        </div>
+        {liveTerm.length === 0 ? (
+          <PickerPrompt ocid="quote_detail.item_search.prompt_state">
+            Escribe el código o el nombre del repuesto o servicio para ver
+            coincidencias.
           </PickerPrompt>
-        ) : partsQuery.isLoading ? (
+        ) : isLoading ? (
           <div
-            data-ocid="quote_detail.part_search.loading_state"
+            data-ocid="quote_detail.item_search.loading_state"
             className="space-y-1.5"
           >
             {Array.from(
               { length: 3 },
-              (_, index) => `quote-part-skeleton-${index}`,
+              (_, index) => `quote-item-skeleton-${index}`,
             ).map((key) => (
               <Skeleton key={key} className="h-12 w-full" />
             ))}
           </div>
-        ) : partsQuery.isError ? (
+        ) : isError ? (
           <p
-            data-ocid="quote_detail.part_search.error_state"
+            data-ocid="quote_detail.item_search.error_state"
             className="text-xs text-destructive"
           >
-            No se pudo cargar el catálogo de repuestos. Inténtalo de nuevo.
+            No se pudo cargar el catálogo. Inténtalo de nuevo.
           </p>
-        ) : parts.length === 0 ? (
+        ) : results.length === 0 ? (
           <p
-            data-ocid="quote_detail.part_search.empty_state"
+            data-ocid="quote_detail.item_search.empty_state"
             className="rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground"
           >
-            {`Sin repuestos que coincidan con “${term}”.`}
+            {`Sin repuestos ni servicios que coincidan con “${term}”.`}
           </p>
         ) : (
           <ul
-            data-ocid="quote_detail.part_search.list"
-            className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border p-1"
+            data-ocid="quote_detail.item_search.list"
+            className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-border p-1"
           >
-            {parts.map((part, index) => (
-              <li key={part.id.toString()}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activePartKey !== null) selectPart(activePartKey, part);
-                  }}
-                  data-ocid={`quote_detail.part_search.item.${index + 1}`}
-                  className="flex w-full items-center justify-between gap-3 rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+            {results.map((result, index) => {
+              const isPart = result.kind === "part";
+              const code = isPart ? result.part.sku : result.service.code;
+              const name = isPart ? result.part.name : result.service.name;
+              const price = isPart
+                ? result.part.salePrice
+                : result.service.laborRate;
+              const meta = isPart
+                ? `${formatNumber(result.part.totalStock)} ${result.part.unit}`
+                : result.service.category;
+              return (
+                <li
+                  key={
+                    isPart
+                      ? `part-${result.part.id.toString()}`
+                      : `service-${result.service.id.toString()}`
+                  }
                 >
-                  <span className="min-w-0">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="data-rail shrink-0 rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                        {part.sku}
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(result)}
+                    data-ocid={`quote_detail.item_search.item.${index + 1}`}
+                    className="flex w-full items-center justify-between gap-3 rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                  >
+                    <span className="min-w-0">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          className={
+                            isPart
+                              ? "shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-primary"
+                              : "shrink-0 rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground"
+                          }
+                        >
+                          {isPart ? "Repuesto" : "Servicio"}
+                        </span>
+                        <span className="data-rail shrink-0 rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                          {code}
+                        </span>
+                        <span className="truncate text-sm font-medium">
+                          {name}
+                        </span>
                       </span>
-                      <span className="truncate text-sm font-medium">
-                        {part.name}
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                        {meta}
                       </span>
                     </span>
-                    <span className="data-rail mt-0.5 block truncate text-xs text-muted-foreground">
-                      {formatNumber(part.totalStock)} {part.unit} ·{" "}
-                      {formatMoney(part.salePrice)}
+                    <span className="data-rail shrink-0 text-xs font-medium">
+                      {formatMoney(price)}
                     </span>
-                  </span>
-                </button>
-              </li>
-            ))}
+                  </button>
+                </li>
+              );
+            })}
           </ul>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Compact editable table of the part lines already added to the quote. */
+function PartLinesTable({
+  lines,
+  onChange,
+}: {
+  lines: PartDraft[];
+  onChange: (lines: PartDraft[]) => void;
+}) {
+  const update = (key: string, patch: Partial<PartDraft>) => {
+    onChange(
+      lines.map((line) => (line.key === key ? { ...line, ...patch } : line)),
+    );
+  };
+
+  const removeLine = (key: string) => {
+    onChange(lines.filter((line) => line.key !== key));
+  };
+
+  return (
+    <Card className="gap-0 rounded-lg py-0 shadow-none">
+      <CardHeader className="border-b border-border px-5 py-4">
+        <CardTitle className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+          <Package className="size-4 text-primary" aria-hidden="true" />
+          Repuestos agregados
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 px-5 py-5">
         {lines.length === 0 ? (
           <p
             data-ocid="quote_detail.parts.empty_state"
             className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground"
           >
-            Sin repuestos. Agrega las piezas que incluye la cotización.
+            Sin repuestos. Busca arriba y toca un resultado para agregarlo.
           </p>
         ) : (
           lines.map((line, index) => (
             <div
               key={line.key}
               data-ocid={`quote_detail.part_line.${index + 1}`}
-              className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 sm:grid-cols-[1fr_5rem_7rem_auto]"
+              className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 sm:grid-cols-[1fr_5rem_7rem_7rem_auto]"
             >
               <div className="space-y-1.5">
                 <Label
@@ -467,49 +574,14 @@ function PartLinesEditor({
                 >
                   Repuesto
                 </Label>
-                {line.partId !== null ? (
-                  <div
-                    data-ocid={`quote_detail.part_selected.${index + 1}`}
-                    className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {line.description || "Repuesto seleccionado"}
-                      </p>
-                      <p className="data-rail truncate text-xs text-muted-foreground">
-                        {formatMoney(BigInt(parseMoney(line.unitPrice)))}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => clearPart(line.key)}
-                      aria-label="Quitar el repuesto seleccionado"
-                      data-ocid={`quote_detail.clear_part_button.${index + 1}`}
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="size-4" aria-hidden="true" />
-                    </Button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setActivePartKey(line.key)}
-                    aria-pressed={activePartKey === line.key}
-                    data-ocid={`quote_detail.part_pick_button.${index + 1}`}
-                    className={
-                      activePartKey === line.key
-                        ? "flex h-9 w-full items-center gap-2 rounded-md border border-primary/50 bg-primary/5 px-3 text-left text-xs text-foreground focus-visible:outline-none"
-                        : "flex h-9 w-full items-center gap-2 rounded-md border border-dashed border-border px-3 text-left text-xs text-muted-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-                    }
-                  >
-                    <Search className="size-3.5 shrink-0" aria-hidden="true" />
-                    {activePartKey === line.key
-                      ? "Elige un repuesto de la lista de arriba"
-                      : "Usar el buscador de arriba"}
-                  </button>
-                )}
+                <div
+                  data-ocid={`quote_detail.part_selected.${index + 1}`}
+                  className="flex h-9 items-center rounded-md border border-primary/40 bg-primary/5 px-3"
+                >
+                  <p className="truncate text-sm font-medium">
+                    {line.description || "Repuesto"}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -556,6 +628,26 @@ function PartLinesEditor({
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor={`part-amount-${line.key}`}
+                  className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                >
+                  Importe
+                </Label>
+                <div
+                  id={`part-amount-${line.key}`}
+                  data-ocid={`quote_detail.part_amount.${index + 1}`}
+                  className="data-rail flex h-9 items-center justify-end rounded-md border border-border bg-muted/40 px-3 text-sm font-medium"
+                >
+                  {formatMoney(
+                    BigInt(
+                      parseQuantity(line.quantity) * parseMoney(line.unitPrice),
+                    ),
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-end justify-end">
                 <Button
                   type="button"
@@ -577,57 +669,18 @@ function PartLinesEditor({
   );
 }
 
-function ServiceLinesEditor({
+/** Compact editable table of the service lines already added to the quote. */
+function ServiceLinesTable({
   lines,
   onChange,
 }: {
   lines: ServiceDraft[];
   onChange: (lines: ServiceDraft[]) => void;
 }) {
-  const [search, setSearch] = useState("");
-  const [activeServiceKey, setActiveServiceKey] = useState<string | null>(null);
-  const debouncedSearch = useDebouncedValue(search, 250);
-  const term = debouncedSearch.trim();
-  const servicesQuery = useServices({
-    search: debouncedSearch,
-    category: null,
-    activeOnly: true,
-    sort: ServiceSort.name,
-    page: 1,
-    pageSize: SERVICE_PICKER_PAGE_SIZE,
-    enabled: term.length > 0,
-  });
-  const services = term.length > 0 ? (servicesQuery.data?.items ?? []) : [];
-
   const update = (key: string, patch: Partial<ServiceDraft>) => {
     onChange(
       lines.map((line) => (line.key === key ? { ...line, ...patch } : line)),
     );
-  };
-
-  const selectService = (key: string, service: Service) => {
-    update(key, {
-      serviceId: service.id,
-      description: service.name,
-      unitPrice: centsToInput(service.laborRate),
-    });
-  };
-
-  const clearService = (key: string) => {
-    update(key, { serviceId: null });
-  };
-
-  const addLine = () => {
-    onChange([
-      ...lines,
-      {
-        key: nextKey("service"),
-        serviceId: null,
-        description: "",
-        quantity: "1",
-        unitPrice: "0.00",
-      },
-    ]);
   };
 
   const removeLine = (key: string) => {
@@ -636,112 +689,26 @@ function ServiceLinesEditor({
 
   return (
     <Card className="gap-0 rounded-lg py-0 shadow-none">
-      <CardHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
+      <CardHeader className="border-b border-border px-5 py-4">
         <CardTitle className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
           <Wrench className="size-4 text-primary" aria-hidden="true" />
-          Servicios
+          Servicios agregados
         </CardTitle>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={addLine}
-          data-ocid="quote_detail.add_service_button"
-          className="gap-1.5"
-        >
-          <Plus className="size-4" aria-hidden="true" />
-          Agregar
-        </Button>
       </CardHeader>
       <CardContent className="space-y-3 px-5 py-5">
-        <PickerSearch
-          value={search}
-          onChange={setSearch}
-          placeholder="Buscar por código o nombre…"
-          ariaLabel="Buscar servicio por código o nombre"
-          ocid="quote_detail.service_search_input"
-        />
-        {term.length === 0 ? (
-          <PickerPrompt ocid="quote_detail.service_search.prompt_state">
-            Escribe el código o el nombre del servicio para ver coincidencias.
-          </PickerPrompt>
-        ) : servicesQuery.isLoading ? (
-          <div
-            data-ocid="quote_detail.service_search.loading_state"
-            className="space-y-1.5"
-          >
-            {Array.from(
-              { length: 3 },
-              (_, index) => `quote-service-skeleton-${index}`,
-            ).map((key) => (
-              <Skeleton key={key} className="h-12 w-full" />
-            ))}
-          </div>
-        ) : servicesQuery.isError ? (
-          <p
-            data-ocid="quote_detail.service_search.error_state"
-            className="text-xs text-destructive"
-          >
-            No se pudo cargar el catálogo de servicios. Inténtalo de nuevo.
-          </p>
-        ) : services.length === 0 ? (
-          <p
-            data-ocid="quote_detail.service_search.empty_state"
-            className="rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground"
-          >
-            {`Sin servicios que coincidan con “${term}”.`}
-          </p>
-        ) : (
-          <ul
-            data-ocid="quote_detail.service_search.list"
-            className="max-h-56 space-y-1 overflow-y-auto rounded-md border border-border p-1"
-          >
-            {services.map((service, index) => (
-              <li key={service.id.toString()}>
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (activeServiceKey !== null) {
-                      selectService(activeServiceKey, service);
-                    }
-                  }}
-                  data-ocid={`quote_detail.service_search.item.${index + 1}`}
-                  className="flex w-full items-center justify-between gap-3 rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-                >
-                  <span className="min-w-0">
-                    <span className="flex min-w-0 items-center gap-2">
-                      <span className="data-rail shrink-0 rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
-                        {service.code}
-                      </span>
-                      <span className="truncate text-sm font-medium">
-                        {service.name}
-                      </span>
-                    </span>
-                    <span className="mt-0.5 block truncate text-xs text-muted-foreground">
-                      {service.category}
-                    </span>
-                  </span>
-                  <span className="data-rail shrink-0 text-xs font-medium">
-                    {formatMoney(service.laborRate)}
-                  </span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
         {lines.length === 0 ? (
           <p
             data-ocid="quote_detail.services.empty_state"
             className="rounded-md border border-dashed border-border bg-muted/30 px-4 py-6 text-center text-xs text-muted-foreground"
           >
-            Sin servicios. Agrega la mano de obra o los servicios cotizados.
+            Sin servicios. Busca arriba y toca un resultado para agregarlo.
           </p>
         ) : (
           lines.map((line, index) => (
             <div
               key={line.key}
               data-ocid={`quote_detail.service_line.${index + 1}`}
-              className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 sm:grid-cols-[1fr_5rem_7rem_auto]"
+              className="grid gap-3 rounded-md border border-border bg-muted/20 p-3 sm:grid-cols-[1fr_5rem_7rem_7rem_auto]"
             >
               <div className="space-y-1.5">
                 <Label
@@ -750,49 +717,14 @@ function ServiceLinesEditor({
                 >
                   Servicio
                 </Label>
-                {line.serviceId !== null ? (
-                  <div
-                    data-ocid={`quote_detail.service_selected.${index + 1}`}
-                    className="flex items-center justify-between gap-3 rounded-md border border-primary/40 bg-primary/5 px-3 py-2"
-                  >
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-medium">
-                        {line.description || "Servicio seleccionado"}
-                      </p>
-                      <p className="data-rail truncate text-xs text-muted-foreground">
-                        {formatMoney(BigInt(parseMoney(line.unitPrice)))}
-                      </p>
-                    </div>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => clearService(line.key)}
-                      aria-label="Quitar el servicio seleccionado"
-                      data-ocid={`quote_detail.clear_service_button.${index + 1}`}
-                      className="shrink-0 text-muted-foreground hover:text-destructive"
-                    >
-                      <X className="size-4" aria-hidden="true" />
-                    </Button>
-                  </div>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => setActiveServiceKey(line.key)}
-                    aria-pressed={activeServiceKey === line.key}
-                    data-ocid={`quote_detail.service_pick_button.${index + 1}`}
-                    className={
-                      activeServiceKey === line.key
-                        ? "flex h-9 w-full items-center gap-2 rounded-md border border-primary/50 bg-primary/5 px-3 text-left text-xs text-foreground focus-visible:outline-none"
-                        : "flex h-9 w-full items-center gap-2 rounded-md border border-dashed border-border px-3 text-left text-xs text-muted-foreground transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
-                    }
-                  >
-                    <Search className="size-3.5 shrink-0" aria-hidden="true" />
-                    {activeServiceKey === line.key
-                      ? "Elige un servicio de la lista de arriba"
-                      : "Usar el buscador de arriba"}
-                  </button>
-                )}
+                <div
+                  data-ocid={`quote_detail.service_selected.${index + 1}`}
+                  className="flex h-9 items-center rounded-md border border-primary/40 bg-primary/5 px-3"
+                >
+                  <p className="truncate text-sm font-medium">
+                    {line.description || "Servicio"}
+                  </p>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -839,6 +771,26 @@ function ServiceLinesEditor({
                 />
               </div>
 
+              <div className="space-y-1.5">
+                <Label
+                  htmlFor={`service-amount-${line.key}`}
+                  className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+                >
+                  Importe
+                </Label>
+                <div
+                  id={`service-amount-${line.key}`}
+                  data-ocid={`quote_detail.service_amount.${index + 1}`}
+                  className="data-rail flex h-9 items-center justify-end rounded-md border border-border bg-muted/40 px-3 text-sm font-medium"
+                >
+                  {formatMoney(
+                    BigInt(
+                      parseQuantity(line.quantity) * parseMoney(line.unitPrice),
+                    ),
+                  )}
+                </div>
+              </div>
+
               <div className="flex items-end justify-end">
                 <Button
                   type="button"
@@ -873,7 +825,6 @@ async function buildQuotePdf(
   meta: DocumentMeta[],
   lines: DocumentLine[],
   totals: DocumentTotals[],
-  footer: string,
   hope: HopeMessageContent | null,
 ): Promise<jsPDF> {
   const { jsPDF, autoTable } = await loadPdfLibs();
@@ -995,16 +946,10 @@ async function buildQuotePdf(
     (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
       ?.finalY ?? afterLines + 4;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(narrow ? 6 : 7.5);
-  doc.setTextColor(100, 116, 139);
-  const footerY = afterTotals + (narrow ? 6 : 10);
-  const footerLines = doc.splitTextToSize(footer, right - margin);
-  doc.text(footerLines, margin, footerY);
   drawHopeMessage(doc, hope, {
     x: margin,
     right,
-    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    y: afterTotals + (narrow ? 6 : 10),
     narrow,
   });
 
@@ -1022,7 +967,6 @@ export function QuoteDetailPage() {
   const companyQuery = useCompanyProfile();
   const dailyHopeQuery = useDailyHopeMessage();
   const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
-  const serviceTermsQuery = useServiceTermsSettings();
   const { isIvaResponsible, taxRate: effectiveTaxRate } = useIvaSettings();
 
   const [customerId, setCustomerId] = useState<Id | null>(null);
@@ -1097,8 +1041,9 @@ export function QuoteDetailPage() {
 
   const motorcycles = motorcyclesQuery.data ?? [];
 
-  // The quote form no longer asks for a motorcycle: the backend still requires
-  // one, so the customer's first registered bike is attached automatically.
+  // The quote form no longer asks for a motorcycle. When the customer has a
+  // registered bike, the first one is attached automatically; when the customer
+  // has none, the quote is saved without a motorcycle.
   const motorcycleId = motorcycles[0]?.id ?? null;
   const selectedMotorcycle = motorcycles[0];
 
@@ -1138,12 +1083,6 @@ export function QuoteDetailPage() {
   function buildInput(): QuoteInput | null {
     if (customerId === null) {
       setFormError("Selecciona el cliente de la cotización.");
-      return null;
-    }
-    if (motorcycleId === null) {
-      setFormError(
-        "El cliente seleccionado no tiene motos registradas. Registra una moto antes de cotizar.",
-      );
       return null;
     }
     const parts: QuotePartLineInput[] = [];
@@ -1188,7 +1127,7 @@ export function QuoteDetailPage() {
     }
     return {
       customerId,
-      motorcycleId,
+      motorcycleId: motorcycleId ?? undefined,
       notes: notes.trim() === "" ? undefined : notes.trim(),
       discount: BigInt(parseMoney(discount)),
       partLines: parts,
@@ -1208,6 +1147,7 @@ export function QuoteDetailPage() {
           void navigate({
             to: "/cotizaciones/$id",
             params: { id: created.quote.id.toString() },
+            search: {},
           });
         },
         onError: (error) => setFormError(errorMessage(error)),
@@ -1238,24 +1178,122 @@ export function QuoteDetailPage() {
   }
 
   /**
-   * Adds a scanned part as a new quote part line. The scanner already resolved
-   * the code through `findPartByCode`, so the part is appended with its sale
-   * price and a quantity of one; an unknown code never reaches this handler.
+   * Adds a catalog part as a new quote part line with the chosen quantity and
+   * its catalog price. The new line is inserted at the top of the list so the
+   * most recently appended item is the first one in the document. Used by the
+   * unified search and by the barcode scanner, which already resolved the code
+   * through `findPartByCode`.
    */
-  function handleScanPart(part: PartView) {
+  function handleAddPart(part: PartView, quantity: number) {
     setFormError(null);
     setPartLines((current) => [
-      ...current,
       {
         key: nextKey("part"),
         partId: part.id,
         description: part.name,
-        quantity: "1",
+        quantity: quantity.toString(),
         unitPrice: centsToInput(part.salePrice),
       },
+      ...current,
     ]);
     toast.success(`${part.name} agregado a la cotización`);
   }
+
+  /**
+   * Adds a catalog service as a new quote service line with the chosen quantity
+   * and its catalog labor rate. The new line is inserted at the top of the list
+   * so the most recently appended item is the first one in the document. Used
+   * by the unified search.
+   */
+  function handleAddService(service: Service, quantity: number) {
+    setFormError(null);
+    setServiceLines((current) => [
+      {
+        key: nextKey("service"),
+        serviceId: service.id,
+        description: service.name,
+        quantity: quantity.toString(),
+        unitPrice: centsToInput(service.laborRate),
+      },
+      ...current,
+    ]);
+    toast.success(`${service.name} agregado a la cotización`);
+  }
+
+  // A factura is immutable, so its item search sends the chosen part/service
+  // and quantity here as query params. On mount the line is appended to the
+  // quote draft as the first line, then the params are cleared from the URL.
+  const addSearch = useSearch({ from: "/cotizaciones/$id" });
+  const addPartId = addSearch.addPartId;
+  const addServiceId = addSearch.addServiceId;
+  const addQuantity = addSearch.addQuantity;
+  const addPartQuery = usePart(
+    addPartId !== undefined ? BigInt(addPartId) : null,
+  );
+  const addServiceQuery = useService(
+    addServiceId !== undefined ? BigInt(addServiceId) : null,
+  );
+  const addAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (addAppliedRef.current) return;
+    if (addPartId === undefined && addServiceId === undefined) return;
+    if (isNew) return;
+
+    const quantity = Math.max(1, Number.parseInt(addQuantity ?? "1", 10) || 1);
+
+    if (addPartId !== undefined) {
+      const part = addPartQuery.data;
+      if (!part) return;
+      addAppliedRef.current = true;
+      setInitialized(true);
+      setFormError(null);
+      setPartLines((current) => [
+        {
+          key: nextKey("part"),
+          partId: part.id,
+          description: part.name,
+          quantity: quantity.toString(),
+          unitPrice: centsToInput(part.salePrice),
+        },
+        ...current,
+      ]);
+      toast.success(`${part.name} agregado a la cotización`);
+    } else if (addServiceId !== undefined) {
+      const service = addServiceQuery.data;
+      if (!service) return;
+      addAppliedRef.current = true;
+      setInitialized(true);
+      setFormError(null);
+      setServiceLines((current) => [
+        {
+          key: nextKey("service"),
+          serviceId: service.id,
+          description: service.name,
+          quantity: quantity.toString(),
+          unitPrice: centsToInput(service.laborRate),
+        },
+        ...current,
+      ]);
+      toast.success(`${service.name} agregado a la cotización`);
+    }
+
+    void navigate({
+      to: "/cotizaciones/$id",
+      params: { id: params.id as string },
+      search: {},
+      replace: true,
+    });
+  }, [
+    addPartId,
+    addServiceId,
+    addQuantity,
+    isNew,
+    params.id,
+    addPartQuery.data,
+    addServiceQuery.data,
+    navigate,
+  ]);
 
   function handleStatusChange(status: QuoteStatus) {
     if (quoteId === null) return;
@@ -1290,6 +1328,7 @@ export function QuoteDetailPage() {
         void navigate({
           to: "/ordenes/$id",
           params: { id: order.order.id.toString() },
+          search: {},
         });
       },
       onError: (error) => setFormError(errorMessage(error)),
@@ -1376,15 +1415,23 @@ export function QuoteDetailPage() {
         selectedCustomer?.name ??
         (quote ? `Cliente #${quote.customerId.toString()}` : "—"),
     },
-    {
-      label: "Moto",
-      value: selectedMotorcycle
-        ? `${selectedMotorcycle.brand} ${selectedMotorcycle.model} · ${selectedMotorcycle.plate}`
-        : quote
-          ? `#${quote.motorcycleId.toString()}`
-          : "—",
-      rail: true,
-    },
+    ...(selectedMotorcycle
+      ? [
+          {
+            label: "Moto",
+            value: `${selectedMotorcycle.brand} ${selectedMotorcycle.model} · ${selectedMotorcycle.plate}`,
+            rail: true,
+          },
+        ]
+      : quote?.motorcycleId !== undefined
+        ? [
+            {
+              label: "Moto",
+              value: `#${quote.motorcycleId.toString()}`,
+              rail: true,
+            },
+          ]
+        : []),
     {
       label: "Fecha",
       value: formatDate(quote?.createdAt ?? null),
@@ -1413,13 +1460,6 @@ export function QuoteDetailPage() {
     },
   ];
 
-  // Pie de página editable "Términos y condiciones del Servicio". Mientras la
-  // configuración carga, o cuando el administrador la dejó vacía, se usa el
-  // texto de recepción por defecto para que el documento nunca quede sin pie.
-  const serviceTermsText = serviceTermsQuery.data?.text?.trim() ?? "";
-  const quoteFooter =
-    serviceTermsText !== "" ? serviceTermsText : SERVICE_TERMS_DEFAULT_TEXT;
-
   async function handleDownloadPdf(nextFormat: DocumentFormat) {
     setDownloadError(null);
     setIsDownloading(true);
@@ -1431,7 +1471,6 @@ export function QuoteDetailPage() {
         documentMeta,
         documentLines,
         documentTotals,
-        quoteFooter,
         hopeMessage,
       );
       await downloadFile({
@@ -1714,10 +1753,10 @@ export function QuoteDetailPage() {
                   ) : (
                     <p
                       data-ocid="quote_detail.motorcycle_missing_state"
-                      className="rounded-md border border-dashed border-warning/50 bg-warning/10 px-3 py-2.5 text-xs text-warning"
+                      className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground"
                     >
-                      Este cliente no tiene motos registradas. Registra una moto
-                      antes de guardar la cotización.
+                      Este cliente no tiene motos registradas. Puedes guardar la
+                      cotización sin moto.
                     </p>
                   )}
                 </div>
@@ -1725,12 +1764,12 @@ export function QuoteDetailPage() {
             </CardContent>
           </Card>
 
-          <PartLinesEditor
-            lines={partLines}
-            onChange={setPartLines}
-            onScanPart={handleScanPart}
+          <UnifiedItemSearch
+            onAddPart={handleAddPart}
+            onAddService={handleAddService}
           />
-          <ServiceLinesEditor lines={serviceLines} onChange={setServiceLines} />
+          <PartLinesTable lines={partLines} onChange={setPartLines} />
+          <ServiceLinesTable lines={serviceLines} onChange={setServiceLines} />
 
           <Card className="gap-0 rounded-lg py-0 shadow-none">
             <CardHeader className="border-b border-border px-5 py-4">
@@ -1789,7 +1828,9 @@ export function QuoteDetailPage() {
                 <p className="truncate text-sm font-medium">
                   {selectedMotorcycle
                     ? `${selectedMotorcycle.brand} ${selectedMotorcycle.model}`
-                    : `Moto #${quote?.motorcycleId.toString()}`}
+                    : quote?.motorcycleId !== undefined
+                      ? `Moto #${quote.motorcycleId.toString()}`
+                      : "Sin moto"}
                 </p>
                 {selectedMotorcycle ? (
                   <p className="data-rail text-xs text-muted-foreground">
@@ -2002,7 +2043,6 @@ export function QuoteDetailPage() {
                 meta={documentMeta}
                 lines={documentLines}
                 totals={documentTotals}
-                footer={quoteFooter}
                 hopeMessage={hopeMessage}
                 format={printFormat}
                 ocid="quote_detail.document"

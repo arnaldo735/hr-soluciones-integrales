@@ -9,12 +9,22 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useOpenShiftMutation } from "@/hooks/use-cash";
-import type { OpenShiftInput } from "@/lib/types";
-import { useEffect, useState } from "react";
+import { useAuth } from "@/hooks/use-auth";
+import { useBackend } from "@/hooks/use-backend";
+import { useCashRegisters, useOpenShiftMutation } from "@/hooks/use-cash";
+import type { CashRegisterKind, Id, OpenShiftInput } from "@/lib/types";
+import { useQuery } from "@tanstack/react-query";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
-import { parseAmount } from "./cash-labels";
+import { cashRegisterKindLabel, parseAmount } from "./cash-labels";
 
 interface OpenShiftDialogProps {
   open: boolean;
@@ -22,24 +32,62 @@ interface OpenShiftDialogProps {
 }
 
 interface OpenShiftFormState {
+  registerId: string;
+  responsibleName: string;
+  responsibleUserId: string;
   openingCash: string;
   openingBank: string;
   notes: string;
 }
 
 function emptyForm(): OpenShiftFormState {
-  return { openingCash: "", openingBank: "", notes: "" };
+  return {
+    registerId: "",
+    responsibleName: "",
+    responsibleUserId: "",
+    openingCash: "",
+    openingBank: "",
+    notes: "",
+  };
 }
 
 /**
- * Opens a cash shift with the declared opening balances of Caja and Bancos.
- * The backend rejects a second open shift, so the caller blocks this dialog
- * while a shift is already open.
+ * Opens a shift on a chosen caja/banco with its declared opening balance and an
+ * assigned responsible. Several registers can have an open shift at once, but
+ * the backend rejects a second open shift on the same register.
  */
 export function OpenShiftDialog({ open, onOpenChange }: OpenShiftDialogProps) {
   const [form, setForm] = useState<OpenShiftFormState>(emptyForm);
   const [error, setError] = useState<string | null>(null);
   const openShift = useOpenShiftMutation();
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+
+  const registersQuery = useCashRegisters({
+    kind: null,
+    active: true,
+    search: "",
+    offset: 0,
+    limit: 100,
+  });
+
+  const usersQuery = useQuery({
+    queryKey: ["users-page", "", 1],
+    queryFn: async () => {
+      if (!actor) return { items: [], total: 0n, offset: 0n, limit: 0n };
+      return actor.listUsersPage(token, null, 0n, 100n);
+    },
+    enabled: !!actor && !isFetching,
+  });
+
+  const registers = useMemo(
+    () => registersQuery.data?.items ?? [],
+    [registersQuery.data],
+  );
+  const users = useMemo(
+    () => (usersQuery.data?.items ?? []).filter((user) => user.active),
+    [usersQuery.data],
+  );
 
   useEffect(() => {
     if (open) {
@@ -55,22 +103,46 @@ export function OpenShiftDialog({ open, onOpenChange }: OpenShiftDialogProps) {
     setForm((current) => ({ ...current, [key]: value }));
   }
 
+  const selectedRegister = registers.find(
+    (register) => register.id.toString() === form.registerId,
+  );
+  const registerKind: CashRegisterKind | null = selectedRegister?.kind ?? null;
+
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const openingCash = parseAmount(form.openingCash);
-    const openingBank = parseAmount(form.openingBank);
-    if (openingCash === null) {
+    if (form.registerId === "") {
+      setError("Elige la caja o banco donde abrirás el turno.");
+      return;
+    }
+    const responsibleName = form.responsibleName.trim();
+    if (responsibleName === "") {
+      setError("Asigna un responsable del turno.");
+      return;
+    }
+    // Only the balance that applies to the register kind is required; the
+    // other one is sent as 0 and never blocks saving.
+    const cashApplies = registerKind !== "bank";
+    const bankApplies = registerKind !== "cash";
+    const openingCash = cashApplies ? parseAmount(form.openingCash) : 0n;
+    const openingBank = bankApplies ? parseAmount(form.openingBank) : 0n;
+    if (cashApplies && openingCash === null) {
       setError("Captura el saldo inicial de caja (puede ser 0).");
       return;
     }
-    if (openingBank === null) {
+    if (bankApplies && openingBank === null) {
       setError("Captura el saldo inicial de bancos (puede ser 0).");
       return;
     }
 
     const input: OpenShiftInput = {
-      openingCash,
-      openingBank,
+      registerId: BigInt(form.registerId),
+      responsibleName,
+      responsibleUserId:
+        form.responsibleUserId === ""
+          ? undefined
+          : BigInt(form.responsibleUserId),
+      openingCash: openingCash ?? 0n,
+      openingBank: openingBank ?? 0n,
       notes: form.notes.trim() === "" ? undefined : form.notes.trim(),
     };
 
@@ -83,7 +155,7 @@ export function OpenShiftDialog({ open, onOpenChange }: OpenShiftDialogProps) {
       onError: (mutationError: Error) => {
         setError(
           mutationError.message ||
-            "No se pudo abrir el turno. Verifica que no haya otro turno abierto.",
+            "No se pudo abrir el turno. Verifica que la caja o banco no tenga ya un turno abierto.",
         );
       },
     });
@@ -100,15 +172,106 @@ export function OpenShiftDialog({ open, onOpenChange }: OpenShiftDialogProps) {
             Abrir turno de caja
           </DialogTitle>
           <DialogDescription>
-            Declara el saldo inicial de efectivo en caja y de dinero en bancos.
-            Estos saldos son la base para calcular el cierre del turno.
+            Elige la caja o banco, asigna el responsable y declara el saldo
+            inicial. Puedes tener varios turnos abiertos, uno por caja o banco.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="open-register">Caja o banco</Label>
+            <Select
+              value={form.registerId}
+              onValueChange={(value) => update("registerId", value)}
+            >
+              <SelectTrigger
+                id="open-register"
+                aria-label="Caja o banco"
+                data-ocid="caja.open_shift.register_select"
+              >
+                <SelectValue placeholder="Elige una caja o banco" />
+              </SelectTrigger>
+              <SelectContent>
+                {registers.length === 0 ? (
+                  <SelectItem value="__none__" disabled>
+                    No hay cajas o bancos activos
+                  </SelectItem>
+                ) : (
+                  registers.map((register) => (
+                    <SelectItem
+                      key={register.id.toString()}
+                      value={register.id.toString()}
+                    >
+                      {register.name} · {cashRegisterKindLabel(register.kind)}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1.5">
+            <Label htmlFor="open-responsible">Responsable del turno</Label>
+            <Select
+              value={form.responsibleUserId}
+              onValueChange={(value) => {
+                if (value === "__free__") {
+                  update("responsibleUserId", "");
+                  return;
+                }
+                const user = users.find(
+                  (candidate) => candidate.id.toString() === value,
+                );
+                setForm((current) => ({
+                  ...current,
+                  responsibleUserId: value,
+                  responsibleName: user?.name ?? current.responsibleName,
+                }));
+              }}
+            >
+              <SelectTrigger
+                id="open-responsible"
+                aria-label="Responsable del turno"
+                data-ocid="caja.open_shift.responsible_select"
+              >
+                <SelectValue placeholder="Elige un usuario o escribe un nombre" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="__free__">
+                  Escribir un nombre libre
+                </SelectItem>
+                {users.map((user) => (
+                  <SelectItem
+                    key={user.id.toString()}
+                    value={user.id.toString()}
+                  >
+                    {user.name} · {user.roleName}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Input
+              id="open-responsible-name"
+              value={form.responsibleName}
+              onChange={(event) =>
+                update("responsibleName", event.target.value)
+              }
+              placeholder="Nombre del responsable"
+              data-ocid="caja.open_shift.responsible_input"
+              required
+            />
+          </div>
+
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label htmlFor="open-cash">Saldo inicial en caja (COP)</Label>
+              <Label htmlFor="open-cash">
+                Saldo inicial en caja (COP)
+                {registerKind === "bank" ? (
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    (no aplica)
+                  </span>
+                ) : null}
+              </Label>
               <Input
                 id="open-cash"
                 inputMode="decimal"
@@ -117,11 +280,19 @@ export function OpenShiftDialog({ open, onOpenChange }: OpenShiftDialogProps) {
                 placeholder="0.00"
                 className="data-rail"
                 data-ocid="caja.open_shift.cash_input"
-                required
+                required={registerKind !== "bank"}
+                disabled={registerKind === "bank"}
               />
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="open-bank">Saldo inicial en bancos (COP)</Label>
+              <Label htmlFor="open-bank">
+                Saldo inicial en bancos (COP)
+                {registerKind === "cash" ? (
+                  <span className="ml-1 text-xs font-normal text-muted-foreground">
+                    (no aplica)
+                  </span>
+                ) : null}
+              </Label>
               <Input
                 id="open-bank"
                 inputMode="decimal"
@@ -130,7 +301,8 @@ export function OpenShiftDialog({ open, onOpenChange }: OpenShiftDialogProps) {
                 placeholder="0.00"
                 className="data-rail"
                 data-ocid="caja.open_shift.bank_input"
-                required
+                required={registerKind !== "cash"}
+                disabled={registerKind === "cash"}
               />
             </div>
           </div>

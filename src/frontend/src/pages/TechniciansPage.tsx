@@ -456,6 +456,7 @@ function ActiveOrderList({ orders }: { orders: OrderView[] }) {
           <Link
             to="/ordenes/$id"
             params={{ id: view.order.id.toString() }}
+            search={{}}
             className="data-rail font-medium text-foreground underline-offset-4 hover:text-primary hover:underline"
           >
             {view.order.orderNumber}

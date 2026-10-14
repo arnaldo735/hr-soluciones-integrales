@@ -1,20 +1,19 @@
 {
-  "overview": "Sistema de gestión para taller de motos y repuestos con punto de venta, inventario, órdenes de trabajo, cotizaciones y facturación.",
+  "overview": "Aplicación de gestión para un taller automotriz: órdenes de trabajo, cotizaciones, facturación, inventario, caja y bancos, con interfaz en español.",
   "features": [
-    "Punto de venta de mostrador con búsqueda de productos",
-    "Inventario de repuestos con lotes y movimientos",
-    "Órdenes de trabajo del taller",
-    "Cotizaciones y facturación",
-    "Clientes y motocicletas",
-    "Recordatorios de cobros y pagos"
+    "Órdenes de trabajo con anticipos y abonos",
+    "Facturación de órdenes y cotizaciones",
+    "Caja y Bancos con turnos y movimientos",
+    "Registro automático de cada venta en Caja y Bancos",
+    "Panel de saldos y alertas del taller"
   ],
   "category": "business-management",
   "tags": [
     "taller",
-    "pos",
-    "inventario",
     "facturacion",
-    "colombia"
+    "caja",
+    "bancos",
+    "ordenes-de-trabajo"
   ],
-  "last_updated": "2026-09-28T23:57:43.421Z"
+  "last_updated": "2026-10-05T21:08:48.353Z"
 }

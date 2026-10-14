@@ -2,12 +2,14 @@ import Map "mo:core/Map";
 import Principal "mo:core/Principal";
 import Runtime "mo:core/Runtime";
 import AccessControl "mo:caffeineai-authorization/access-control";
+
 import Types "../types/workshop";
 import InventoryTypes "../types/inventory";
 import CustomerTypes "../types/customers";
 import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
 import ServiceTypes "../types/services";
+import CashTypes "../types/cash";
 import Common "../types/common";
 import UserTypes "../types/users";
 import WorkshopLib "../lib/workshop";
@@ -22,24 +24,37 @@ mixin (
   customers : Map.Map<Types.Id, CustomerTypes.Customer>,
   motorcycles : Map.Map<Types.Id, CustomerTypes.Motorcycle>,
   services : Map.Map<Types.Id, ServiceTypes.Service>,
-  counters : {
-    var nextOrderId : Nat;
-    var nextOrderPartId : Nat;
-    var nextLaborId : Nat;
-    var nextMovementId : Nat;
-    var nextOrderPhotoId : Nat;
-  },
+  counters : WorkshopLib.Counters,
   businessSettings : { var settings : BillingTypes.BusinessSettings },
   company : { var profile : CompanyTypes.CompanyProfile },
+  cashRegisters : Map.Map<Types.Id, CashTypes.CashRegister>,
+  shifts : Map.Map<Types.Id, CashTypes.Shift>,
+  cashMovements : Map.Map<Types.Id, CashTypes.CashMovement>,
+  invoices : Map.Map<Types.Id, BillingTypes.Invoice>,
   credentials : Map.Map<Common.Id, UserTypes.Credential>,
   sessions : Map.Map<Text, UserTypes.Session>,
   roles : Map.Map<Common.Id, UserTypes.Role>,
 ) {
-  func workshopState() : WorkshopLib.State = { orders; parts; lots; movements; customers; motorcycles; services; counters; businessSettings; company };
+  func workshopState() : WorkshopLib.State = {
+    orders;
+    parts;
+    lots;
+    movements;
+    customers;
+    motorcycles;
+    services;
+    counters;
+    businessSettings;
+    company;
+    cashRegisters;
+    shifts;
+    cashMovements;
+    invoices;
+  };
 
   func requireWorkshopModule(caller : Principal, token : ?Text) {
     if (not UsersLib.canAccessModule({ credentials; sessions; roles }, accessControlState, caller, token, "workshop")) {
-      Runtime.trap("Unauthorized: no tiene acceso al módulo de taller");
+      Runtime.trap("Unauthorized: no tiene acceso al módulo de órdenes de trabajo");
     };
   };
 
@@ -56,6 +71,22 @@ mixin (
   public shared ({ caller }) func createOrder(token : ?Text, input : Types.OrderInput) : async Types.OrderView {
     requireWorkshopModule(caller, token);
     WorkshopLib.createOrder(workshopState(), input, caller);
+  };
+
+  // Fija o borra el anticipo de una orden ya creada. `amount = null` borra el
+  // anticipo; con valor, `method` debe ser efectivo o transferencia. El monto
+  // no puede superar el total de la orden ni registrarse sobre una orden ya
+  // facturada. Ajusta el movimiento de Caja/Bancos correspondiente.
+  public shared ({ caller }) func setOrderAdvance(token : ?Text, id : Types.Id, input : Types.SetOrderAdvanceInput) : async Types.OrderView {
+    requireWorkshopModule(caller, token);
+    WorkshopLib.setOrderAdvance(workshopState(), id, input, caller);
+  };
+
+  // Edita el intervalo de km del próximo cambio de aceite de una orden ya
+  // creada. El próximo cambio se deriva como `intakeMileage + oilChangeInterval`.
+  public shared ({ caller }) func updateOilChangeInterval(token : ?Text, id : Types.Id, input : Types.OilChangeIntervalInput) : async Types.OrderView {
+    requireWorkshopModule(caller, token);
+    WorkshopLib.updateOilChangeInterval(workshopState(), id, input, caller);
   };
 
   public shared ({ caller }) func updateOrderStatus(token : ?Text, id : Types.Id, status : Types.OrderStatus) : async Types.OrderView {
@@ -124,5 +155,27 @@ mixin (
   public shared ({ caller }) func removeOrderPhoto(token : ?Text, id : Types.Id, photoId : Types.Id) : async Types.OrderView {
     requireWorkshopModule(caller, token);
     WorkshopLib.removeOrderPhoto(workshopState(), id, photoId, caller);
+  };
+
+  // Registra un abono sobre una orden de taller antes de facturarla. El monto
+  // debe ser mayor que cero y no puede superar el saldo pendiente. La orden no
+  // admite abonos si está cancelada, entregada o ya facturada. Cada abono crea
+  // un movimiento de ingreso en Caja/Bancos asociado a la OT.
+  public shared ({ caller }) func addOrderPayment(token : ?Text, id : Types.Id, input : Types.OrderPaymentInput) : async Types.OrderView {
+    requireWorkshopModule(caller, token);
+    WorkshopLib.addOrderPayment(workshopState(), id, input, caller);
+  };
+
+  // Lista los abonos registrados sobre una orden, ordenados por id ascendente.
+  public query ({ caller }) func listOrderPayments(token : ?Text, id : Types.Id) : async [Types.OrderPayment] {
+    requireWorkshopModule(caller, token);
+    WorkshopLib.listOrderPayments(workshopState(), id);
+  };
+
+  // Recibo de anticipo imprimible de una orden: cliente, documento, moto y
+  // placa, anticipo, total, total abonado y saldo pendiente.
+  public query ({ caller }) func getOrderAdvanceReceipt(token : ?Text, id : Types.Id) : async Types.OrderAdvanceReceipt {
+    requireWorkshopModule(caller, token);
+    WorkshopLib.buildAdvanceReceipt(workshopState(), id);
   };
 };

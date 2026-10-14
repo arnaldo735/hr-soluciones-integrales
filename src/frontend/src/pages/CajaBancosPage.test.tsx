@@ -1,6 +1,9 @@
+import type { UserListItem, UserPage } from "@/backend";
 import type {
   CashMovement,
   CashMovementPage,
+  CashRegister,
+  CashRegisterPage,
   CompanyProfile,
   DailyShiftReport,
   Shift,
@@ -10,6 +13,7 @@ import {
   CashAccount,
   CashMovementKind,
   CashMovementSource,
+  CashRegisterKind,
   DocumentType,
   FiscalRegime,
   PaymentMethod,
@@ -18,42 +22,58 @@ import {
 } from "@/lib/types";
 import { CajaBancosPage } from "@/pages/CajaBancosPage";
 import { renderWithProviders } from "@/test/helpers";
+import { Principal } from "@icp-sdk/core/principal";
 import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Caja y Bancos coverage.
+ * Caja y Bancos coverage for the multi-register rework.
  *
- * The accepted change adds the cash-register module: opening and closing a
- * shift with declared opening/closing balances, registering income and expense
- * movements classified by payment method (cash hits Caja, transfer/card hit
- * Bancos), and a printable daily shift report in A4 and 80 mm. These tests
- * exercise the real page against a typed local actor mock, so they pin the
- * observable wiring: the payloads the page sends, the balances it renders from
- * the backend's computed closing amounts, and the report it shows.
+ * The accepted change turns the single global shift into several registers
+ * (cajas y bancos), each with at most one open shift, and adds an assignable
+ * responsible. These tests exercise the real page against a typed local actor
+ * mock, so they pin the observable wiring:
+ *
+ *   - several registers can have an open shift at once, each shown with its
+ *     register name and responsible;
+ *   - opening a shift sends the chosen register, responsible and opening
+ *     balance, and a rejected second shift on the same register surfaces the
+ *     backend's Spanish message;
+ *   - a movement is registered against the chosen open shift;
+ *   - closing a shift targets that specific shift;
+ *   - the responsible can be changed by system user or free name;
+ *   - the history filters by register and responsible reach `listShifts`.
  */
 
-const getOpenShiftMock = vi.fn();
+const listOpenShiftsMock = vi.fn();
+const listCashRegistersMock = vi.fn();
 const openShiftMock = vi.fn();
 const closeShiftMock = vi.fn();
+const setShiftResponsibleMock = vi.fn();
 const listShiftsMock = vi.fn();
 const listCashMovementsMock = vi.fn();
 const registerCashMovementMock = vi.fn();
 const getDailyShiftReportMock = vi.fn();
 const getCompanyProfileMock = vi.fn();
+const getDailyHopeMessageMock = vi.fn();
+const listUsersPageMock = vi.fn();
 
 vi.mock("@/hooks/use-backend", () => ({
   useBackend: () => ({
     actor: {
-      getOpenShift: getOpenShiftMock,
+      listOpenShifts: listOpenShiftsMock,
+      listCashRegisters: listCashRegistersMock,
       openShift: openShiftMock,
       closeShift: closeShiftMock,
+      setShiftResponsible: setShiftResponsibleMock,
       listShifts: listShiftsMock,
       listCashMovements: listCashMovementsMock,
       registerCashMovement: registerCashMovementMock,
       getDailyShiftReport: getDailyShiftReportMock,
       getCompanyProfile: getCompanyProfileMock,
+      getDailyHopeMessage: getDailyHopeMessageMock,
+      listUsersPage: listUsersPageMock,
     },
     isFetching: false,
   }),
@@ -75,10 +95,31 @@ vi.mock("@tanstack/react-router", () => ({
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }));
 
 const TS = 1_700_000_000_000_000_000n;
+const PRINCIPAL = Principal.fromText("aaaaa-aa");
+
+function register(overrides: Partial<CashRegister> = {}): CashRegister {
+  return {
+    id: 1n,
+    name: "Caja principal",
+    kind: CashRegisterKind.cash,
+    openingBalance: 0n,
+    active: true,
+    createdAt: TS,
+    updatedAt: TS,
+    ...overrides,
+  };
+}
+
+function registerPage(items: CashRegister[]): CashRegisterPage {
+  return { items, total: BigInt(items.length), offset: 0n, limit: 100n };
+}
 
 function shift(overrides: Partial<Shift> = {}): Shift {
   return {
     id: 7n,
+    registerId: 1n,
+    responsibleName: "Ana Torres",
+    responsibleUserId: undefined,
     status: ShiftStatus.open,
     openingCash: 100000n,
     openingBank: 500000n,
@@ -90,7 +131,7 @@ function shift(overrides: Partial<Shift> = {}): Shift {
     differenceBank: 0n,
     openedAt: TS,
     closedAt: undefined,
-    openedBy: undefined as never,
+    openedBy: PRINCIPAL,
     closedBy: undefined,
     notes: undefined,
     ...overrides,
@@ -121,9 +162,45 @@ function shiftPage(items: Shift[]): ShiftPage {
   return { items, total: BigInt(items.length), offset: 0n, limit: 15n };
 }
 
-function companyProfile(
-  overrides: Partial<CompanyProfile> = {},
-): CompanyProfile {
+function dailyReport(
+  overrides: Partial<DailyShiftReport> = {},
+): DailyShiftReport {
+  return {
+    shift: shift(),
+    registerName: "Caja principal",
+    responsibleName: "Ana Torres",
+    movements: [movement()],
+    byPaymentMethod: [
+      { method: PaymentMethod.transfer, income: 250000n, expense: 0n },
+    ],
+    cashIncome: 0n,
+    cashExpense: 0n,
+    bankIncome: 250000n,
+    bankExpense: 0n,
+    totalIncome: 250000n,
+    totalExpense: 0n,
+    ...overrides,
+  };
+}
+
+function user(overrides: Partial<UserListItem> = {}): UserListItem {
+  return {
+    id: 5n,
+    username: "ana",
+    name: "Ana Torres",
+    roleId: 1n,
+    roleName: "Mecánico",
+    active: true,
+    createdAt: TS,
+    ...overrides,
+  };
+}
+
+function userPage(items: UserListItem[]): UserPage {
+  return { items, total: BigInt(items.length), offset: 0n, limit: 100n };
+}
+
+function companyProfile(): CompanyProfile {
   return {
     legalName: "HR SOLUCIONES INTEGRALES S.A.S.",
     tradeName: "Taller HR Motos",
@@ -140,127 +217,206 @@ function companyProfile(
     logoUrl: undefined,
     taxRate: 16n,
     updatedAt: TS,
-    ...overrides,
   };
 }
 
-function dailyReport(
-  overrides: Partial<DailyShiftReport> = {},
-): DailyShiftReport {
-  return {
-    shift: shift(),
-    movements: [movement()],
-    byPaymentMethod: [
-      { method: PaymentMethod.transfer, income: 250000n, expense: 0n },
-    ],
-    cashIncome: 0n,
-    cashExpense: 0n,
-    bankIncome: 250000n,
-    bankExpense: 0n,
-    totalIncome: 250000n,
-    totalExpense: 0n,
-    ...overrides,
-  };
-}
-
-describe("CajaBancosPage", () => {
+describe("CajaBancosPage (multi-register)", () => {
   beforeEach(() => {
-    getOpenShiftMock.mockReset();
+    listOpenShiftsMock.mockReset();
+    listCashRegistersMock.mockReset();
     openShiftMock.mockReset();
     closeShiftMock.mockReset();
+    setShiftResponsibleMock.mockReset();
     listShiftsMock.mockReset();
     listCashMovementsMock.mockReset();
     registerCashMovementMock.mockReset();
     getDailyShiftReportMock.mockReset();
     getCompanyProfileMock.mockReset();
+    getDailyHopeMessageMock.mockReset();
+    listUsersPageMock.mockReset();
 
-    getCompanyProfileMock.mockResolvedValue(companyProfile());
+    listOpenShiftsMock.mockResolvedValue([]);
+    listCashRegistersMock.mockResolvedValue(
+      registerPage([
+        register({
+          id: 1n,
+          name: "Caja principal",
+          kind: CashRegisterKind.cash,
+        }),
+        register({ id: 2n, name: "Banco Bogotá", kind: CashRegisterKind.bank }),
+      ]),
+    );
     listShiftsMock.mockResolvedValue(shiftPage([]));
     listCashMovementsMock.mockResolvedValue(movementPage([]));
+    getCompanyProfileMock.mockResolvedValue(companyProfile());
+    getDailyHopeMessageMock.mockResolvedValue(null);
+    listUsersPageMock.mockResolvedValue(userPage([user()]));
   });
 
-  it("shows the closed state and opens a shift with the declared balances", async () => {
-    getOpenShiftMock.mockResolvedValue(null);
+  it("shows a caja and a banco open at the same time with their responsible", async () => {
+    listOpenShiftsMock.mockResolvedValue([
+      shift({ id: 7n, registerId: 1n, responsibleName: "Ana Torres" }),
+      shift({
+        id: 8n,
+        registerId: 2n,
+        responsibleName: "Carlos Pérez",
+        openingCash: 0n,
+        openingBank: 900000n,
+        computedClosingCash: 0n,
+        computedClosingBank: 900000n,
+      }),
+    ]);
+    renderWithProviders(<CajaBancosPage />);
+
+    const list = await screen.findByTestId("caja.open_shifts.list");
+    expect(within(list).getByText("Caja principal")).toBeInTheDocument();
+    expect(within(list).getByText("Banco Bogotá")).toBeInTheDocument();
+    expect(within(list).getByText(/Ana Torres/)).toBeInTheDocument();
+    expect(within(list).getByText(/Carlos Pérez/)).toBeInTheDocument();
+    // Two open shifts, so two close buttons are offered.
+    expect(
+      screen.getByTestId("caja.open_shifts.close_button.1"),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByTestId("caja.open_shifts.close_button.2"),
+    ).toBeInTheDocument();
+  });
+
+  it("opens a shift on the chosen register with a system-user responsible", async () => {
     openShiftMock.mockResolvedValue(shift());
     renderWithProviders(<CajaBancosPage />);
 
-    expect(
-      await screen.findByTestId("caja.balances.closed_state"),
-    ).toHaveTextContent("La caja está cerrada");
-
-    await userEvent.click(screen.getByTestId("caja.open_shift_button"));
+    await userEvent.click(await screen.findByTestId("caja.open_shift_button"));
     const dialog = await screen.findByTestId("caja.open_shift.dialog");
-    await userEvent.type(
-      within(dialog).getByTestId("caja.open_shift.cash_input"),
-      "1000",
+
+    // Choose the banco register.
+    await userEvent.click(
+      within(dialog).getByTestId("caja.open_shift.register_select"),
     );
+    await userEvent.click(
+      await screen.findByRole("option", { name: /Banco Bogotá/ }),
+    );
+    // Choose the system user; its name fills the responsible field.
+    await userEvent.click(
+      within(dialog).getByTestId("caja.open_shift.responsible_select"),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: /Ana Torres/ }),
+    );
+    // A banco only asks for the bank opening balance.
     await userEvent.type(
       within(dialog).getByTestId("caja.open_shift.bank_input"),
-      "5000",
+      "9000",
     );
     await userEvent.click(
       within(dialog).getByTestId("caja.open_shift.submit_button"),
     );
 
     await waitFor(() => expect(openShiftMock).toHaveBeenCalledTimes(1));
-    // The token is null in a test session, and the amounts are integer cents.
     expect(openShiftMock).toHaveBeenCalledWith(null, {
-      openingCash: 100000n,
-      openingBank: 500000n,
+      registerId: 2n,
+      responsibleName: "Ana Torres",
+      responsibleUserId: 5n,
+      openingCash: 0n,
+      openingBank: 900000n,
       notes: undefined,
     });
   });
 
-  it("renders the open shift balances from the backend's computed closing amounts", async () => {
-    getOpenShiftMock.mockResolvedValue(
-      shift({
-        openingCash: 100000n,
-        openingBank: 500000n,
-        computedClosingCash: 150000n,
-        computedClosingBank: 650000n,
-      }),
+  it("opens a shift with a free-text responsible", async () => {
+    openShiftMock.mockResolvedValue(shift());
+    renderWithProviders(<CajaBancosPage />);
+
+    await userEvent.click(await screen.findByTestId("caja.open_shift_button"));
+    const dialog = await screen.findByTestId("caja.open_shift.dialog");
+
+    await userEvent.click(
+      within(dialog).getByTestId("caja.open_shift.register_select"),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: /Caja principal/ }),
+    );
+    await userEvent.type(
+      within(dialog).getByTestId("caja.open_shift.responsible_input"),
+      "Turno de la tarde",
+    );
+    await userEvent.type(
+      within(dialog).getByTestId("caja.open_shift.cash_input"),
+      "1000",
+    );
+    await userEvent.click(
+      within(dialog).getByTestId("caja.open_shift.submit_button"),
+    );
+
+    await waitFor(() => expect(openShiftMock).toHaveBeenCalledTimes(1));
+    expect(openShiftMock).toHaveBeenCalledWith(null, {
+      registerId: 1n,
+      responsibleName: "Turno de la tarde",
+      responsibleUserId: undefined,
+      openingCash: 100000n,
+      openingBank: 0n,
+      notes: undefined,
+    });
+  });
+
+  it("surfaces the backend error when a register already has an open shift", async () => {
+    openShiftMock.mockRejectedValue(
+      new Error("Ya hay un turno abierto para esta caja o banco"),
     );
     renderWithProviders(<CajaBancosPage />);
 
-    const panel = await screen.findByTestId("caja.balances.section");
-    expect(within(panel).getByTestId("caja.balances.cash")).toHaveTextContent(
-      "$ 1.500",
+    await userEvent.click(await screen.findByTestId("caja.open_shift_button"));
+    const dialog = await screen.findByTestId("caja.open_shift.dialog");
+
+    await userEvent.click(
+      within(dialog).getByTestId("caja.open_shift.register_select"),
     );
-    expect(within(panel).getByTestId("caja.balances.bank")).toHaveTextContent(
-      "$ 6.500",
+    await userEvent.click(
+      await screen.findByRole("option", { name: /Caja principal/ }),
     );
-    expect(within(panel).getByTestId("caja.balances.total")).toHaveTextContent(
-      "$ 8.000",
+    await userEvent.type(
+      within(dialog).getByTestId("caja.open_shift.responsible_input"),
+      "Ana Torres",
     );
-    expect(panel).toHaveTextContent("Turno abierto");
-    // The open shift exposes the movement, report and close actions.
+    await userEvent.type(
+      within(dialog).getByTestId("caja.open_shift.cash_input"),
+      "1000",
+    );
+    await userEvent.click(
+      within(dialog).getByTestId("caja.open_shift.submit_button"),
+    );
+
     expect(
-      screen.getByTestId("caja.register_movement_button"),
-    ).toBeInTheDocument();
-    expect(screen.getByTestId("caja.view_report_button")).toBeInTheDocument();
-    expect(screen.getByTestId("caja.close_shift_button")).toBeInTheDocument();
+      await within(dialog).findByTestId("caja.open_shift.error_state"),
+    ).toHaveTextContent("Ya hay un turno abierto para esta caja o banco");
   });
 
-  it("registers a transfer income against Bancos", async () => {
-    getOpenShiftMock.mockResolvedValue(shift());
+  it("registers a movement against the chosen open shift", async () => {
+    listOpenShiftsMock.mockResolvedValue([
+      shift({ id: 7n, registerId: 1n, responsibleName: "Ana Torres" }),
+      shift({
+        id: 8n,
+        registerId: 2n,
+        responsibleName: "Carlos Pérez",
+        openingCash: 0n,
+        openingBank: 900000n,
+        computedClosingCash: 0n,
+        computedClosingBank: 900000n,
+      }),
+    ]);
     registerCashMovementMock.mockResolvedValue(movement());
     renderWithProviders(<CajaBancosPage />);
 
+    // Open the movement dialog from the second (banco) shift card.
     await userEvent.click(
-      await screen.findByTestId("caja.register_movement_button"),
+      await screen.findByTestId("caja.open_shifts.movement_button.2"),
     );
     const dialog = await screen.findByTestId("caja.movement.dialog");
 
-    // Pick Transferencia; the account is derived to Bancos.
-    await userEvent.click(
-      within(dialog).getByTestId("caja.movement.method_select"),
-    );
-    await userEvent.click(
-      await screen.findByRole("option", { name: "Transferencia" }),
-    );
+    // The dialog is pre-selected with the banco shift.
     expect(
-      within(dialog).getByTestId("caja.movement.account_hint"),
-    ).toHaveTextContent("Bancos");
+      within(dialog).getByTestId("caja.movement.shift_select"),
+    ).toHaveTextContent(/Banco Bogotá/);
 
     await userEvent.type(
       within(dialog).getByTestId("caja.movement.amount_input"),
@@ -279,108 +435,179 @@ describe("CajaBancosPage", () => {
     );
     expect(registerCashMovementMock).toHaveBeenCalledWith(null, {
       kind: CashMovementKind.income,
-      paymentMethod: PaymentMethod.transfer,
-      account: CashAccount.bank,
+      paymentMethod: PaymentMethod.cash,
+      account: CashAccount.cash,
       amount: 250000n,
       description: "Consignación cliente",
       reference: undefined,
       source: CashMovementSource.manual,
+      shiftId: 8n,
     });
   });
 
-  it("closes the shift with the declared closing balances and shows the difference", async () => {
-    getOpenShiftMock.mockResolvedValue(
-      shift({ computedClosingCash: 100000n, computedClosingBank: 500000n }),
-    );
+  it("closes only the chosen shift", async () => {
+    listOpenShiftsMock.mockResolvedValue([
+      shift({ id: 7n, registerId: 1n, responsibleName: "Ana Torres" }),
+      shift({
+        id: 8n,
+        registerId: 2n,
+        responsibleName: "Carlos Pérez",
+        openingCash: 0n,
+        openingBank: 900000n,
+        computedClosingCash: 0n,
+        computedClosingBank: 900000n,
+      }),
+    ]);
     closeShiftMock.mockResolvedValue(
-      shift({ status: ShiftStatus.closed, closedAt: TS }),
+      shift({
+        id: 8n,
+        registerId: 2n,
+        status: ShiftStatus.closed,
+        closedAt: TS,
+      }),
     );
     renderWithProviders(<CajaBancosPage />);
 
-    await userEvent.click(await screen.findByTestId("caja.close_shift_button"));
+    await userEvent.click(
+      await screen.findByTestId("caja.open_shifts.close_button.2"),
+    );
     const dialog = await screen.findByTestId("caja.close_shift.dialog");
-
-    // The declared fields are prefilled with the computed balances, so the
-    // difference starts at zero.
-    expect(
-      within(dialog).getByTestId("caja.close_shift.cash_input"),
-    ).toHaveValue("1000.00");
-    expect(
-      within(dialog).getByTestId("caja.close_shift.difference_cash"),
-    ).toHaveTextContent("$ 0");
-
-    // Declaring 900.00 against a computed 1000.00 shows a −$ 100 difference.
-    const cashInput = within(dialog).getByTestId("caja.close_shift.cash_input");
-    await userEvent.clear(cashInput);
-    await userEvent.type(cashInput, "900");
-    expect(
-      within(dialog).getByTestId("caja.close_shift.difference_cash"),
-    ).toHaveTextContent("-$ 100");
+    expect(dialog).toHaveTextContent("Banco Bogotá");
 
     await userEvent.click(
       within(dialog).getByTestId("caja.close_shift.submit_button"),
     );
 
     await waitFor(() => expect(closeShiftMock).toHaveBeenCalledTimes(1));
-    expect(closeShiftMock).toHaveBeenCalledWith(null, 7n, {
-      declaredClosingCash: 90000n,
-      declaredClosingBank: 500000n,
+    expect(closeShiftMock).toHaveBeenCalledWith(null, 8n, {
+      declaredClosingCash: 0n,
+      declaredClosingBank: 900000n,
       notes: undefined,
     });
   });
 
-  it("shows the daily report with movements, payment-method totals and both print formats", async () => {
-    getOpenShiftMock.mockResolvedValue(shift());
-    getDailyShiftReportMock.mockResolvedValue(dailyReport());
+  it("changes the responsible of an open shift", async () => {
+    listOpenShiftsMock.mockResolvedValue([
+      shift({ id: 7n, registerId: 1n, responsibleName: "Ana Torres" }),
+    ]);
+    setShiftResponsibleMock.mockResolvedValue(
+      shift({ responsibleName: "Ana Torres", responsibleUserId: 5n }),
+    );
     renderWithProviders(<CajaBancosPage />);
 
-    await userEvent.click(await screen.findByTestId("caja.view_report_button"));
-    const dialog = await screen.findByTestId("caja.report.dialog");
+    await userEvent.click(
+      await screen.findByTestId("caja.open_shifts.responsible_button.1"),
+    );
+    const dialog = await screen.findByTestId("caja.responsible.dialog");
+
+    await userEvent.click(
+      within(dialog).getByTestId("caja.responsible.user_select"),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: /Ana Torres/ }),
+    );
+    await userEvent.click(
+      within(dialog).getByTestId("caja.responsible.submit_button"),
+    );
 
     await waitFor(() =>
-      expect(getDailyShiftReportMock).toHaveBeenCalledWith(null, 7n),
+      expect(setShiftResponsibleMock).toHaveBeenCalledTimes(1),
     );
-    // The movement and its payment-method total are listed.
-    expect(dialog).toHaveTextContent("Consignación cliente");
-    expect(
-      within(dialog).getByTestId("caja.report.method.transfer"),
-    ).toHaveTextContent("Transferencia");
-    expect(
-      within(dialog).getByTestId("caja.report.method.transfer"),
-    ).toHaveTextContent("+$ 2.500");
-    // Both printable formats are offered.
-    expect(within(dialog).getByTestId("caja.report.a4")).toBeInTheDocument();
-    expect(within(dialog).getByTestId("caja.report.80mm")).toBeInTheDocument();
+    expect(setShiftResponsibleMock).toHaveBeenCalledWith(
+      null,
+      7n,
+      "Ana Torres",
+      5n,
+    );
   });
 
-  it("lists closed shifts in the history and opens a shift's report", async () => {
-    getOpenShiftMock.mockResolvedValue(null);
-    listShiftsMock.mockResolvedValue(
-      shiftPage([
-        shift({
-          id: 3n,
-          status: ShiftStatus.closed,
-          closedAt: TS,
-          computedClosingCash: 200000n,
-          computedClosingBank: 300000n,
-        }),
-      ]),
-    );
+  it("shows the chosen shift's report with its register and responsible", async () => {
+    listOpenShiftsMock.mockResolvedValue([
+      shift({ id: 7n, registerId: 1n, responsibleName: "Ana Torres" }),
+      shift({
+        id: 8n,
+        registerId: 2n,
+        responsibleName: "Carlos Pérez",
+        openingCash: 0n,
+        openingBank: 900000n,
+        computedClosingCash: 0n,
+        computedClosingBank: 900000n,
+      }),
+    ]);
     getDailyShiftReportMock.mockResolvedValue(
-      dailyReport({ shift: shift({ id: 3n, status: ShiftStatus.closed }) }),
+      dailyReport({
+        shift: shift({
+          id: 8n,
+          registerId: 2n,
+          responsibleName: "Carlos Pérez",
+        }),
+        registerName: "Banco Bogotá",
+        responsibleName: "Carlos Pérez",
+      }),
     );
+    renderWithProviders(<CajaBancosPage />);
+
+    // Open the report from the second (banco) shift card.
+    await userEvent.click(
+      await screen.findByTestId("caja.open_shifts.report_button.2"),
+    );
+    const dialog = await screen.findByTestId("caja.report.dialog");
+
+    // The report is scoped to the chosen shift, not the first one.
+    await waitFor(() =>
+      expect(getDailyShiftReportMock).toHaveBeenCalledWith(null, 8n),
+    );
+    expect(dialog).toHaveTextContent("Banco Bogotá");
+    expect(dialog).toHaveTextContent("Carlos Pérez");
+  });
+
+  it("sends the register and responsible filters to listShifts", async () => {
     renderWithProviders(<CajaBancosPage />);
 
     await userEvent.click(await screen.findByTestId("caja.tab.history"));
-    expect(await screen.findByText("#3")).toBeInTheDocument();
-    expect(screen.getByText("Cerrado")).toBeInTheDocument();
+    await waitFor(() =>
+      expect(listShiftsMock).toHaveBeenCalledWith(
+        null,
+        {
+          registerId: undefined,
+          responsible: undefined,
+          status: ShiftStatus.closed,
+          from: undefined,
+          to: undefined,
+        },
+        0n,
+        15n,
+      ),
+    );
 
+    // Filter by the banco register.
     await userEvent.click(
-      screen.getByRole("button", { name: "Ver informe del turno" }),
+      await screen.findByTestId("caja.history.register_filter"),
+    );
+    await userEvent.click(
+      await screen.findByRole("option", { name: "Banco Bogotá" }),
     );
     await waitFor(() =>
-      expect(getDailyShiftReportMock).toHaveBeenCalledWith(null, 3n),
+      expect(listShiftsMock).toHaveBeenLastCalledWith(
+        null,
+        expect.objectContaining({ registerId: 2n }),
+        0n,
+        15n,
+      ),
     );
-    expect(await screen.findByTestId("caja.report.dialog")).toBeInTheDocument();
+
+    // Filter by responsible.
+    await userEvent.type(
+      screen.getByTestId("caja.history.responsible_input"),
+      "Carlos",
+    );
+    await waitFor(() =>
+      expect(listShiftsMock).toHaveBeenLastCalledWith(
+        null,
+        expect.objectContaining({ responsible: "Carlos" }),
+        0n,
+        15n,
+      ),
+    );
   });
 });

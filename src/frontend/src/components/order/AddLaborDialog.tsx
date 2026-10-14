@@ -35,6 +35,7 @@ export function AddLaborDialog({
 }: AddLaborDialogProps) {
   const [description, setDescription] = useState("");
   const [price, setPrice] = useState("");
+  const [quantity, setQuantity] = useState("1");
   const [technicianId, setTechnicianId] = useState<Id | null>(null);
   const [service, setService] = useState<Service | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
@@ -47,6 +48,7 @@ export function AddLaborDialog({
     if (open) {
       setDescription("");
       setPrice("");
+      setQuantity("1");
       setTechnicianId(null);
       setService(null);
       setFormError(null);
@@ -56,11 +58,21 @@ export function AddLaborDialog({
   const priceValue = Number(price);
   const priceValid =
     price.trim() !== "" && Number.isFinite(priceValue) && priceValue >= 0;
+  const quantityValue = Number(quantity);
+  const quantityValid =
+    quantity.trim() !== "" &&
+    Number.isInteger(quantityValue) &&
+    quantityValue >= 1;
   const descriptionValid = description.trim().length > 0;
+  const lineTotalCents =
+    priceValid && quantityValid
+      ? BigInt(Math.round(priceValue * 100)) * BigInt(quantityValue)
+      : null;
 
   function reset() {
     setDescription("");
     setPrice("");
+    setQuantity("1");
     setTechnicianId(null);
     setService(null);
     setFormError(null);
@@ -92,13 +104,17 @@ export function AddLaborDialog({
       setFormError("Captura un precio válido (mayor o igual a cero).");
       return;
     }
+    if (!quantityValid) {
+      setFormError("Captura una cantidad válida (entero mayor o igual a 1).");
+      return;
+    }
 
     addLabor.mutate(
       {
         id: orderId,
         labor: {
           description: description.trim(),
-          price: BigInt(Math.round(priceValue * 100)),
+          price: BigInt(Math.round(priceValue * 100)) * BigInt(quantityValue),
           technicianId: technicianId ?? undefined,
           serviceId: service?.id ?? undefined,
         },
@@ -151,29 +167,51 @@ export function AddLaborDialog({
             />
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="add-labor-price">Precio (COP)</Label>
-            <Input
-              id="add-labor-price"
-              type="number"
-              inputMode="decimal"
-              min={0}
-              step="0.01"
-              value={price}
-              onChange={(event) => {
-                setPrice(event.target.value);
-                setFormError(null);
-              }}
-              placeholder="0.00"
-              data-ocid="order_detail.add_labor.price_input"
-              className="data-rail"
-            />
-            {priceValid ? (
-              <p className="data-rail text-xs text-muted-foreground">
-                {formatMoney(BigInt(Math.round(priceValue * 100)))}
-              </p>
-            ) : null}
+          <div className="grid grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label htmlFor="add-labor-price">Precio unitario (COP)</Label>
+              <Input
+                id="add-labor-price"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                step="0.01"
+                value={price}
+                onChange={(event) => {
+                  setPrice(event.target.value);
+                  setFormError(null);
+                }}
+                placeholder="0.00"
+                data-ocid="order_detail.add_labor.price_input"
+                className="data-rail"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="add-labor-quantity">Cantidad</Label>
+              <Input
+                id="add-labor-quantity"
+                type="number"
+                inputMode="numeric"
+                min={1}
+                step="1"
+                value={quantity}
+                onChange={(event) => {
+                  setQuantity(event.target.value);
+                  setFormError(null);
+                }}
+                placeholder="1"
+                data-ocid="order_detail.add_labor.quantity_input"
+                className="data-rail"
+              />
+            </div>
           </div>
+
+          {lineTotalCents !== null ? (
+            <p className="data-rail text-xs text-muted-foreground">
+              Total: {formatMoney(lineTotalCents)}
+            </p>
+          ) : null}
 
           <LaborTechnicianSelect
             id="add-labor-technician"

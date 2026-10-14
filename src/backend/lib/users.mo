@@ -286,17 +286,15 @@ module {
       case (?_) { Runtime.trap("Ya existe un usuario con ese nombre de acceso") };
       case null {};
     };
-    // El primer usuario creado es el administrador; los siguientes usan el rol
-    // indicado o, si no se indica, el rol Mecánico (id 1).
-    let isFirst = state.credentials.size() == 0;
-    let effectiveRoleId = if (isFirst) {
-      0;
-    } else if (roleId == 0 and not state.roles.containsKey(0)) {
+    // El rol elegido por el administrador se respeta siempre que exista. Solo
+    // cuando el rol indicado no existe se recurre al rol Mecánico (id 1) como
+    // respaldo; si tampoco existe, la creación falla con un error claro. El
+    // rol nunca se fuerza a Administrador: el formulario decide el rol.
+    let effectiveRoleId = if (state.roles.containsKey(roleId)) {
+      roleId;
+    } else if (state.roles.containsKey(1)) {
       1;
     } else {
-      roleId;
-    };
-    if (not state.roles.containsKey(effectiveRoleId)) {
       Runtime.trap("Rol no encontrado");
     };
     let id = state.counters.nextUserId;

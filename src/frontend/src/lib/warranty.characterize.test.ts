@@ -63,26 +63,34 @@ describe("warrantyAppliesToOrder (characterization)", () => {
     expect(serviceNameFor).toHaveBeenCalledWith(9n);
   });
 
-  it("is false when no labor line is linked to a catalog service", () => {
+  it("is true when an unlinked labor line's description names a warranty service", () => {
+    // The accepted change activates the warranty from the written description
+    // too, so a line with no catalog link still matches by name.
     const serviceNameFor = vi.fn(() => "Reparación de motor");
 
-    expect(warrantyAppliesToOrder([laborLine()], serviceNameFor)).toBe(false);
+    expect(warrantyAppliesToOrder([laborLine()], serviceNameFor)).toBe(true);
     expect(serviceNameFor).not.toHaveBeenCalled();
   });
 
-  it("is false when the linked service is not a warranty service", () => {
+  it("is false when the linked service and the description are not warranty services", () => {
     const serviceNameFor = vi.fn(() => "Cambio de aceite");
 
     expect(
-      warrantyAppliesToOrder([laborLine({ serviceId: 5n })], serviceNameFor),
+      warrantyAppliesToOrder(
+        [laborLine({ description: "Ajuste de frenos", serviceId: 5n })],
+        serviceNameFor,
+      ),
     ).toBe(false);
   });
 
-  it("is false when the service id cannot be resolved", () => {
+  it("is false when the service id cannot be resolved and the description does not match", () => {
     const serviceNameFor = vi.fn(() => null);
 
     expect(
-      warrantyAppliesToOrder([laborLine({ serviceId: 9n })], serviceNameFor),
+      warrantyAppliesToOrder(
+        [laborLine({ description: "Ajuste de frenos", serviceId: 9n })],
+        serviceNameFor,
+      ),
     ).toBe(false);
   });
 

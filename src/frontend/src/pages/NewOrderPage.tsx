@@ -24,6 +24,7 @@ import {
   AlertTriangle,
   ArrowLeft,
   Bike,
+  HandCoins,
   Save,
   Search,
   UserRound,
@@ -48,6 +49,8 @@ export function NewOrderPage() {
   const [customerId, setCustomerId] = useState<Id | null>(null);
   const [motorcycleId, setMotorcycleId] = useState<Id | null>(null);
   const [mileage, setMileage] = useState("");
+  const [previousMileage, setPreviousMileage] = useState("");
+  const [oilChangeInterval, setOilChangeInterval] = useState("3000");
   const [problem, setProblem] = useState("");
   const [formError, setFormError] = useState<string | null>(null);
   const [customerSearch, setCustomerSearch] = useState("");
@@ -73,11 +76,55 @@ export function NewOrderPage() {
     Number.isFinite(mileageValue) &&
     mileageValue >= 0 &&
     Number.isInteger(mileageValue);
+
+  const previousMileageValue =
+    previousMileage.trim() === "" ? null : Number(previousMileage);
+  const previousMileageValid =
+    previousMileageValue === null ||
+    (Number.isFinite(previousMileageValue) &&
+      previousMileageValue >= 0 &&
+      Number.isInteger(previousMileageValue));
+
+  const intervalValue =
+    oilChangeInterval.trim() === "" ? null : Number(oilChangeInterval);
+  const intervalValid =
+    intervalValue !== null &&
+    Number.isFinite(intervalValue) &&
+    intervalValue >= 0 &&
+    Number.isInteger(intervalValue);
+
+  const mileageBelowPrevious =
+    mileageValid &&
+    previousMileageValid &&
+    previousMileageValue !== null &&
+    mileageValue !== null &&
+    mileageValue < previousMileageValue;
+
+  const travelledKm =
+    mileageValid &&
+    previousMileageValid &&
+    previousMileageValue !== null &&
+    mileageValue !== null
+      ? mileageValue - previousMileageValue
+      : null;
+
+  const nextOilChangeKm =
+    mileageValid &&
+    intervalValid &&
+    mileageValue !== null &&
+    intervalValue !== null
+      ? mileageValue + intervalValue
+      : null;
+
   const problemValid = problem.trim().length > 0;
+
   const canSubmit =
     customerId !== null &&
     motorcycleId !== null &&
     mileageValid &&
+    previousMileageValid &&
+    intervalValid &&
+    !mileageBelowPrevious &&
     problemValid &&
     !createOrder.isPending;
 
@@ -110,6 +157,24 @@ export function NewOrderPage() {
       setFormError("Captura un kilometraje de ingreso válido (número entero).");
       return;
     }
+    if (!previousMileageValid) {
+      setFormError(
+        "El kilometraje anterior debe ser un número entero en kilómetros.",
+      );
+      return;
+    }
+    if (mileageBelowPrevious) {
+      setFormError(
+        "El kilometraje actual no puede ser menor que el kilometraje anterior.",
+      );
+      return;
+    }
+    if (!intervalValid || intervalValue === null) {
+      setFormError(
+        "El intervalo de cambio de aceite debe ser un número entero en kilómetros.",
+      );
+      return;
+    }
     if (!problemValid) {
       setFormError("Describe la falla o el servicio solicitado.");
       return;
@@ -122,12 +187,19 @@ export function NewOrderPage() {
         intakeMileage: BigInt(mileageValue),
         technicianIds: [],
         problem: problem.trim(),
+        ...(previousMileageValue !== null
+          ? { previousMileage: BigInt(previousMileageValue) }
+          : {}),
+        ...(intervalValue !== null
+          ? { oilChangeInterval: BigInt(intervalValue) }
+          : {}),
       },
       {
         onSuccess: (view) => {
           void navigate({
             to: "/ordenes/$id",
             params: { id: view.order.id.toString() },
+            search: {},
           });
         },
         onError: (error) => {
@@ -330,35 +402,139 @@ export function NewOrderPage() {
               </div>
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="order-mileage">Kilometraje de ingreso</Label>
-              <div className="relative">
-                <Bike
-                  className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
-                  aria-hidden="true"
-                />
+            <div className="grid gap-5 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="order-mileage">Kilometraje de ingreso</Label>
+                <div className="relative">
+                  <Bike
+                    className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground"
+                    aria-hidden="true"
+                  />
+                  <Input
+                    id="order-mileage"
+                    type="number"
+                    inputMode="numeric"
+                    min={0}
+                    step={1}
+                    value={mileage}
+                    onChange={(event) => {
+                      setMileage(event.target.value);
+                      setFormError(null);
+                    }}
+                    placeholder="Ej. 24500"
+                    data-ocid="new_order.mileage_input"
+                    className="data-rail pl-9"
+                  />
+                </div>
+                {mileageValid ? (
+                  <p className="data-rail text-xs text-muted-foreground">
+                    {formatNumber(mileageValue)} km
+                  </p>
+                ) : null}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="order-previous-mileage">
+                  Kilometraje anterior{" "}
+                  <span className="font-normal text-muted-foreground">
+                    (opcional)
+                  </span>
+                </Label>
                 <Input
-                  id="order-mileage"
+                  id="order-previous-mileage"
                   type="number"
                   inputMode="numeric"
                   min={0}
                   step={1}
-                  value={mileage}
+                  value={previousMileage}
                   onChange={(event) => {
-                    setMileage(event.target.value);
+                    setPreviousMileage(event.target.value);
                     setFormError(null);
                   }}
-                  placeholder="Ej. 24500"
-                  data-ocid="new_order.mileage_input"
-                  className="data-rail pl-9"
+                  placeholder="Ej. 20000"
+                  data-ocid="new_order.previous_mileage_input"
+                  className="data-rail"
                 />
+                {previousMileageValue !== null && previousMileageValid ? (
+                  <p className="data-rail text-xs text-muted-foreground">
+                    {formatNumber(previousMileageValue)} km
+                  </p>
+                ) : null}
               </div>
-              {mileageValid ? (
-                <p className="data-rail text-xs text-muted-foreground">
-                  {formatNumber(mileageValue)} km
-                </p>
-              ) : null}
             </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="order-oil-interval">
+                Intervalo de cambio de aceite (km)
+              </Label>
+              <Input
+                id="order-oil-interval"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={oilChangeInterval}
+                onChange={(event) => {
+                  setOilChangeInterval(event.target.value);
+                  setFormError(null);
+                }}
+                placeholder="Ej. 3000"
+                data-ocid="new_order.oil_change_interval_input"
+                className="data-rail"
+              />
+              <p className="text-xs text-muted-foreground">
+                Kilómetros que se suman al kilometraje de ingreso para programar
+                el próximo cambio de aceite.
+              </p>
+            </div>
+
+            <div
+              data-ocid="new_order.mileage_summary"
+              className="grid gap-3 rounded-md border border-border bg-muted/30 px-4 py-3 sm:grid-cols-2"
+            >
+              <div className="space-y-1">
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Kilómetros recorridos
+                </p>
+                <p
+                  data-ocid="new_order.travelled_km_value"
+                  className="data-rail text-sm font-medium"
+                >
+                  {travelledKm !== null
+                    ? `${formatNumber(travelledKm)} km`
+                    : "no registrado"}
+                </p>
+              </div>
+              <div className="space-y-1">
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Próximo cambio de aceite
+                </p>
+                <p
+                  data-ocid="new_order.next_oil_change_value"
+                  className="data-rail text-sm font-semibold text-primary"
+                >
+                  {nextOilChangeKm !== null
+                    ? `${formatNumber(nextOilChangeKm)} km`
+                    : "—"}
+                </p>
+              </div>
+            </div>
+
+            {mileageBelowPrevious ? (
+              <div
+                data-ocid="new_order.mileage_validation_error"
+                className="flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5"
+              >
+                <AlertTriangle
+                  className="mt-0.5 size-4 shrink-0 text-destructive"
+                  aria-hidden="true"
+                />
+                <p className="text-xs text-destructive">
+                  El kilometraje actual no puede ser menor que el kilometraje
+                  anterior. Corrige los valores para poder crear la orden.
+                </p>
+              </div>
+            ) : null}
 
             <div className="space-y-2">
               <Label htmlFor="order-problem">Falla o servicio solicitado</Label>
@@ -373,6 +549,26 @@ export function NewOrderPage() {
                 placeholder="Describe el síntoma reportado por el cliente, ruidos, fugas o el servicio a realizar…"
                 data-ocid="new_order.problem_textarea"
               />
+            </div>
+
+            <div
+              data-ocid="new_order.advance.panel"
+              className="flex items-start gap-2.5 rounded-md border border-border bg-muted/30 px-4 py-3.5"
+            >
+              <HandCoins
+                className="mt-0.5 size-4 shrink-0 text-primary"
+                aria-hidden="true"
+              />
+              <div className="space-y-0.5">
+                <p className="font-display text-sm font-semibold tracking-tight">
+                  Anticipo
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  El anticipo se registra desde el detalle de la orden, después
+                  de agregar los repuestos y la mano de obra. Así el monto se
+                  valida contra el total real de la OT.
+                </p>
+              </div>
             </div>
 
             {formError ? (

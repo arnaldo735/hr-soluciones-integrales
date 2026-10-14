@@ -143,6 +143,7 @@ export interface CashMovementFilter {
   'from' : [] | [Timestamp],
   'kind' : [] | [CashMovementKind],
   'account' : [] | [CashAccount],
+  'registerId' : [] | [Id],
   'shiftId' : [] | [Id],
 }
 export interface CashMovementInput {
@@ -153,6 +154,7 @@ export interface CashMovementInput {
   'description' : string,
   'account' : CashAccount,
   'amount' : Money,
+  'shiftId' : [] | [Id],
 }
 export type CashMovementKind = { 'expense' : null } |
   { 'income' : null };
@@ -169,7 +171,35 @@ export type CashMovementSource = { 'pos' : null } |
   { 'commission' : null } |
   { 'receivable' : null } |
   { 'manual' : null } |
-  { 'purchase' : null };
+  { 'purchase' : null } |
+  { 'advance' : null };
+export interface CashRegister {
+  'id' : Id,
+  'active' : boolean,
+  'kind' : CashRegisterKind,
+  'name' : string,
+  'createdAt' : Timestamp,
+  'updatedAt' : Timestamp,
+  'openingBalance' : Money,
+}
+export interface CashRegisterFilter {
+  'active' : [] | [boolean],
+  'kind' : [] | [CashRegisterKind],
+  'search' : [] | [string],
+}
+export interface CashRegisterInput {
+  'kind' : CashRegisterKind,
+  'name' : string,
+  'openingBalance' : Money,
+}
+export type CashRegisterKind = { 'bank' : null } |
+  { 'cash' : null };
+export interface CashRegisterPage {
+  'total' : bigint,
+  'offset' : bigint,
+  'limit' : bigint,
+  'items' : Array<CashRegister>,
+}
 export interface CategoryBreakdown { 'total' : Money, 'category' : string }
 export interface Cell { 'value' : Value, 'name' : string }
 export interface CloseShiftInput {
@@ -357,12 +387,26 @@ export interface DailyShiftReport {
   'movements' : Array<CashMovement>,
   'bankIncome' : Money,
   'totalIncome' : Money,
+  'responsibleName' : string,
   'byPaymentMethod' : Array<PaymentMethodTotal>,
   'shift' : Shift,
   'cashExpense' : Money,
   'cashIncome' : Money,
   'bankExpense' : Money,
+  'registerName' : string,
   'totalExpense' : Money,
+}
+export interface DashboardAlertsSummary {
+  'overdueInstallments' : [] | [ReminderSection_7],
+  'payables' : [] | [ReminderSection_2],
+  'generatedAt' : Timestamp,
+  'unapprovedOrders' : [] | [ReminderSection_5],
+  'appointments' : [] | [ReminderSection],
+  'finishedOrders' : [] | [ReminderSection_1],
+  'supplierOrders' : [] | [ReminderSection_8],
+  'receivables' : [] | [ReminderSection_4],
+  'lowStockParts' : [] | [ReminderSection_6],
+  'pendingQuotes' : [] | [ReminderSection_3],
 }
 export interface DashboardSummary {
   'pendingPayablesTotal' : Money,
@@ -595,6 +639,7 @@ export interface Invoice {
   'id' : Id,
   'tax' : Money,
   'customerName' : string,
+  'advanceApplied' : [] | [Money],
   'total' : Money,
   'paymentStatus' : PaymentStatus,
   'posSaleId' : [] | [Id],
@@ -831,21 +876,53 @@ export type NotificationSource = { 'pos' : null } |
   { 'order' : null } |
   { 'invoice' : null } |
   { 'quote' : null };
+export interface OilChangeIntervalInput { 'oilChangeInterval' : [] | [bigint] }
 export interface OpenShiftInput {
+  'responsibleUserId' : [] | [Id],
   'openingBank' : Money,
   'openingCash' : Money,
+  'responsibleName' : string,
   'notes' : [] | [string],
+  'registerId' : Id,
+}
+export interface OrderAdvance {
+  'method' : PaymentMethod,
+  'registeredAt' : Timestamp,
+  'registeredBy' : Principal,
+  'amount' : Money,
+}
+export interface OrderAdvanceInput {
+  'method' : PaymentMethod,
+  'amount' : Money,
+}
+export interface OrderAdvanceReceipt {
+  'customerName' : string,
+  'total' : Money,
+  'motorcycleModel' : string,
+  'balance' : Money,
+  'payments' : Array<OrderPayment>,
+  'orderId' : Id,
+  'issuedAt' : Timestamp,
+  'motorcycleBrand' : string,
+  'paidAmount' : Money,
+  'motorcyclePlate' : string,
+  'customerDocument' : [] | [string],
+  'orderNumber' : string,
+  'advance' : [] | [OrderAdvance],
 }
 export interface OrderFilter {
   'status' : [] | [OrderStatus],
   'search' : [] | [string],
 }
 export interface OrderInput {
+  'oilChangeInterval' : [] | [bigint],
   'motorcycleId' : Id,
   'customerId' : Id,
   'intakeMileage' : bigint,
   'technicianIds' : Array<Id>,
+  'advance' : [] | [OrderAdvanceInput],
   'problem' : string,
+  'previousMileage' : [] | [bigint],
 }
 export interface OrderPage {
   'total' : bigint,
@@ -866,6 +943,19 @@ export interface OrderPartInput {
   'lotId' : [] | [Id],
   'quantity' : bigint,
   'partId' : Id,
+}
+export interface OrderPayment {
+  'id' : Id,
+  'method' : PaymentMethod,
+  'note' : [] | [string],
+  'registeredAt' : Timestamp,
+  'registeredBy' : Principal,
+  'amount' : Money,
+}
+export interface OrderPaymentInput {
+  'method' : PaymentMethod,
+  'note' : [] | [string],
+  'amount' : Money,
 }
 export interface OrderPhoto {
   'id' : Id,
@@ -889,8 +979,10 @@ export interface OrderStatusCount { 'status' : string, 'count' : bigint }
 export interface OrderTotals {
   'tax' : Money,
   'total' : Money,
+  'balance' : Money,
   'partsSubtotal' : Money,
   'laborSubtotal' : Money,
+  'paidAmount' : Money,
   'taxRate' : TaxRate,
   'subtotal' : Money,
 }
@@ -1126,7 +1218,7 @@ export interface Quote {
   'updatedAt' : Timestamp,
   'notes' : [] | [string],
   'discount' : Money,
-  'motorcycleId' : Id,
+  'motorcycleId' : [] | [Id],
   'customerId' : Id,
   'partLines' : Array<QuotePartLine>,
   'taxRate' : TaxRate,
@@ -1139,7 +1231,7 @@ export interface QuoteInput {
   'serviceLines' : Array<QuoteServiceLineInput>,
   'notes' : [] | [string],
   'discount' : Money,
-  'motorcycleId' : Id,
+  'motorcycleId' : [] | [Id],
   'customerId' : Id,
   'partLines' : Array<QuotePartLineInput>,
 }
@@ -1247,11 +1339,26 @@ export interface ReminderFinishedOrder {
   'orderNumber' : string,
   'daysInWorkshop' : bigint,
 }
+export interface ReminderLowStockPart {
+  'id' : Id,
+  'sku' : string,
+  'lowStockThreshold' : bigint,
+  'name' : string,
+  'totalStock' : bigint,
+}
 export interface ReminderOrder {
   'id' : Id,
   'customerName' : string,
   'plate' : string,
   'orderNumber' : string,
+}
+export interface ReminderOverdueInstallment {
+  'customerName' : string,
+  'installmentNumber' : bigint,
+  'dueDate' : Timestamp,
+  'invoiceId' : Id,
+  'invoiceNumber' : string,
+  'amount' : Money,
 }
 export interface ReminderPayable {
   'status' : string,
@@ -1298,6 +1405,27 @@ export interface ReminderSection_4 {
 export interface ReminderSection_5 {
   'count' : bigint,
   'items' : Array<ReminderOrder>,
+}
+export interface ReminderSection_6 {
+  'count' : bigint,
+  'items' : Array<ReminderLowStockPart>,
+}
+export interface ReminderSection_7 {
+  'count' : bigint,
+  'items' : Array<ReminderOverdueInstallment>,
+}
+export interface ReminderSection_8 {
+  'count' : bigint,
+  'items' : Array<ReminderSupplierOrder>,
+}
+export interface ReminderSupplierOrder {
+  'id' : Id,
+  'sku' : string,
+  'supplierName' : string,
+  'createdAt' : Timestamp,
+  'description' : string,
+  'quantity' : bigint,
+  'supplierId' : Id,
 }
 export interface RemindersSummary {
   'payables' : [] | [ReminderSection_2],
@@ -1431,13 +1559,19 @@ export interface SessionInfo {
   'roleId' : Id,
   'modules' : Array<ModuleKey>,
 }
+export interface SetOrderAdvanceInput {
+  'method' : [] | [PaymentMethod],
+  'amount' : [] | [Money],
+}
 export interface Shift {
   'id' : Id,
+  'responsibleUserId' : [] | [Id],
   'status' : ShiftStatus,
   'openingBank' : Money,
   'openingCash' : Money,
   'differenceBank' : bigint,
   'differenceCash' : bigint,
+  'responsibleName' : string,
   'closedAt' : [] | [Timestamp],
   'closedBy' : [] | [Principal],
   'notes' : [] | [string],
@@ -1445,6 +1579,7 @@ export interface Shift {
   'declaredClosingCash' : [] | [Money],
   'computedClosingBank' : Money,
   'computedClosingCash' : Money,
+  'registerId' : Id,
   'openedAt' : Timestamp,
   'openedBy' : Principal,
 }
@@ -1452,6 +1587,8 @@ export interface ShiftFilter {
   'to' : [] | [Timestamp],
   'status' : [] | [ShiftStatus],
   'from' : [] | [Timestamp],
+  'responsible' : [] | [string],
+  'registerId' : [] | [Id],
 }
 export interface ShiftPage {
   'total' : bigint,
@@ -1644,10 +1781,12 @@ export interface WhatsAppMessageResult {
 export interface WorkshopOrder {
   'id' : Id,
   'status' : OrderStatus,
+  'payments' : Array<OrderPayment>,
   'createdAt' : Timestamp,
   'statusHistory' : Array<StatusChange>,
   'labor' : Array<LaborItem>,
   'cancelledAt' : [] | [Timestamp],
+  'oilChangeInterval' : [] | [bigint],
   'updatedAt' : Timestamp,
   'motorcycleId' : Id,
   'customerId' : Id,
@@ -1656,8 +1795,10 @@ export interface WorkshopOrder {
   'intakeMileage' : bigint,
   'technicianIds' : Array<Id>,
   'orderNumber' : string,
+  'advance' : [] | [OrderAdvance],
   'problem' : string,
   'photos' : Array<OrderPhoto>,
+  'previousMileage' : [] | [bigint],
 }
 export interface ZeroInventoryResult { 'affected' : bigint }
 export interface ZeroServicesResult { 'deleted' : bigint }
@@ -1696,6 +1837,10 @@ export interface _SERVICE {
   '_internet_identity_sign_in_start' : ActorMethod<[], Uint8Array>,
   'addLabor' : ActorMethod<[[] | [string], Id, LaborInput], OrderView>,
   'addOrderPart' : ActorMethod<[[] | [string], Id, OrderPartInput], OrderView>,
+  'addOrderPayment' : ActorMethod<
+    [[] | [string], Id, OrderPaymentInput],
+    OrderView
+  >,
   'addOrderPhoto' : ActorMethod<
     [[] | [string], Id, OrderPhotoInput],
     OrderView
@@ -1755,6 +1900,10 @@ export interface _SERVICE {
    * / Genera el respaldo y lo sube al Drive del administrador.
    */
   'createBackup' : ActorMethod<[[] | [string]], BackupOutcome>,
+  'createCashRegister' : ActorMethod<
+    [[] | [string], CashRegisterInput],
+    CashRegister
+  >,
   'createCustomer' : ActorMethod<[[] | [string], CustomerInput], Customer>,
   'createExpense' : ActorMethod<[[] | [string], ExpenseInput], Expense>,
   'createExpenseCategory' : ActorMethod<
@@ -1835,6 +1984,7 @@ export interface _SERVICE {
     UserListItem
   >,
   'deleteAppointment' : ActorMethod<[[] | [string], Id], boolean>,
+  'deleteCashRegister' : ActorMethod<[[] | [string], Id], undefined>,
   'deleteExpense' : ActorMethod<[[] | [string], Id], boolean>,
   'deleteExpenseCategory' : ActorMethod<[[] | [string], Id], boolean>,
   'deleteInvoice' : ActorMethod<[[] | [string], Id], boolean>,
@@ -1897,6 +2047,7 @@ export interface _SERVICE {
   'getBusinessSettings' : ActorMethod<[[] | [string]], BusinessSettings>,
   'getCallerUserProfile' : ActorMethod<[], [] | [UserProfile]>,
   'getCallerUserRole' : ActorMethod<[], UserRole>,
+  'getCashRegister' : ActorMethod<[[] | [string], Id], [] | [CashRegister]>,
   'getCommissionPayment' : ActorMethod<
     [[] | [string], Id],
     [] | [CommissionPayment]
@@ -1910,6 +2061,7 @@ export interface _SERVICE {
   'getCustomerDetail' : ActorMethod<[[] | [string], Id], [] | [CustomerDetail]>,
   'getDailyHopeMessage' : ActorMethod<[], HopeMessage>,
   'getDailyShiftReport' : ActorMethod<[[] | [string], Id], DailyShiftReport>,
+  'getDashboardAlerts' : ActorMethod<[[] | [string]], DashboardAlertsSummary>,
   'getDashboardSummary' : ActorMethod<[[] | [string]], DashboardSummary>,
   /**
    * / Estado de la conexión con Google Drive del administrador. Es tolerante a
@@ -1944,8 +2096,12 @@ export interface _SERVICE {
    * / cada valor se obtiene con `getBackupSection(index, offset, limit)`.
    */
   'getLocalBackupManifest' : ActorMethod<[[] | [string]], LocalBackupManifest>,
-  'getOpenShift' : ActorMethod<[[] | [string]], [] | [Shift]>,
+  'getOpenShift' : ActorMethod<[[] | [string], Id], [] | [Shift]>,
   'getOrder' : ActorMethod<[[] | [string], Id], [] | [OrderView]>,
+  'getOrderAdvanceReceipt' : ActorMethod<
+    [[] | [string], Id],
+    OrderAdvanceReceipt
+  >,
   'getPart' : ActorMethod<[[] | [string], Id], [] | [PartView]>,
   'getPayable' : ActorMethod<[[] | [string], Id], [] | [Payable]>,
   'getPosSale' : ActorMethod<[[] | [string], Id], [] | [PosSale]>,
@@ -1999,6 +2155,10 @@ export interface _SERVICE {
     [[] | [string], CashMovementFilter, bigint, bigint],
     CashMovementPage
   >,
+  'listCashRegisters' : ActorMethod<
+    [[] | [string], CashRegisterFilter, bigint, bigint],
+    CashRegisterPage
+  >,
   'listCommissionLines' : ActorMethod<
     [[] | [string], [] | [Id], CommissionPeriod],
     Array<CommissionLine>
@@ -2050,6 +2210,8 @@ export interface _SERVICE {
     MotorcyclePage
   >,
   'listMovements' : ActorMethod<[[] | [string], Id], Array<Movement>>,
+  'listOpenShifts' : ActorMethod<[[] | [string]], Array<Shift>>,
+  'listOrderPayments' : ActorMethod<[[] | [string], Id], Array<OrderPayment>>,
   'listOrders' : ActorMethod<
     [[] | [string], OrderFilter, bigint, bigint],
     OrderPage
@@ -2173,6 +2335,18 @@ export interface _SERVICE {
   >,
   'saveCallerUserProfile' : ActorMethod<[string], UserProfile>,
   'schema' : ActorMethod<[], string>,
+  'setCashRegisterActive' : ActorMethod<
+    [[] | [string], Id, boolean],
+    CashRegister
+  >,
+  'setOrderAdvance' : ActorMethod<
+    [[] | [string], Id, SetOrderAdvanceInput],
+    OrderView
+  >,
+  'setShiftResponsible' : ActorMethod<
+    [[] | [string], Id, string, [] | [Id]],
+    Shift
+  >,
   'setUserActive' : ActorMethod<[[] | [string], Id, boolean], UserListItem>,
   /**
    * / Inicia la autorización OAuth (PKCE) de la cuenta propia del
@@ -2194,6 +2368,10 @@ export interface _SERVICE {
     BusinessSettings
   >,
   'updateCallerName' : ActorMethod<[string, string], SessionInfo>,
+  'updateCashRegister' : ActorMethod<
+    [[] | [string], Id, CashRegisterInput],
+    CashRegister
+  >,
   'updateCompanyProfile' : ActorMethod<
     [[] | [string], CompanyProfileRawInput],
     CompanyProfile
@@ -2215,6 +2393,10 @@ export interface _SERVICE {
   'updateMotorcycle' : ActorMethod<
     [[] | [string], Id, MotorcycleInput],
     Motorcycle
+  >,
+  'updateOilChangeInterval' : ActorMethod<
+    [[] | [string], Id, OilChangeIntervalInput],
+    OrderView
   >,
   'updateOrderStatus' : ActorMethod<
     [[] | [string], Id, OrderStatus],

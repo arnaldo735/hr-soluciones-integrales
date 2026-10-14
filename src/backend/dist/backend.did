@@ -15,6 +15,7 @@ type ZeroServicesResult = record {deleted: nat;};
 type ZeroInventoryResult = record {affected: nat;};
 type WorkshopOrder = 
  record {
+   advance: opt OrderAdvance;
    cancelReason: opt text;
    cancelledAt: opt Timestamp;
    createdAt: Timestamp;
@@ -23,9 +24,12 @@ type WorkshopOrder =
    intakeMileage: nat;
    labor: vec LaborItem;
    motorcycleId: Id;
+   oilChangeInterval: opt nat;
    orderNumber: text;
    parts: vec OrderPart;
+   payments: vec OrderPayment;
    photos: vec OrderPhoto;
+   previousMileage: opt nat;
    problem: text;
    status: OrderStatus;
    statusHistory: vec StatusChange;
@@ -264,6 +268,8 @@ type ShiftPage =
 type ShiftFilter = 
  record {
    from: opt Timestamp;
+   registerId: opt Id;
+   responsible: opt text;
    status: opt ShiftStatus;
    to: opt Timestamp;
  };
@@ -283,7 +289,15 @@ type Shift =
    openedBy: principal;
    openingBank: Money;
    openingCash: Money;
+   registerId: Id;
+   responsibleName: text;
+   responsibleUserId: opt Id;
    status: ShiftStatus;
+ };
+type SetOrderAdvanceInput = 
+ record {
+   amount: opt Money;
+   method: opt PaymentMethod;
  };
 type SessionInfo = 
  record {
@@ -462,6 +476,31 @@ type RemindersSummary =
    receivables: opt ReminderSection_4;
    unapprovedOrders: opt ReminderSection_5;
  };
+type ReminderSupplierOrder = 
+ record {
+   createdAt: Timestamp;
+   description: text;
+   id: Id;
+   quantity: nat;
+   sku: text;
+   supplierId: Id;
+   supplierName: text;
+ };
+type ReminderSection_8 = 
+ record {
+   count: nat;
+   items: vec ReminderSupplierOrder;
+ };
+type ReminderSection_7 = 
+ record {
+   count: nat;
+   items: vec ReminderOverdueInstallment;
+ };
+type ReminderSection_6 = 
+ record {
+   count: nat;
+   items: vec ReminderLowStockPart;
+ };
 type ReminderSection_5 = 
  record {
    count: nat;
@@ -517,12 +556,29 @@ type ReminderPayable =
    supplierId: Id;
    supplierName: text;
  };
+type ReminderOverdueInstallment = 
+ record {
+   amount: Money;
+   customerName: text;
+   dueDate: Timestamp;
+   installmentNumber: nat;
+   invoiceId: Id;
+   invoiceNumber: text;
+ };
 type ReminderOrder = 
  record {
    customerName: text;
    id: Id;
    orderNumber: text;
    plate: text;
+ };
+type ReminderLowStockPart = 
+ record {
+   id: Id;
+   lowStockThreshold: nat;
+   name: text;
+   sku: text;
+   totalStock: nat;
  };
 type ReminderFinishedOrder = 
  record {
@@ -658,7 +714,7 @@ type QuoteInput =
  record {
    customerId: Id;
    discount: Money;
-   motorcycleId: Id;
+   motorcycleId: opt Id;
    notes: opt text;
    partLines: vec QuotePartLineInput;
    serviceLines: vec QuoteServiceLineInput;
@@ -674,7 +730,7 @@ type Quote =
    customerId: Id;
    discount: Money;
    id: Id;
-   motorcycleId: Id;
+   motorcycleId: opt Id;
    notes: opt text;
    partLines: vec QuotePartLine;
    quoteNumber: text;
@@ -960,7 +1016,9 @@ type OrderView =
  };
 type OrderTotals = 
  record {
+   balance: Money;
    laborSubtotal: Money;
+   paidAmount: Money;
    partsSubtotal: Money;
    subtotal: Money;
    tax: Money;
@@ -995,6 +1053,21 @@ type OrderPhoto =
    uploadedAt: Timestamp;
    uploadedBy: principal;
  };
+type OrderPaymentInput = 
+ record {
+   amount: Money;
+   method: PaymentMethod;
+   note: opt text;
+ };
+type OrderPayment = 
+ record {
+   amount: Money;
+   id: Id;
+   method: PaymentMethod;
+   note: opt text;
+   registeredAt: Timestamp;
+   registeredBy: principal;
+ };
 type OrderPartInput = 
  record {
    lotId: opt Id;
@@ -1020,9 +1093,12 @@ type OrderPage =
  };
 type OrderInput = 
  record {
+   advance: opt OrderAdvanceInput;
    customerId: Id;
    intakeMileage: nat;
    motorcycleId: Id;
+   oilChangeInterval: opt nat;
+   previousMileage: opt nat;
    problem: text;
    technicianIds: vec Id;
  };
@@ -1031,12 +1107,44 @@ type OrderFilter =
    search: opt text;
    status: opt OrderStatus;
  };
+type OrderAdvanceReceipt = 
+ record {
+   advance: opt OrderAdvance;
+   balance: Money;
+   customerDocument: opt text;
+   customerName: text;
+   issuedAt: Timestamp;
+   motorcycleBrand: text;
+   motorcycleModel: text;
+   motorcyclePlate: text;
+   orderId: Id;
+   orderNumber: text;
+   paidAmount: Money;
+   payments: vec OrderPayment;
+   total: Money;
+ };
+type OrderAdvanceInput = 
+ record {
+   amount: Money;
+   method: PaymentMethod;
+ };
+type OrderAdvance = 
+ record {
+   amount: Money;
+   method: PaymentMethod;
+   registeredAt: Timestamp;
+   registeredBy: principal;
+ };
 type OpenShiftInput = 
  record {
    notes: opt text;
    openingBank: Money;
    openingCash: Money;
+   registerId: Id;
+   responsibleName: text;
+   responsibleUserId: opt Id;
  };
+type OilChangeIntervalInput = record {oilChangeInterval: opt nat;};
 type NotificationSource = 
  variant {
    invoice;
@@ -1311,6 +1419,7 @@ type InvoiceApplyLineResult =
  };
 type Invoice = 
  record {
+   advanceApplied: opt Money;
    customerAddress: opt text;
    customerId: opt Id;
    customerName: text;
@@ -1613,6 +1722,19 @@ type DashboardSummary =
    pendingPayablesCount: nat;
    pendingPayablesTotal: Money;
  };
+type DashboardAlertsSummary = 
+ record {
+   appointments: opt ReminderSection;
+   finishedOrders: opt ReminderSection_1;
+   generatedAt: Timestamp;
+   lowStockParts: opt ReminderSection_6;
+   overdueInstallments: opt ReminderSection_7;
+   payables: opt ReminderSection_2;
+   pendingQuotes: opt ReminderSection_3;
+   receivables: opt ReminderSection_4;
+   supplierOrders: opt ReminderSection_8;
+   unapprovedOrders: opt ReminderSection_5;
+ };
 type DailyShiftReport = 
  record {
    bankExpense: Money;
@@ -1621,6 +1743,8 @@ type DailyShiftReport =
    cashExpense: Money;
    cashIncome: Money;
    movements: vec CashMovement;
+   registerName: text;
+   responsibleName: text;
    shift: Shift;
    totalExpense: Money;
    totalIncome: Money;
@@ -1841,8 +1965,43 @@ type CategoryBreakdown =
    category: text;
    total: Money;
  };
+type CashRegisterPage = 
+ record {
+   items: vec CashRegister;
+   limit: nat;
+   offset: nat;
+   total: nat;
+ };
+type CashRegisterKind = 
+ variant {
+   bank;
+   cash;
+ };
+type CashRegisterInput = 
+ record {
+   kind: CashRegisterKind;
+   name: text;
+   openingBalance: Money;
+ };
+type CashRegisterFilter = 
+ record {
+   active: opt bool;
+   kind: opt CashRegisterKind;
+   search: opt text;
+ };
+type CashRegister = 
+ record {
+   active: bool;
+   createdAt: Timestamp;
+   id: Id;
+   kind: CashRegisterKind;
+   name: text;
+   openingBalance: Money;
+   updatedAt: Timestamp;
+ };
 type CashMovementSource = 
  variant {
+   advance;
    commission;
    expense;
    invoice;
@@ -1872,6 +2031,7 @@ type CashMovementInput =
    kind: CashMovementKind;
    paymentMethod: PaymentMethod;
    reference: opt text;
+   shiftId: opt Id;
    source: CashMovementSource;
  };
 type CashMovementFilter = 
@@ -1880,6 +2040,7 @@ type CashMovementFilter =
    from: opt Timestamp;
    kind: opt CashMovementKind;
    paymentMethod: opt PaymentMethod;
+   registerId: opt Id;
    shiftId: opt Id;
    to: opt Timestamp;
  };
@@ -2058,6 +2219,8 @@ service : {
   addLabor: (token: opt text, id: Id, input: LaborInput) -> (OrderView);
   addOrderPart: (token: opt text, id: Id, input: OrderPartInput) ->
    (OrderView);
+  addOrderPayment: (token: opt text, id: Id, input: OrderPaymentInput) ->
+   (OrderView);
   addOrderPhoto: (token: opt text, id: Id, input: OrderPhotoInput) ->
    (OrderView);
   adjustStock: (token: opt text, input: AdjustmentInput) -> (Movement);
@@ -2100,6 +2263,8 @@ service : {
    (Appointment);
   /// Genera el respaldo y lo sube al Drive del administrador.
   createBackup: (token: opt text) -> (BackupOutcome);
+  createCashRegister: (token: opt text, input: CashRegisterInput) ->
+   (CashRegister);
   createCustomer: (token: opt text, input: CustomerInput) -> (Customer);
   createExpense: (token: opt text, input: ExpenseInput) -> (Expense);
   createExpenseCategory: (token: opt text, input: ExpenseCategoryInput) ->
@@ -2136,6 +2301,7 @@ service : {
   createUser: (token: opt text, username: text, name: text, roleId: Id,
    temporaryPassword: text) -> (UserListItem);
   deleteAppointment: (token: opt text, id: Id) -> (bool);
+  deleteCashRegister: (token: opt text, id: Id) -> ();
   deleteExpense: (token: opt text, id: Id) -> (bool);
   deleteExpenseCategory: (token: opt text, id: Id) -> (bool);
   deleteInvoice: (token: opt text, id: Id) -> (bool);
@@ -2182,6 +2348,7 @@ service : {
   getBusinessSettings: (token: opt text) -> (BusinessSettings) query;
   getCallerUserProfile: () -> (opt UserProfile) query;
   getCallerUserRole: () -> (UserRole) query;
+  getCashRegister: (token: opt text, id: Id) -> (opt CashRegister) query;
   getCommissionPayment: (token: opt text, id: Id) ->
    (opt CommissionPayment) query;
   getCommissionReport: (token: opt text, period: CommissionPeriod) ->
@@ -2192,6 +2359,7 @@ service : {
   getDailyHopeMessage: () -> (HopeMessage) query;
   getDailyShiftReport: (token: opt text, shiftId: Id) ->
    (DailyShiftReport) query;
+  getDashboardAlerts: (token: opt text) -> (DashboardAlertsSummary) query;
   getDashboardSummary: (token: opt text) -> (DashboardSummary) query;
   /// Estado de la conexión con Google Drive del administrador. Es tolerante a
   /// credenciales ausentes: nunca lanza un trap por configuración faltante y
@@ -2215,8 +2383,10 @@ service : {
   /// `{ "generatedAt": <generatedAt>, "<sections[0]>": <valor>, ... }`, donde
   /// cada valor se obtiene con `getBackupSection(index, offset, limit)`.
   getLocalBackupManifest: (token: opt text) -> (LocalBackupManifest) query;
-  getOpenShift: (token: opt text) -> (opt Shift) query;
+  getOpenShift: (token: opt text, registerId: Id) -> (opt Shift) query;
   getOrder: (token: opt text, id: Id) -> (opt OrderView) query;
+  getOrderAdvanceReceipt: (token: opt text, id: Id) ->
+   (OrderAdvanceReceipt) query;
   getPart: (token: opt text, id: Id) -> (opt PartView) query;
   getPayable: (token: opt text, supplierId: Id) -> (opt Payable) query;
   getPosSale: (token: opt text, id: Id) -> (opt PosSale) query;
@@ -2249,6 +2419,8 @@ service : {
   listBackups: (token: opt text) -> (BackupListOutcome);
   listCashMovements: (token: opt text, filter: CashMovementFilter, offset:
    nat, limit: nat) -> (CashMovementPage) query;
+  listCashRegisters: (token: opt text, filter: CashRegisterFilter, offset:
+   nat, limit: nat) -> (CashRegisterPage) query;
   listCommissionLines: (token: opt text, technicianId: opt Id, period:
    CommissionPeriod) -> (vec CommissionLine) query;
   listCommissionPayments: (token: opt text, filter:
@@ -2281,6 +2453,8 @@ service : {
    MotorcycleSort, descending: bool, offset: nat, limit: nat) ->
    (MotorcyclePage) query;
   listMovements: (token: opt text, partId: Id) -> (vec Movement) query;
+  listOpenShifts: (token: opt text) -> (vec Shift) query;
+  listOrderPayments: (token: opt text, id: Id) -> (vec OrderPayment) query;
   listOrders: (token: opt text, filter: OrderFilter, offset: nat, limit:
    nat) -> (OrderPage) query;
   listPartFacets: (token: opt text) -> (PartFacets) query;
@@ -2354,6 +2528,12 @@ service : {
    (PurchaseInvoice);
   saveCallerUserProfile: (name: text) -> (UserProfile);
   schema: () -> (text) query;
+  setCashRegisterActive: (token: opt text, id: Id, active: bool) ->
+   (CashRegister);
+  setOrderAdvance: (token: opt text, id: Id, input: SetOrderAdvanceInput) ->
+   (OrderView);
+  setShiftResponsible: (token: opt text, id: Id, responsibleName: text,
+   responsibleUserId: opt Id) -> (Shift);
   setUserActive: (token: opt text, userId: Id, active: bool) ->
    (UserListItem);
   /// Inicia la autorización OAuth (PKCE) de la cuenta propia del
@@ -2369,6 +2549,8 @@ service : {
   updateBusinessSettings: (token: opt text, settings: BusinessSettings) ->
    (BusinessSettings);
   updateCallerName: (token: text, name: text) -> (SessionInfo);
+  updateCashRegister: (token: opt text, id: Id, input: CashRegisterInput) ->
+   (CashRegister);
   updateCompanyProfile: (token: opt text, input: CompanyProfileRawInput) ->
    (CompanyProfile);
   updateCustomer: (token: opt text, id: Id, input: CustomerInput) ->
@@ -2382,6 +2564,8 @@ service : {
    opt Id) -> (OrderView);
   updateMotorcycle: (token: opt text, id: Id, input: MotorcycleInput) ->
    (Motorcycle);
+  updateOilChangeInterval: (token: opt text, id: Id, input:
+   OilChangeIntervalInput) -> (OrderView);
   updateOrderStatus: (token: opt text, id: Id, status: OrderStatus) ->
    (OrderView);
   updatePart: (token: opt text, id: Id, input: PartInput) -> (PartView);

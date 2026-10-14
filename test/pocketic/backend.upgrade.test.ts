@@ -376,7 +376,11 @@ it("carries one record of every list through the upgrade", async () => {
     0n,
     100n,
   );
-  expect(quotes.items.some((row) => row.quote.id === quote.quote.id)).toBe(true);
+  const quoteRow = quotes.items.find((row) => row.quote.id === quote.quote.id);
+  expect(quoteRow).toBeDefined();
+  // The migration wraps the old required motorcycleId in `?`, so a quote saved
+  // with a motorcycle before the upgrade still reads its bike back.
+  expect(quoteRow?.quote.motorcycleId).toEqual([motorcycle.id]);
 
   const invoices = await upgraded.listInvoices(
     { to: [], from: [], search: [] },
@@ -460,4 +464,72 @@ it("supplies the new Drive backup state through the upgrade", async () => {
   await expect(upgraded.listBackups()).resolves.toEqual({
     err: { notConnected: null },
   });
+});
+
+/**
+ * Accepted behavior: a quote saved with a motorcycle before the upgrade still
+ * reads its bike back after the upgrade.
+ *
+ * The accepted change makes `Quote.motorcycleId` optional, so the migration
+ * wraps the previously required id in `?`. This test installs the previous
+ * revision, writes a quote that references a motorcycle through the OLD public
+ * API, upgrades to the wasm this build produces, and reads the quote back
+ * through the NEW API. It proves the migration preserves the existing bike
+ * reference instead of dropping it.
+ *
+ * It is self-contained and uses the current leading-token actor signature for
+ * both the previous and the upgraded canister, so it does not depend on the
+ * older upgrade tests above.
+ */
+it("keeps a pre-upgrade quote's motorcycle through the migration", async () => {
+  const previous = await pic!.setupCanister({
+    idlFactory: previousIdlFactory,
+    wasm: PREVIOUS_WASM,
+  });
+  previous.actor.setPrincipal(OWNER);
+  await previous.actor._initialize_access_control();
+  await previous.actor.saveCallerUserProfile("Dueño");
+
+  const customer = await previous.actor.createCustomer([], {
+    name: "Cliente Migración Moto",
+    phone: "+57 300 222 3344",
+    email: [],
+    document: [],
+    address: [],
+  });
+  const motorcycle = await previous.actor.createMotorcycle([], {
+    customerId: customer.id,
+    plate: "MIG-MOTO-1",
+    brand: "Yamaha",
+    model: "FZ25",
+    year: 2023n,
+    mileage: 8000n,
+  });
+  const quote = await previous.actor.createQuote([], {
+    customerId: customer.id,
+    // The previous revision required a motorcycle, so the old API takes the
+    // bare id; the migration is what makes it optional.
+    motorcycleId: motorcycle.id,
+    notes: ["Cotización con moto antes del upgrade"],
+    discount: 0n,
+    serviceLines: [],
+    partLines: [],
+  });
+
+  await pic!.upgradeCanister({
+    canisterId: previous.canisterId,
+    wasm: BACKEND_WASM,
+    upgradeModeOptions: {
+      skip_pre_upgrade: [],
+      wasm_memory_persistence: [{ keep: null }],
+    },
+  });
+
+  const upgraded = pic!.createActor<_SERVICE>(idlFactory, previous.canisterId);
+  upgraded.setPrincipal(OWNER);
+
+  const readBack = await upgraded.getQuote([], quote.quote.id);
+  expect(readBack).toHaveLength(1);
+  // The migration wraps the old required id in `?`, so the bike survives.
+  expect(readBack[0].quote.motorcycleId).toEqual([motorcycle.id]);
 });

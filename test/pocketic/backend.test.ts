@@ -1010,6 +1010,73 @@ it("keeps the first caller as admin and blocks a non-admin from admin actions", 
 // taxable base before tax; and the company profile round-trips the fiscal
 // regime the decision reads. They never assert what a regime implies.
 
+it("stores previous mileage and oil-change interval and updates the interval", async () => {
+  actor.setPrincipal(OWNER);
+  const customer = await actor.createCustomer([], {
+    name: "Cliente Kilometraje",
+    phone: "+57 300 666 6666",
+    email: [],
+    document: [],
+    address: [],
+  });
+  const motorcycle = await actor.createMotorcycle([], {
+    customerId: customer.id,
+    plate: "KM-001",
+    brand: "Honda",
+    model: "CB",
+    year: 2020n,
+    mileage: 20000n,
+  });
+
+  const order = await actor.createOrder([], {
+    customerId: customer.id,
+    motorcycleId: motorcycle.id,
+    intakeMileage: 24500n,
+    previousMileage: [20000n],
+    oilChangeInterval: [3000n],
+    problem: "Cambio de aceite",
+    technicianIds: [],
+  });
+  expect(order.order.previousMileage).toEqual([20000n]);
+  expect(order.order.oilChangeInterval).toEqual([3000n]);
+
+  // Editing the interval persists the new value; the next oil change is derived
+  // by the frontend as intakeMileage + interval.
+  const updated = await actor.updateOilChangeInterval([], order.order.id, {
+    oilChangeInterval: [5000n],
+  });
+  expect(updated.order.oilChangeInterval).toEqual([5000n]);
+  expect(updated.order.intakeMileage).toEqual(24500n);
+
+  // An order created without a previous reading keeps both fields unset.
+  const plain = await actor.createOrder([], {
+    customerId: customer.id,
+    motorcycleId: motorcycle.id,
+    intakeMileage: 25000n,
+    previousMileage: [],
+    oilChangeInterval: [],
+    problem: "Sin lectura previa",
+    technicianIds: [],
+  });
+  expect(plain.order.previousMileage).toEqual([]);
+  expect(plain.order.oilChangeInterval).toEqual([]);
+
+  // The current mileage cannot be lower than the previous one.
+  await expect(
+    actor.createOrder([], {
+      customerId: customer.id,
+      motorcycleId: motorcycle.id,
+      intakeMileage: 19000n,
+      previousMileage: [20000n],
+      oilChangeInterval: [3000n],
+      problem: "Lectura inválida",
+      technicianIds: [],
+    }),
+  ).rejects.toThrow(
+    "El kilometraje actual no puede ser menor que el kilometraje anterior",
+  );
+});
+
 it("computes order totals from the configured rate", async () => {
   actor.setPrincipal(OWNER);
   // A configured non-zero rate, so the arithmetic is exercised rather than the
@@ -5488,4 +5555,149 @@ it("opens a shift, classifies movements by account and closes with the computed 
       source: { manual: null },
     }),
   ).rejects.toBeDefined();
+});
+
+// --- Accepted behavior: the quote's motorcycle is optional ------------------
+//
+// The accepted change makes the motorcycle optional: a quote can be created and
+// updated for a customer with no registered motorcycles, and the first bike is
+// still attached when the customer has one. A `motorcycleId` that does not
+// exist is still rejected with "Moto no encontrada". These tests call the real
+// canister, so they prove the rule is implemented rather than a stub that traps.
+
+it("creates and reads back a quote with no motorcycle", async () => {
+  actor.setPrincipal(OWNER);
+  const customer = await actor.createCustomer([], {
+    name: "Cliente Sin Moto",
+    phone: "+57 300 818 1818",
+    email: [],
+    document: [],
+    address: [],
+  });
+
+  // No `motorcycleId` at all: the quote is created without a bike.
+  const created = await actor.createQuote([], {
+    customerId: customer.id,
+    motorcycleId: [],
+    discount: 0n,
+    notes: [],
+    partLines: [],
+    serviceLines: [
+      {
+        description: "Diagnóstico general",
+        quantity: 1n,
+        unitPrice: 30000n,
+        serviceId: [],
+      },
+    ],
+  });
+  expect(created.quote.customerId).toBe(customer.id);
+  // The stored quote carries no motorcycle, as a Candid optional.
+  expect(created.quote.motorcycleId).toEqual([]);
+
+  // The read returns the same quote without a motorcycle.
+  const read = await actor.getQuote([], created.quote.id);
+  expect(read).toHaveLength(1);
+  expect(read[0].quote.motorcycleId).toEqual([]);
+  expect(read[0].quote.quoteNumber).toBe(created.quote.quoteNumber);
+});
+
+it("updates a quote to remove its motorcycle", async () => {
+  actor.setPrincipal(OWNER);
+  const customer = await actor.createCustomer([], {
+    name: "Cliente Edita Moto",
+    phone: "+57 300 919 1919",
+    email: [],
+    document: [],
+    address: [],
+  });
+  const motorcycle = await actor.createMotorcycle([], {
+    customerId: customer.id,
+    plate: "OPT-001",
+    brand: "Honda",
+    model: "CB190R",
+    year: 2022n,
+    mileage: 1000n,
+  });
+
+  const created = await actor.createQuote([], {
+    customerId: customer.id,
+    motorcycleId: [motorcycle.id],
+    discount: 0n,
+    notes: [],
+    partLines: [],
+    serviceLines: [],
+  });
+  expect(created.quote.motorcycleId).toEqual([motorcycle.id]);
+
+  // The update drops the motorcycle; the quote is saved without one.
+  const updated = await actor.updateQuote([], created.quote.id, {
+    customerId: customer.id,
+    motorcycleId: [],
+    discount: 0n,
+    notes: [],
+    partLines: [],
+    serviceLines: [],
+  });
+  expect(updated.quote.motorcycleId).toEqual([]);
+
+  const read = await actor.getQuote([], created.quote.id);
+  expect(read[0].quote.motorcycleId).toEqual([]);
+});
+
+it("still attaches an existing motorcycle to a quote", async () => {
+  actor.setPrincipal(OWNER);
+  const customer = await actor.createCustomer([], {
+    name: "Cliente Con Moto",
+    phone: "+57 300 020 2020",
+    email: [],
+    document: [],
+    address: [],
+  });
+  const motorcycle = await actor.createMotorcycle([], {
+    customerId: customer.id,
+    plate: "OPT-002",
+    brand: "Yamaha",
+    model: "FZ25",
+    year: 2021n,
+    mileage: 5000n,
+  });
+
+  const created = await actor.createQuote([], {
+    customerId: customer.id,
+    motorcycleId: [motorcycle.id],
+    discount: 0n,
+    notes: [],
+    partLines: [],
+    serviceLines: [],
+  });
+  expect(created.quote.motorcycleId).toEqual([motorcycle.id]);
+
+  // The existing quote with a motorcycle still reads its bike back correctly.
+  const read = await actor.getQuote([], created.quote.id);
+  expect(read).toHaveLength(1);
+  expect(read[0].quote.motorcycleId).toEqual([motorcycle.id]);
+});
+
+it("rejects a quote whose motorcycleId does not exist", async () => {
+  actor.setPrincipal(OWNER);
+  const customer = await actor.createCustomer([], {
+    name: "Cliente Moto Inexistente",
+    phone: "+57 300 121 2121",
+    email: [],
+    document: [],
+    address: [],
+  });
+
+  // A motorcycleId that is not in the catalog is still rejected.
+  await expect(
+    actor.createQuote([], {
+      customerId: customer.id,
+      motorcycleId: [999_999n],
+      discount: 0n,
+      notes: [],
+      partLines: [],
+      serviceLines: [],
+    }),
+  ).rejects.toThrow(/Moto no encontrada/);
 });

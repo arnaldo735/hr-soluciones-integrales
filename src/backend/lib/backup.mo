@@ -7,6 +7,7 @@
 /// El token OAuth se obtiene/renueva con `google-oauth`.
 
 import Array "mo:core/Array";
+import Blob "mo:core/Blob";
 import Char "mo:core/Char";
 import Int "mo:core/Int";
 import List "mo:core/List";
@@ -27,6 +28,8 @@ import { Client } "mo:googledrive-client/Client";
 import { type Config; defaultConfig } "mo:googledrive-client/Config";
 import { type File; JSON = FileJSON } "mo:googledrive-client/Models/File";
 import { type FileList } "mo:googledrive-client/Models/FileList";
+
+import JsonScan "json-scan";
 
 import Common "../types/common";
 import Types "../types/backup";
@@ -207,6 +210,7 @@ module {
   func partJson(p : InventoryTypes.Part) : Candid = jObj([
     ("id", jNat(p.id)),
     ("sku", jText(p.sku)),
+    ("barcode", jText(p.barcode)),
     ("name", jText(p.name)),
     ("category", jText(p.category)),
     ("brand", jText(p.brand)),
@@ -309,6 +313,22 @@ module {
     ("at", jInt(s.at)),
   ]);
 
+  func orderAdvanceJson(a : WorkshopTypes.OrderAdvance) : Candid = jObj([
+    ("amount", jNat(a.amount)),
+    ("method", jText(paymentMethodText(a.method))),
+    ("registeredAt", jInt(a.registeredAt)),
+    ("registeredBy", jPrincipal(a.registeredBy)),
+  ]);
+
+  func orderPaymentJson(p : WorkshopTypes.OrderPayment) : Candid = jObj([
+    ("id", jNat(p.id)),
+    ("amount", jNat(p.amount)),
+    ("method", jText(paymentMethodText(p.method))),
+    ("note", jOptText(p.note)),
+    ("registeredAt", jInt(p.registeredAt)),
+    ("registeredBy", jPrincipal(p.registeredBy)),
+  ]);
+
   func orderJson(o : WorkshopTypes.WorkshopOrder) : Candid = jObj([
     ("id", jNat(o.id)),
     ("orderNumber", jText(o.orderNumber)),
@@ -324,6 +344,10 @@ module {
     ("statusHistory", jArr(o.statusHistory.map(statusChangeJson))),
     ("cancelReason", jOptText(o.cancelReason)),
     ("cancelledAt", jOptInt(o.cancelledAt)),
+    ("previousMileage", jOptNat(o.previousMileage)),
+    ("oilChangeInterval", jOptNat(o.oilChangeInterval)),
+    ("advance", switch (o.advance) { case (?a) orderAdvanceJson(a); case null jNull() }),
+    ("payments", jArr(o.payments.map(orderPaymentJson))),
     ("createdAt", jInt(o.createdAt)),
     ("updatedAt", jInt(o.updatedAt)),
   ]);
@@ -353,6 +377,7 @@ module {
     ("items", jArr(p.items.map(purchaseItemJson))),
     ("total", jNat(p.total)),
     ("paidAmount", jNat(p.paidAmount)),
+    ("accepted", jBool(p.accepted)),
     ("createdAt", jInt(p.createdAt)),
   ]);
 
@@ -434,6 +459,7 @@ module {
     ("taxRate", jNat(i.taxRate)),
     ("tax", jNat(i.tax)),
     ("total", jNat(i.total)),
+    ("advanceApplied", jOptNat(i.advanceApplied)),
     ("paymentMethod", jText(paymentMethodText(i.paymentMethod))),
     ("paymentCondition", jText(paymentConditionText(i.paymentCondition))),
     ("paymentStatus", jText(paymentStatusText(i.paymentStatus))),
@@ -498,7 +524,7 @@ module {
     ("id", jNat(q.id)),
     ("quoteNumber", jText(q.quoteNumber)),
     ("customerId", jNat(q.customerId)),
-    ("motorcycleId", jNat(q.motorcycleId)),
+    ("motorcycleId", jOptNat(q.motorcycleId)),
     ("status", jText(quoteStatusText(q.status))),
     ("partLines", jArr(q.partLines.map(quotePartLineJson))),
     ("serviceLines", jArr(q.serviceLines.map(quoteServiceLineJson))),
@@ -538,6 +564,7 @@ module {
     ("hourlyRate", jNat(t.hourlyRate)),
     ("commissionRate", jNat(t.commissionRate)),
     ("active", jBool(t.active)),
+    ("email", jOptText(t.email)),
     ("createdAt", jInt(t.createdAt)),
   ]);
 
@@ -1268,8 +1295,14 @@ module {
     switch (v) { case (#Text(t)) { ?t }; case _ { null } };
   };
 
+  // Acepta un número JSON tanto si el parser lo clasificó como `#Nat` (no
+  // negativo) como `#Int` (negativo). Un valor negativo no es un `Nat` válido.
   func asNat(v : Candid) : ?Nat {
-    switch (v) { case (#Nat(n)) { ?n }; case _ { null } };
+    switch (v) {
+      case (#Nat(n)) { ?n };
+      case (#Int(n)) { if (n >= 0) { ?n.toNat() } else { null } };
+      case _ { null };
+    };
   };
 
   func asInt(v : Candid) : ?Int {
@@ -1299,10 +1332,63 @@ module {
     };
   };
 
+  // Decodifica un carácter base32 (RFC 4648, alfabeto en minúsculas sin
+  // relleno) a su valor de 5 bits. Devuelve `null` para cualquier carácter
+  // fuera del alfabeto.
+  func base32Value(c : Char) : ?Nat8 {
+    let code = c.toNat32();
+    if (code >= 97 and code <= 122) { ?(code - 97).toNat8() } // a-z -> 0-25
+    else if (code >= 50 and code <= 55) { ?(code - 24).toNat8() } // 2-7 -> 26-31
+    else { null };
+  };
+
+  // Decodifica el texto base32 de un principal a sus bytes. Devuelve `null` si
+  // el texto está vacío, contiene un carácter inválido o su longitud no es
+  // coherente con un número entero de bytes.
+  func decodeBase32(text : Text) : ?[Nat8] {
+    // El formato de texto de un principal separa grupos de 5 caracteres con
+    // `-`; se descartan antes de decodificar.
+    let chars = text.toArray().filter(func (c : Char) : Bool = c != '-');
+    if (chars.size() == 0) { return null };
+    let out = List.empty<Nat8>();
+    var buffer : Nat = 0;
+    var bits : Nat = 0;
+    for (c in chars.values()) {
+      let ?value = base32Value(c) else return null;
+      buffer := buffer * 32 + value.toNat();
+      bits += 5;
+      if (bits >= 8) {
+        bits -= 8;
+        out.add((buffer / (2 ** bits)).toNat8());
+        buffer := buffer % (2 ** bits);
+      };
+    };
+    // Los bits sobrantes deben ser cero para que la codificación sea canónica.
+    if (buffer != 0) { return null };
+    ?out.toArray();
+  };
+
+  // Convierte el texto de un principal a `Principal` sin lanzar traps: valida
+  // el checksum CRC32 y devuelve `null` si el texto no es un principal válido.
+  // `Principal.fromText` sí lanza un trap con texto malformado, por lo que no
+  // se usa en la ruta de restauración.
+  func principalFromText(text : Text) : ?Principal {
+    let ?bytes = decodeBase32(text) else return null;
+    if (bytes.size() < 4) { return null };
+    // El texto de un principal codifica `crc32(payload) || payload`: los
+    // primeros 4 bytes son el checksum y el resto es el principal.
+    let checksum = bytes.sliceToArray(0, 4);
+    let payload = bytes.sliceToArray(4, bytes.size().toInt());
+    let expected = payload.toBlob().hash();
+    let actual = checksum.foldLeft(0 : Nat32, func (acc : Nat32, b : Nat8) : Nat32 = acc * 256 + b.toNat32());
+    if (expected != actual) { return null };
+    ?Principal.fromBlob(payload.toBlob());
+  };
+
   func asPrincipal(v : Candid) : ?Principal {
     switch (v) {
       case (#Principal(p)) { ?p };
-      case (#Text(t)) { ?Principal.fromText(t) };
+      case (#Text(t)) { principalFromText(t) };
       case _ { null };
     };
   };
@@ -1449,6 +1535,26 @@ module {
     ?{ from; to; performedBy; at };
   };
 
+  func readOrderAdvance(v : Candid) : ?WorkshopTypes.OrderAdvance {
+    let ?amount = asNat(field(v, "amount") ?? #Null) else return null;
+    let ?method = readPaymentMethod(field(v, "method") ?? #Null) else return null;
+    let ?registeredAt = asInt(field(v, "registeredAt") ?? #Null) else return null;
+    let ?registeredBy = asPrincipal(field(v, "registeredBy") ?? #Null) else return null;
+    ?{ amount; method; registeredAt; registeredBy };
+  };
+
+  func readOrderPayment(v : Candid) : ?WorkshopTypes.OrderPayment {
+    let ?id = asNat(field(v, "id") ?? #Null) else return null;
+    let ?amount = asNat(field(v, "amount") ?? #Null) else return null;
+    let ?method = readPaymentMethod(field(v, "method") ?? #Null) else return null;
+    let ?registeredAt = asInt(field(v, "registeredAt") ?? #Null) else return null;
+    let ?registeredBy = asPrincipal(field(v, "registeredBy") ?? #Null) else return null;
+    ?{
+      id; amount; method; registeredAt; registeredBy;
+      note = asOpt(field(v, "note")).map(func (x) = asText(x) ?? "");
+    };
+  };
+
   func readOrder(v : Candid) : ?WorkshopTypes.WorkshopOrder {
     let ?id = asNat(field(v, "id") ?? #Null) else return null;
     let ?orderNumber = asText(field(v, "orderNumber") ?? #Null) else return null;
@@ -1469,6 +1575,14 @@ module {
       parts; labor; photos; technicianIds; statusHistory; createdAt; updatedAt;
       cancelReason = asOpt(field(v, "cancelReason")).map(func (x) = asText(x) ?? "");
       cancelledAt = asOpt(field(v, "cancelledAt")).map(func (x) = asInt(x) ?? 0);
+      previousMileage = asOpt(field(v, "previousMileage")).map(func (x) = asNat(x) ?? 0);
+      oilChangeInterval = asOpt(field(v, "oilChangeInterval")).map(func (x) = asNat(x) ?? 0);
+      advance = switch (asOpt(field(v, "advance"))) {
+        case null { null };
+        case (?inner) { readOrderAdvance(inner) };
+      };
+      // `payments` es opcional en archivos anteriores a su incorporación.
+      payments = readList(field(v, "payments"), readOrderPayment) ?? [];
     };
   };
 
@@ -1616,6 +1730,7 @@ module {
       customerId = asOpt(field(v, "customerId")).map(func (x) = asNat(x) ?? 0);
       customerTaxId = asOpt(field(v, "customerTaxId")).map(func (x) = asText(x) ?? "");
       customerAddress = asOpt(field(v, "customerAddress")).map(func (x) = asText(x) ?? "");
+      advanceApplied = asOpt(field(v, "advanceApplied")).map(func (x) = asNat(x) ?? 0);
       installments = switch (asOpt(field(v, "installments"))) {
         case null { null };
         case (?inner) { readInstallmentPlan(inner) };
@@ -1683,7 +1798,7 @@ module {
     let ?id = asNat(field(v, "id") ?? #Null) else return null;
     let ?quoteNumber = asText(field(v, "quoteNumber") ?? #Null) else return null;
     let ?customerId = asNat(field(v, "customerId") ?? #Null) else return null;
-    let ?motorcycleId = asNat(field(v, "motorcycleId") ?? #Null) else return null;
+    let motorcycleId = asOpt(field(v, "motorcycleId")).map(func (x) = asNat(x) ?? 0);
     let ?status = readQuoteStatus(field(v, "status") ?? #Null) else return null;
     let ?partLines = readList(field(v, "partLines"), readQuotePartLine) else return null;
     let ?serviceLines = readList(field(v, "serviceLines"), readQuoteServiceLine) else return null;
@@ -1926,19 +2041,58 @@ module {
     readList(v, func (item : Candid) : ?Nat = asNat(item));
   };
 
+  // Lee un arreglo JSON decodificando **cada elemento por separado** con el
+  // parser de `serde-core`. El escáner iterativo localiza el tramo de cada
+  // elemento y solo ese tramo se decodifica, de modo que la recursión del
+  // parser nunca abarca el arreglo completo. Devuelve `null` si el valor no es
+  // un arreglo o si algún elemento no tiene el formato esperado.
+  func readArrayElements<T>(doc : JsonScan.Doc, span : JsonScan.Span, reader : Candid -> ?T) : ?[T] {
+    let spans = switch (JsonScan.arrayElements(doc, span)) {
+      case (#ok(spans)) { spans };
+      case (#err(_)) { return null };
+    };
+    let out = List.empty<T>();
+    for (elementSpan in spans.values()) {
+      let ?value = decodeValue(JsonScan.slice(doc, elementSpan)) else return null;
+      switch (reader(value)) {
+        case (?parsed) { out.add(parsed) };
+        case null { return null };
+      };
+    };
+    ?out.toArray();
+  };
+
   // ── Validación del archivo ────────────────────────────────────────────────
 
-  // Parsea el JSON raíz del archivo. Devuelve el valor Candid raíz o un error
-  // de formato.
-  func parseRoot(json : Text) : { #ok : Candid; #err : Text } {
-    switch (JSON.toCandid(json)) {
-      case (#ok(candid)) {
-        switch (asRecord(candid)) {
-          case (?_) { #ok(candid) };
-          case null { #err("El archivo no tiene un objeto JSON en la raíz") };
-        };
+  // Escanea el objeto raíz del archivo con el escáner iterativo (sin
+  // recursión) y devuelve el tramo de texto de cada clave de primer nivel.
+  // No materializa el árbol Candid completo: un archivo grande ya no desborda
+  // la pila del canister.
+  func scanRoot(doc : JsonScan.Doc) : { #ok : [(Text, JsonScan.Span)]; #err : Text } {
+    switch (JsonScan.rootFields(doc)) {
+      case (#ok(fields)) { #ok(fields) };
+      case (#err(message)) {
+        #err("El archivo de copia no es un JSON válido: " # message);
       };
-      case (#err(message)) { #err("El archivo no es un JSON válido: " # message) };
+    };
+  };
+
+  // Decodifica un valor JSON aislado (un tramo de texto) con el parser de
+  // `serde-core`. La recursión queda acotada a ese valor, nunca al archivo
+  // completo.
+  func decodeValue(text : Text) : ?Candid {
+    switch (JSON.toCandid(text)) {
+      case (#ok(candid)) { ?candid };
+      case (#err(_)) { null };
+    };
+  };
+
+  // Decodifica el valor de una clave de primer nivel. Devuelve `null` si el
+  // tramo no es un JSON válido.
+  func decodeField(doc : JsonScan.Doc, fields : [(Text, JsonScan.Span)], key : Text) : ?Candid {
+    switch (JsonScan.findField(fields, key)) {
+      case (?span) { decodeValue(JsonScan.slice(doc, span)) };
+      case null { null };
     };
   };
 
@@ -1956,23 +2110,32 @@ module {
   /// alterar ningún dato. Es el paso previo a la restauración: el frontend
   /// muestra la vista previa y luego confirma sección por sección.
   public func validateRestoreFile(json : Text) : Types.RestorePreviewOutcome {
-    let root = switch (parseRoot(json)) {
-      case (#ok(candid)) { candid };
+    let doc = JsonScan.doc(json);
+    let fields = switch (scanRoot(doc)) {
+      case (#ok(fields)) { fields };
       case (#err(message)) { return #err(#invalidFormat(message)) };
     };
     // La versión es opcional en archivos antiguos; se asume la versión 1.
-    let formatVersion = asNat(field(root, "formatVersion") ?? #Null) ?? 1;
+    let formatVersion = switch (decodeField(doc, fields, "formatVersion")) {
+      case (?value) { asNat(value) ?? 1 };
+      case null { 1 };
+    };
     if (formatVersion > Types.RESTORE_FORMAT_VERSION) {
       return #err(#incompatibleVersion(formatVersion));
     };
-    let generatedAt = asInt(field(root, "generatedAt") ?? #Null) ?? 0;
+    let generatedAt = switch (decodeField(doc, fields, "generatedAt")) {
+      case (?value) { asInt(value) ?? 0 };
+      case null { 0 };
+    };
     let sections = List.empty<Types.RestoreSectionInfo>();
     var index = 0;
     for (key in SECTION_KEYS.values()) {
-      switch (field(root, key)) {
-        case (?value) {
-          let count = switch (asArray(value)) {
-            case (?items) { items.size() };
+      switch (JsonScan.findField(fields, key)) {
+        case (?span) {
+          // El conteo se obtiene recorriendo el arreglo con el escáner
+          // iterativo; no se decodifica ningún elemento.
+          let count = switch (JsonScan.countArray(doc, span)) {
+            case (?n) { n };
             case null { 1 };
           };
           sections.add({ key; index; count });
@@ -2045,109 +2208,121 @@ module {
       return #err(#unknownSection(index.toText()));
     };
     let key = SECTION_KEYS[index];
-    let root = switch (parseRoot(json)) {
-      case (#ok(candid)) { candid };
+    let doc = JsonScan.doc(json);
+    let fields = switch (scanRoot(doc)) {
+      case (#ok(fields)) { fields };
       case (#err(message)) { return #err(#invalidFormat(message)) };
     };
-    let formatVersion = asNat(field(root, "formatVersion") ?? #Null) ?? 1;
+    let formatVersion = switch (decodeField(doc, fields, "formatVersion")) {
+      case (?value) { asNat(value) ?? 1 };
+      case null { 1 };
+    };
     if (formatVersion > Types.RESTORE_FORMAT_VERSION) {
       return #err(#incompatibleVersion(formatVersion));
     };
-    let section = switch (field(root, key)) {
-      case (?value) { value };
+    let span = switch (JsonScan.findField(fields, key)) {
+      case (?span) { span };
       case null { return #err(#unknownSection(key)) };
     };
+    // Ninguna llamada entrega el tramo completo de la sección al parser
+    // recursivo de `serde-core`: las secciones de colección decodifican cada
+    // elemento por separado con `readArrayElements`, y las secciones de un
+    // único registro (businessSettings, company) decodifican solo el tramo de
+    // ese registro, que es pequeño y acotado. Así una sección grande ya no
+    // desborda la pila del canister (IC0502).
     let restored = switch (index) {
       case (0) {
-        let ?parsed = readList(?section, readPart) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readPart) else return #err(#invalidSection(key));
         replaceMap(state.parts, parsed, func (p : InventoryTypes.Part) : Common.Id = p.id, Nat.compare);
       };
       case (1) {
-        let ?parsed = readList(?section, readLot) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readLot) else return #err(#invalidSection(key));
         replaceMap(state.lots, parsed, func (l : InventoryTypes.Lot) : Common.Id = l.id, Nat.compare);
       };
       case (2) {
-        let ?parsed = readList(?section, readMovement) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readMovement) else return #err(#invalidSection(key));
         replaceMap(state.movements, parsed, func (m : InventoryTypes.Movement) : Common.Id = m.id, Nat.compare);
       };
       case (3) {
-        let ?parsed = readList(?section, readCustomer) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readCustomer) else return #err(#invalidSection(key));
         replaceMap(state.customers, parsed, func (c : CustomerTypes.Customer) : Common.Id = c.id, Nat.compare);
       };
       case (4) {
-        let ?parsed = readList(?section, readMotorcycle) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readMotorcycle) else return #err(#invalidSection(key));
         replaceMap(state.motorcycles, parsed, func (m : CustomerTypes.Motorcycle) : Common.Id = m.id, Nat.compare);
       };
       case (5) {
-        let ?parsed = readList(?section, readOrder) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readOrder) else return #err(#invalidSection(key));
         replaceMap(state.orders, parsed, func (o : WorkshopTypes.WorkshopOrder) : Common.Id = o.id, Nat.compare);
       };
       case (6) {
-        let ?parsed = readList(?section, readSupplier) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readSupplier) else return #err(#invalidSection(key));
         replaceMap(state.suppliers, parsed, func (s : PurchasingTypes.Supplier) : Common.Id = s.id, Nat.compare);
       };
       case (7) {
-        let ?parsed = readList(?section, readPurchase) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readPurchase) else return #err(#invalidSection(key));
         replaceMap(state.purchases, parsed, func (p : PurchasingTypes.Purchase) : Common.Id = p.id, Nat.compare);
       };
       case (8) {
-        let ?parsed = readList(?section, readPayment) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readPayment) else return #err(#invalidSection(key));
         replaceMap(state.payments, parsed, func (p : PurchasingTypes.Payment) : Common.Id = p.id, Nat.compare);
       };
       case (9) {
-        let ?parsed = readList(?section, readInvoice) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readInvoice) else return #err(#invalidSection(key));
         replaceMap(state.invoices, parsed, func (i : BillingTypes.Invoice) : Common.Id = i.id, Nat.compare);
       };
       case (10) {
+        let ?section = decodeValue(JsonScan.slice(doc, span)) else return #err(#invalidSection(key));
         let ?parsed = readBusinessSettings(section) else return #err(#invalidSection(key));
         state.businessSettings.settings := parsed;
         1;
       };
       case (11) {
-        let ?parsed = readList(?section, readUserProfileEntry) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readUserProfileEntry) else return #err(#invalidSection(key));
         replaceMapEntries(state.userProfiles, parsed, Principal.compare);
       };
       case (12) {
-        let ?parsed = readList(?section, readQuote) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readQuote) else return #err(#invalidSection(key));
         replaceMap(state.quotes, parsed, func (q : QuoteTypes.Quote) : Common.Id = q.id, Nat.compare);
       };
       case (13) {
-        let ?parsed = readList(?section, readService) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readService) else return #err(#invalidSection(key));
         replaceMap(state.services, parsed, func (s : ServiceTypes.Service) : Common.Id = s.id, Nat.compare);
       };
       case (14) {
-        let ?parsed = readList(?section, readServiceCategory) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readServiceCategory) else return #err(#invalidSection(key));
         replaceMap(state.serviceCategories, parsed, func (c : ServiceCategoryTypes.ServiceCategory) : Common.Id = c.id, Nat.compare);
       };
       case (15) {
-        let ?parsed = readList(?section, readTechnician) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readTechnician) else return #err(#invalidSection(key));
         replaceMap(state.technicians, parsed, func (t : TechnicianTypes.Technician) : Common.Id = t.id, Nat.compare);
       };
       case (16) {
-        let ?parsed = readList(?section, readAppointment) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readAppointment) else return #err(#invalidSection(key));
         replaceMap(state.appointments, parsed, func (a : AppointmentTypes.Appointment) : Common.Id = a.id, Nat.compare);
       };
       case (17) {
-        let ?parsed = readList(?section, readExpense) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readExpense) else return #err(#invalidSection(key));
         replaceMap(state.expenses, parsed, func (e : ExpenseTypes.Expense) : Common.Id = e.id, Nat.compare);
       };
       case (18) {
-        let ?parsed = readList(?section, readExpenseCategory) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readExpenseCategory) else return #err(#invalidSection(key));
         replaceMap(state.expenseCategories, parsed, func (c : ExpenseCategoryTypes.ExpenseCategory) : Common.Id = c.id, Nat.compare);
       };
       case (19) {
-        let ?parsed = readList(?section, readPosSale) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readPosSale) else return #err(#invalidSection(key));
         replaceMap(state.posSales, parsed, func (s : PosTypes.PosSale) : Common.Id = s.id, Nat.compare);
       };
       case (20) {
-        let ?parsed = readList(?section, readReceivablePayment) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readReceivablePayment) else return #err(#invalidSection(key));
         replaceMap(state.receivablePayments, parsed, func (p : ReceivableTypes.ReceivablePayment) : Common.Id = p.id, Nat.compare);
       };
       case (21) {
-        let ?parsed = readList(?section, readSupplierOrder) else return #err(#invalidSection(key));
+        let ?parsed = readArrayElements(doc, span, readSupplierOrder) else return #err(#invalidSection(key));
         replaceMap(state.supplierOrders, parsed, func (o : SupplierOrderTypes.SupplierOrder) : Common.Id = o.id, Nat.compare);
       };
       case (22) {
+        let ?section = decodeValue(JsonScan.slice(doc, span)) else return #err(#invalidSection(key));
         let ?parsed = readCompanyProfile(section) else return #err(#invalidSection(key));
         state.company.profile := parsed;
         1;

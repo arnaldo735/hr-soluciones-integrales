@@ -131,6 +131,7 @@ vi.mock("@tanstack/react-router", () => ({
     </a>
   ),
   useParams: () => ({ id: "42" }),
+  useSearch: () => ({}),
 }));
 
 vi.mock("@/components/order/AddPartDialog", () => ({
@@ -182,6 +183,7 @@ function orderView(overrides: Partial<OrderView["order"]> = {}): OrderView {
       createdAt: 1_700_000_000_000_000_000n,
       updatedAt: 1_700_000_000_000_000_000n,
       photos: [],
+      payments: [],
       ...overrides,
     },
     totals: {
@@ -191,6 +193,8 @@ function orderView(overrides: Partial<OrderView["order"]> = {}): OrderView {
       taxRate: 0n,
       tax: 0n,
       total: 250000n,
+      paidAmount: 0n,
+      balance: 250000n,
     },
   };
 }
@@ -336,6 +340,59 @@ describe("OrderDetailPage warranty document (cover)", () => {
     ).toBeInTheDocument();
   });
 
+  it("shows the warranty action when an unlinked labor line names a warranty service", async () => {
+    // The accepted change activates the warranty from the written description
+    // too, so a line with no catalog link still matches by name. The catalog is
+    // empty here, which proves the match does not depend on a resolved id.
+    useServicesMock.mockReturnValue({
+      data: servicePage([]),
+      isLoading: false,
+      isError: false,
+    });
+    useOrderMock.mockReturnValue(
+      loadedOrder(
+        orderView({
+          labor: [
+            {
+              id: 1n,
+              description: "Reparación de cabeza de fuerza",
+              price: 180000n,
+            },
+          ],
+        }),
+      ),
+    );
+
+    renderWithProviders(<OrderDetailPage />);
+    await screen.findByText("OT-0001");
+
+    expect(
+      await screen.findByTestId("order_detail.warranty_button"),
+    ).toBeInTheDocument();
+  });
+
+  it("hides the warranty action when an unlinked labor line names a non-warranty service", async () => {
+    useServicesMock.mockReturnValue({
+      data: servicePage([]),
+      isLoading: false,
+      isError: false,
+    });
+    useOrderMock.mockReturnValue(
+      loadedOrder(
+        orderView({
+          labor: [{ id: 1n, description: "Ajuste de frenos", price: 30000n }],
+        }),
+      ),
+    );
+
+    renderWithProviders(<OrderDetailPage />);
+    await screen.findByText("OT-0001");
+
+    expect(
+      screen.queryByTestId("order_detail.warranty_button"),
+    ).not.toBeInTheDocument();
+  });
+
   it("hides the warranty action when no labor line links to a warranty service", async () => {
     useServicesMock.mockReturnValue({
       data: servicePage([
@@ -365,6 +422,118 @@ describe("OrderDetailPage warranty document (cover)", () => {
     expect(
       screen.queryByTestId("order_detail.warranty_button"),
     ).not.toBeInTheDocument();
+  });
+
+  it("deactivates the warranty action when the warranty labor line is removed", async () => {
+    // The accepted rule: removing the warranty line turns the document off.
+    // The page derives the warranty from the order it is given, so the removal
+    // is observed by handing the page the order the backend returns after the
+    // line is gone.
+    useServicesMock.mockReturnValue({
+      data: servicePage([catalogService()]),
+      isLoading: false,
+      isError: false,
+    });
+    const withWarranty = loadedOrder(
+      orderView({
+        labor: [
+          {
+            id: 1n,
+            description: "Reparación de motor",
+            price: 250000n,
+            serviceId: 9n,
+          },
+        ],
+      }),
+    );
+    const withoutWarranty = loadedOrder(
+      orderView({
+        labor: [{ id: 2n, description: "Ajuste de frenos", price: 30000n }],
+      }),
+    );
+    let current = withWarranty;
+    useOrderMock.mockImplementation(() => current);
+
+    const { rerender } = renderWithProviders(<OrderDetailPage />);
+    await screen.findByText("OT-0001");
+    expect(
+      await screen.findByTestId("order_detail.warranty_button"),
+    ).toBeInTheDocument();
+
+    // The operator removes the warranty line; the backend now reports the
+    // order without it, which is what the page re-renders from.
+    await userEvent.click(
+      screen.getByTestId("order_detail.labor.remove_button.1"),
+    );
+    current = withoutWarranty;
+    rerender(<OrderDetailPage />);
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("order_detail.warranty_button"),
+      ).not.toBeInTheDocument(),
+    );
+  });
+
+  it("deactivates the warranty action when the line is changed to a non-warranty service", async () => {
+    // The accepted rule: changing the linked service to one that is not a
+    // warranty service turns the document off. The page re-derives the
+    // warranty from the order the backend returns after the change.
+    useServicesMock.mockReturnValue({
+      data: servicePage([
+        catalogService(),
+        catalogService({ id: 5n, code: "SRV-001", name: "Cambio de aceite" }),
+      ]),
+      isLoading: false,
+      isError: false,
+    });
+    const withWarranty = loadedOrder(
+      orderView({
+        labor: [
+          {
+            id: 1n,
+            description: "Reparación de motor",
+            price: 250000n,
+            serviceId: 9n,
+          },
+        ],
+      }),
+    );
+    const withOilChange = loadedOrder(
+      orderView({
+        labor: [
+          {
+            id: 1n,
+            description: "Cambio de aceite",
+            price: 30000n,
+            serviceId: 5n,
+          },
+        ],
+      }),
+    );
+    let current = withWarranty;
+    useOrderMock.mockImplementation(() => current);
+
+    renderWithProviders(<OrderDetailPage />);
+    await screen.findByText("OT-0001");
+    expect(
+      await screen.findByTestId("order_detail.warranty_button"),
+    ).toBeInTheDocument();
+
+    // The backend now reports the line linked to a non-warranty service.
+    current = withOilChange;
+    await userEvent.click(
+      screen.getByTestId("order_detail.labor.service.1.badge"),
+    );
+    await userEvent.click(
+      await screen.findByTestId("order_detail.labor.service.1.clear_button"),
+    );
+
+    await waitFor(() =>
+      expect(
+        screen.queryByTestId("order_detail.warranty_button"),
+      ).not.toBeInTheDocument(),
+    );
   });
 
   it("renders the default warranty terms text in the warranty dialog", async () => {

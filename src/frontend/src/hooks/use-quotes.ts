@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { invalidateCashData } from "@/hooks/use-cash";
 import type {
   Id,
   PartView,
@@ -263,6 +264,9 @@ export function useConvertQuoteToInvoice() {
     onSuccess: () => {
       void queryClient.invalidateQueries({ queryKey: ["quotes"] });
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      // Converting an accepted quote records its collection in Caja y Bancos,
+      // so the balances panel and movement history must refetch as well.
+      invalidateCashData(queryClient);
     },
   });
 }

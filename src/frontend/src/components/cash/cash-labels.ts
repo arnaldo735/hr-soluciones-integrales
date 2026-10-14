@@ -2,6 +2,7 @@ import {
   CashAccount,
   CashMovementKind,
   CashMovementSource,
+  CashRegisterKind,
   PaymentMethod,
 } from "@/lib/types";
 
@@ -35,6 +36,36 @@ export function accountLabel(account: CashAccount): string {
   return account === CashAccount.cash ? "Caja" : "Bancos";
 }
 
+/** Spanish label for a cash register kind. */
+export const CASH_REGISTER_KIND_LABELS: Record<CashRegisterKind, string> = {
+  [CashRegisterKind.cash]: "Caja",
+  [CashRegisterKind.bank]: "Banco",
+};
+
+/** Register kinds offered when creating or editing a register. */
+export const CASH_REGISTER_KIND_OPTIONS: CashRegisterKind[] = [
+  CashRegisterKind.cash,
+  CashRegisterKind.bank,
+];
+
+/** Spanish label for a cash register kind, tolerating unknown values. */
+export function cashRegisterKindLabel(kind: string): string {
+  return CASH_REGISTER_KIND_LABELS[kind as CashRegisterKind] ?? kind;
+}
+
+/** Spanish label for a register's active/inactive state. */
+export function registerStatusLabel(active: boolean): string {
+  return active ? "Activa" : "Inactiva";
+}
+
+/**
+ * Spanish label for whether a register currently has an open shift. Used by
+ * the catalog to explain why a register cannot be deleted or deactivated.
+ */
+export function registerShiftStatusLabel(hasOpenShift: boolean): string {
+  return hasOpenShift ? "Con turno abierto" : "Sin turno abierto";
+}
+
 /** Spanish label for the origin of a movement. */
 export function movementSourceLabel(source: CashMovementSource): string {
   switch (source) {
@@ -52,6 +83,8 @@ export function movementSourceLabel(source: CashMovementSource): string {
       return "Comisión";
     case CashMovementSource.receivable:
       return "Cartera";
+    case CashMovementSource.advance:
+      return "Anticipo";
     default:
       return "Otro";
   }

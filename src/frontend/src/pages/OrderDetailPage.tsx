@@ -25,7 +25,15 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -50,9 +58,16 @@ import {
   ORDER_STATUS_LABELS,
   errorMessage,
   nextStatus,
+  useAddLabor,
+  useAddOrderPart,
+  useAddOrderPayment,
   useOrder,
+  useOrderAdvanceReceipt,
+  useOrderPayments,
   useRemoveLabor,
   useRemoveOrderPart,
+  useSetOrderAdvance,
+  useUpdateOilChangeInterval,
   useUpdateOrderStatus,
 } from "@/hooks/use-orders";
 import {
@@ -80,6 +95,7 @@ import {
   formatTaxRate,
 } from "@/lib/format";
 import {
+  downloadOrderAdvanceReceiptPdf,
   downloadWarrantyPdf,
   drawHopeMessage,
   hopeMessageContent,
@@ -87,7 +103,7 @@ import {
   pdfCompanyFromProfile,
 } from "@/lib/pdf";
 import type { HopeMessageContent } from "@/lib/pdf";
-import { OrderStatus, ServiceSort } from "@/lib/types";
+import { OrderStatus, PaymentMethod, ServiceSort } from "@/lib/types";
 import type {
   DocumentFormat,
   DocumentLine,
@@ -96,6 +112,8 @@ import type {
   Id,
   LaborItem,
   Motorcycle,
+  OrderAdvanceReceipt,
+  OrderPayment,
   OrderView,
   Service,
   WarrantyDocumentData,
@@ -107,7 +125,12 @@ import {
 } from "@/lib/types";
 import { warrantyAppliesToOrder } from "@/lib/warranty";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Link, useNavigate, useParams } from "@tanstack/react-router";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearch,
+} from "@tanstack/react-router";
 import type { jsPDF } from "jspdf";
 import {
   AlertTriangle,
@@ -117,12 +140,15 @@ import {
   Bike,
   Clock,
   FileText,
+  HandCoins,
   Loader2,
   Mail,
   MessageCircle,
   Package,
   Plus,
   Printer,
+  ReceiptText,
+  Save,
   ScanLine,
   ShieldCheck,
   Trash2,
@@ -130,13 +156,46 @@ import {
   UserRoundPlus,
   Wrench,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { toast } from "sonner";
 
 /** Formatos de papel del documento de garantía (A4 o tirilla 80 mm). */
 const WARRANTY_FORMATS: Array<{ value: DocumentFormat; label: string }> = [
   { value: "a4", label: "A4" },
   { value: "receipt80", label: "Tirilla 80 mm" },
 ];
+
+/** Métodos de pago admitidos para el anticipo de una orden de taller. */
+const ADVANCE_METHODS: Array<{ value: PaymentMethod; label: string }> = [
+  { value: PaymentMethod.cash, label: "Efectivo" },
+  { value: PaymentMethod.transfer, label: "Transferencia" },
+];
+
+/** Etiqueta en español del método de pago del anticipo. */
+function advanceMethodLabel(method: PaymentMethod): string {
+  return method === PaymentMethod.transfer ? "Transferencia" : "Efectivo";
+}
+
+/** Métodos de pago admitidos para un abono sobre la orden de trabajo. */
+const PAYMENT_METHODS: Array<{ value: PaymentMethod; label: string }> = [
+  { value: PaymentMethod.cash, label: "Efectivo" },
+  { value: PaymentMethod.transfer, label: "Transferencia" },
+  { value: PaymentMethod.card, label: "Tarjeta" },
+];
+
+/** Etiqueta en español del método de pago de un abono. */
+function paymentMethodLabel(method: PaymentMethod): string {
+  switch (method) {
+    case PaymentMethod.transfer:
+      return "Transferencia";
+    case PaymentMethod.card:
+      return "Tarjeta";
+    case PaymentMethod.mixed:
+      return "Mixto";
+    default:
+      return "Efectivo";
+  }
+}
 
 function useOrderContext(customerId: Id | null, motorcycleId: Id | null) {
   const { actor, isFetching } = useBackend();
@@ -705,6 +764,26 @@ export function OrderDetailPage() {
   const [isPrintOpen, setIsPrintOpen] = useState(false);
   const [isWarrantyOpen, setIsWarrantyOpen] = useState(false);
   const [isWarrantyWhatsAppOpen, setIsWarrantyWhatsAppOpen] = useState(false);
+  const [isAdvanceOpen, setIsAdvanceOpen] = useState(false);
+  const [isAdvanceDeleteOpen, setIsAdvanceDeleteOpen] = useState(false);
+  const [advanceAmountDraft, setAdvanceAmountDraft] = useState("");
+  const [advanceMethodDraft, setAdvanceMethodDraft] = useState<PaymentMethod>(
+    PaymentMethod.cash,
+  );
+  const [advanceError, setAdvanceError] = useState<string | null>(null);
+  const [isPaymentOpen, setIsPaymentOpen] = useState(false);
+  const [paymentAmountDraft, setPaymentAmountDraft] = useState("");
+  const [paymentMethodDraft, setPaymentMethodDraft] = useState<PaymentMethod>(
+    PaymentMethod.cash,
+  );
+  const [paymentNoteDraft, setPaymentNoteDraft] = useState("");
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [isReceiptOpen, setIsReceiptOpen] = useState(false);
+  const [receiptFormat, setReceiptFormat] = useState<DocumentFormat>("a4");
+  const [isReceiptDownloading, setIsReceiptDownloading] = useState(false);
+  const [receiptDownloadError, setReceiptDownloadError] = useState<
+    string | null
+  >(null);
   const [actionError, setActionError] = useState<string | null>(null);
   const [printFormat, setPrintFormat] = useState<DocumentFormat>("a4");
   const [warrantyFormat, setWarrantyFormat] = useState<DocumentFormat>("a4");
@@ -714,10 +793,41 @@ export function OrderDetailPage() {
   const [warrantyDownloadError, setWarrantyDownloadError] = useState<
     string | null
   >(null);
+  const [intervalDraft, setIntervalDraft] = useState("");
+  const [intervalError, setIntervalError] = useState<string | null>(null);
 
   const orderQuery = useOrder(orderId);
   const view = orderQuery.data ?? null;
   const order = view?.order ?? null;
+
+  // El backend rechaza un segundo anticipo editable cuando la OT ya tiene
+  // factura. Se consulta la lista de facturas para bloquear la edición con un
+  // mensaje claro en lugar de dejar que el backend falle.
+  //
+  // La consulta es auxiliar: si falla, sigue cargando o el actor aún no está
+  // listo, NO debe ocultar el botón de anticipo. Solo se considera que la OT
+  // está facturada cuando la consulta terminó con éxito y la orden aparece
+  // explícitamente en la lista; el backend sigue siendo la autoridad final y
+  // rechaza un segundo anticipo sobre una OT facturada.
+  const { actor, isFetching } = useBackend();
+  const { token } = useAuth();
+  const invoicedOrdersQuery = useQuery({
+    queryKey: ["invoices", "invoiced-order-ids"],
+    queryFn: async (): Promise<Set<string>> => {
+      if (!actor) throw new Error("Backend no disponible");
+      const page = await actor.listInvoices(token, {}, 0n, 1000n);
+      const ids = new Set<string>();
+      for (const invoice of page.items) {
+        if (invoice.orderId !== undefined) {
+          ids.add(invoice.orderId.toString());
+        }
+      }
+      return ids;
+    },
+    enabled: !!actor && !isFetching,
+  });
+  const invoicedOrderIds = invoicedOrdersQuery.data ?? new Set<string>();
+  const invoicedOrdersLoaded = invoicedOrdersQuery.isSuccess;
 
   const { isIvaResponsible } = useIvaSettings();
   const businessQuery = useBusinessSettings();
@@ -758,12 +868,90 @@ export function OrderDetailPage() {
   );
 
   const updateStatus = useUpdateOrderStatus();
+  const updateOilChangeInterval = useUpdateOilChangeInterval();
+  const setOrderAdvance = useSetOrderAdvance();
+  const addOrderPayment = useAddOrderPayment();
+  const paymentsQuery = useOrderPayments(orderId);
+  const payments = paymentsQuery.data ?? [];
+  const receiptQuery = useOrderAdvanceReceipt(orderId);
+  const receipt = receiptQuery.data ?? null;
   const removePart = useRemoveOrderPart();
   const removeLabor = useRemoveLabor();
   const assignTechnician = useAssignTechnician();
   const unassignTechnician = useUnassignTechnician();
   const updateLaborTechnician = useUpdateLaborTechnician();
   const replaceLaborService = useReplaceLaborService();
+
+  const addOrderPart = useAddOrderPart();
+  const addLabor = useAddLabor();
+
+  // A factura is immutable, so its item search sends the chosen part/service and
+  // quantity here as query params. On mount the line is appended automatically
+  // as the first line of the order, then the params are cleared from the URL.
+  const addSearch = useSearch({ from: "/ordenes/$id" });
+  const addPartId = addSearch.addPartId;
+  const addServiceId = addSearch.addServiceId;
+  const addQuantity = addSearch.addQuantity;
+  const addAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (addAppliedRef.current) return;
+    if (addPartId === undefined && addServiceId === undefined) return;
+    if (!order) return;
+    addAppliedRef.current = true;
+
+    const quantity = Math.max(1, Number.parseInt(addQuantity ?? "1", 10) || 1);
+
+    if (addPartId !== undefined) {
+      addOrderPart.mutate(
+        {
+          id: order.id,
+          part: { partId: BigInt(addPartId), quantity: BigInt(quantity) },
+        },
+        {
+          onSuccess: () =>
+            toast.success("Repuesto anexado como primera línea de la orden"),
+          onError: (error) => setActionError(errorMessage(error)),
+        },
+      );
+    } else if (addServiceId !== undefined) {
+      const service =
+        services.find((item) => item.id.toString() === addServiceId) ?? null;
+      addLabor.mutate(
+        {
+          id: order.id,
+          labor: {
+            description: service
+              ? `${service.code} · ${service.name}`
+              : "Servicio",
+            price: (service?.laborRate ?? 0n) * BigInt(quantity),
+            serviceId: service?.id,
+          },
+        },
+        {
+          onSuccess: () =>
+            toast.success("Servicio anexado como primera línea de la orden"),
+          onError: (error) => setActionError(errorMessage(error)),
+        },
+      );
+    }
+
+    void navigate({
+      to: "/ordenes/$id",
+      params: { id: order.id.toString() },
+      search: {},
+      replace: true,
+    });
+  }, [
+    addPartId,
+    addServiceId,
+    addQuantity,
+    order,
+    services,
+    addOrderPart,
+    addLabor,
+    navigate,
+  ]);
 
   const techniciansQuery = useTechnicians({
     search: "",
@@ -786,6 +974,179 @@ export function OrderDetailPage() {
 
   const upcoming = order ? nextStatus(order.status) : null;
   const isCancelled = order?.status === OrderStatus.cancelled;
+  const isDelivered = order?.status === OrderStatus.delivered;
+  const isEditable = !isCancelled && !isDelivered;
+
+  const previousMileage = order?.previousMileage;
+  const oilChangeInterval = order?.oilChangeInterval;
+  const travelledKm =
+    order && previousMileage !== undefined
+      ? order.intakeMileage - previousMileage
+      : null;
+  const nextOilChangeKm =
+    order && oilChangeInterval !== undefined
+      ? order.intakeMileage + oilChangeInterval
+      : null;
+
+  useEffect(() => {
+    setIntervalDraft(
+      oilChangeInterval !== undefined ? oilChangeInterval.toString() : "",
+    );
+  }, [oilChangeInterval]);
+
+  function handleSaveInterval() {
+    if (!order) return;
+    const trimmed = intervalDraft.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (
+      value === null ||
+      !Number.isFinite(value) ||
+      value < 0 ||
+      !Number.isInteger(value)
+    ) {
+      setIntervalError(
+        "El intervalo debe ser un número entero de kilómetros (0 o más).",
+      );
+      return;
+    }
+    setIntervalError(null);
+    updateOilChangeInterval.mutate(
+      { id: order.id, oilChangeInterval: BigInt(value) },
+      { onError: (error) => setIntervalError(errorMessage(error)) },
+    );
+  }
+
+  function handleOpenAdvanceDialog() {
+    setAdvanceError(null);
+    setAdvanceAmountDraft(
+      order?.advance ? (Number(order.advance.amount) / 100).toString() : "",
+    );
+    setAdvanceMethodDraft(order?.advance?.method ?? PaymentMethod.cash);
+    setIsAdvanceOpen(true);
+  }
+
+  function handleSaveAdvance() {
+    if (!order) return;
+    const trimmed = advanceAmountDraft.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (
+      value === null ||
+      !Number.isFinite(value) ||
+      value <= 0 ||
+      !Number.isInteger(value)
+    ) {
+      setAdvanceError(
+        "El anticipo debe ser un monto en pesos mayor que cero, sin decimales.",
+      );
+      return;
+    }
+    const amountCents = BigInt(Math.round(value * 100));
+    // Cuando la OT aún no tiene repuestos ni mano de obra su total es 0. En ese
+    // caso no se aplica límite superior: el anticipo puede registrarse y el
+    // saldo pendiente se recalcula al agregar conceptos. Con total > 0 se
+    // mantiene la invariante anticipo <= total.
+    if (totals.total > 0n && amountCents > totals.total) {
+      setAdvanceError(
+        `El anticipo no puede superar el total de la orden (${formatMoney(totals.total)}).`,
+      );
+      return;
+    }
+    setAdvanceError(null);
+    setOrderAdvance.mutate(
+      { id: order.id, amount: amountCents, method: advanceMethodDraft },
+      {
+        onSuccess: () => setIsAdvanceOpen(false),
+        onError: (error) => setAdvanceError(errorMessage(error)),
+      },
+    );
+  }
+
+  function handleDeleteAdvance() {
+    if (!order) return;
+    setActionError(null);
+    setOrderAdvance.mutate(
+      { id: order.id, amount: null, method: null },
+      {
+        onSuccess: () => setIsAdvanceDeleteOpen(false),
+        onError: (error) => {
+          setIsAdvanceDeleteOpen(false);
+          setActionError(errorMessage(error));
+        },
+      },
+    );
+  }
+
+  function handleOpenPaymentDialog() {
+    setPaymentError(null);
+    setPaymentAmountDraft("");
+    setPaymentMethodDraft(PaymentMethod.cash);
+    setPaymentNoteDraft("");
+    setIsPaymentOpen(true);
+  }
+
+  function handleSavePayment() {
+    if (!order) return;
+    const trimmed = paymentAmountDraft.trim();
+    const value = trimmed === "" ? null : Number(trimmed);
+    if (
+      value === null ||
+      !Number.isFinite(value) ||
+      value <= 0 ||
+      !Number.isInteger(value)
+    ) {
+      setPaymentError(
+        "El abono debe ser un monto en pesos mayor que cero, sin decimales.",
+      );
+      return;
+    }
+    const amountCents = BigInt(Math.round(value * 100));
+    // Cuando la OT aún no tiene repuestos ni mano de obra su total es 0 y el
+    // saldo pendiente también es 0. En ese caso no se aplica límite superior: el
+    // abono puede registrarse y el saldo se recalcula al agregar conceptos. Con
+    // total > 0 se mantiene la invariante abono <= saldo pendiente.
+    if (totals.total > 0n && amountCents > pendingBalance) {
+      setPaymentError(
+        `El abono no puede superar el saldo pendiente (${formatMoney(pendingBalance)}).`,
+      );
+      return;
+    }
+    setPaymentError(null);
+    const note = paymentNoteDraft.trim();
+    addOrderPayment.mutate(
+      {
+        id: order.id,
+        payment: {
+          amount: amountCents,
+          method: paymentMethodDraft,
+          note: note === "" ? undefined : note,
+        },
+      },
+      {
+        onSuccess: () => setIsPaymentOpen(false),
+        onError: (error) => setPaymentError(errorMessage(error)),
+      },
+    );
+  }
+
+  async function handleDownloadReceiptPdf(nextFormat: DocumentFormat) {
+    if (!receipt) return;
+    setReceiptDownloadError(null);
+    setIsReceiptDownloading(true);
+    try {
+      await downloadOrderAdvanceReceiptPdf(
+        receipt,
+        pdfCompanyFromProfile(companyQuery.data),
+        nextFormat,
+        hopeMessage,
+      );
+    } catch {
+      setReceiptDownloadError(
+        "No se pudo guardar el PDF del recibo en este dispositivo. Intenta de nuevo.",
+      );
+    } finally {
+      setIsReceiptDownloading(false);
+    }
+  }
 
   function handleAssign(technicianId: Id) {
     if (!order) return;
@@ -908,6 +1269,42 @@ export function OrderDetailPage() {
   }
 
   const { totals } = view;
+  const advance = order.advance ?? null;
+  const advanceAmount = advance?.amount ?? 0n;
+  const paymentsTotal = payments.reduce(
+    (sum, payment) => sum + payment.amount,
+    0n,
+  );
+  const paidAmount = advanceAmount + paymentsTotal;
+  // El backend calcula el saldo pendiente como `total − anticipo − abonos`
+  // acotado a 0 (`balance = if (charged >= total) { 0 } else { total - charged }`),
+  // de modo que nunca es negativo. El frontend replica esa misma fórmula acotada
+  // para que el saldo mostrado y validado coincida con el del backend y no
+  // rechace un abono válido por un desfase (p. ej. cuando lo abonado ya cubre el
+  // total y el saldo real es 0, no un valor negativo).
+  const pendingBalance =
+    paidAmount >= totals.total ? 0n : totals.total - paidAmount;
+  // Solo se bloquea por factura cuando la consulta auxiliar cargó con éxito y
+  // confirma que la OT está facturada. Mientras carga, falla o el actor no está
+  // listo, el botón permanece visible (fail-open) y el backend valida al guardar.
+  const hasInvoice =
+    invoicedOrdersLoaded && invoicedOrderIds.has(order.id.toString());
+  const canEditAdvance = isEditable && !hasInvoice;
+  const canRegisterPayment = isEditable && !hasInvoice;
+  const advanceLockedMessage = isCancelled
+    ? "La orden está cancelada; el anticipo no se puede editar."
+    : isDelivered
+      ? "La orden fue entregada; el anticipo no se puede editar."
+      : hasInvoice
+        ? "La orden ya fue facturada; el anticipo no se puede editar."
+        : null;
+  const paymentLockedMessage = isCancelled
+    ? "La orden está cancelada; no se pueden registrar abonos."
+    : isDelivered
+      ? "La orden fue entregada; no se pueden registrar abonos."
+      : hasInvoice
+        ? "La orden ya fue facturada; no se pueden registrar abonos."
+        : null;
   const motorcycle = contextQuery.data?.motorcycle ?? null;
   const customerName = contextQuery.data?.customerName ?? null;
   const customerEmail = contextQuery.data?.customerEmail ?? null;
@@ -949,6 +1346,30 @@ export function OrderDetailPage() {
       rail: true,
     },
     {
+      label: "Kilometraje anterior",
+      value:
+        previousMileage !== undefined
+          ? `${formatNumber(previousMileage)} km`
+          : "no registrado",
+      rail: true,
+    },
+    {
+      label: "Kilómetros recorridos",
+      value:
+        travelledKm !== null
+          ? `${formatNumber(travelledKm)} km`
+          : "no registrado",
+      rail: true,
+    },
+    {
+      label: "Próximo cambio de aceite",
+      value:
+        nextOilChangeKm !== null
+          ? `${formatNumber(nextOilChangeKm)} km`
+          : "no registrado",
+      rail: true,
+    },
+    {
       label: "Estado",
       value: ORDER_STATUS_LABELS[order.status],
     },
@@ -971,14 +1392,107 @@ export function OrderDetailPage() {
         ]
       : []),
     { label: "Total", value: formatMoney(totals.total), emphasis: true },
+    ...(advance
+      ? [{ label: "Anticipo", value: `- ${formatMoney(advance.amount)}` }]
+      : []),
+    ...(paymentsTotal > 0n
+      ? [{ label: "Abonos", value: `- ${formatMoney(paymentsTotal)}` }]
+      : []),
+    ...(advance || paymentsTotal > 0n
+      ? [
+          {
+            label: "Saldo pendiente",
+            value: formatMoney(pendingBalance),
+            emphasis: true,
+          },
+        ]
+      : []),
   ];
 
   const orderFooter = serviceTermsFooter;
   const orderNumber = order.orderNumber;
 
+  // Datos del recibo de anticipo: identificación, anticipo, abonos y totales.
+  const receiptMeta: DocumentMeta[] = receipt
+    ? [
+        { label: "Recibo", value: receipt.orderNumber, rail: true },
+        { label: "Orden de taller", value: receipt.orderNumber, rail: true },
+        { label: "Cliente", value: receipt.customerName },
+        {
+          label: "Documento",
+          value:
+            receipt.customerDocument && receipt.customerDocument.trim() !== ""
+              ? receipt.customerDocument
+              : "—",
+          rail: true,
+        },
+        {
+          label: "Motocicleta",
+          value:
+            `${receipt.motorcycleBrand} ${receipt.motorcycleModel}`.trim() ||
+            "—",
+        },
+        {
+          label: "Placa",
+          value: receipt.motorcyclePlate.trim() || "—",
+          rail: true,
+        },
+        { label: "Fecha de emisión", value: formatDate(receipt.issuedAt) },
+        ...(receipt.advance
+          ? [
+              {
+                label: "Método del anticipo",
+                value: paymentMethodLabel(receipt.advance.method),
+              },
+              {
+                label: "Fecha del anticipo",
+                value: formatDate(receipt.advance.registeredAt),
+              },
+            ]
+          : []),
+      ]
+    : [];
+
+  const receiptLines: DocumentLine[] = receipt
+    ? [
+        ...(receipt.advance
+          ? [
+              {
+                description: "Anticipo",
+                quantity: 1,
+                unitPrice: Number(receipt.advance.amount) / 100,
+                amount: Number(receipt.advance.amount) / 100,
+              },
+            ]
+          : []),
+        ...receipt.payments.map((payment: OrderPayment) => ({
+          description:
+            payment.note && payment.note.trim() !== ""
+              ? `Abono · ${payment.note}`
+              : "Abono",
+          quantity: 1,
+          unitPrice: Number(payment.amount) / 100,
+          amount: Number(payment.amount) / 100,
+        })),
+      ]
+    : [];
+
+  const receiptTotals: DocumentTotals[] = receipt
+    ? [
+        { label: "Total de la orden", value: formatMoney(receipt.total) },
+        { label: "Total abonado", value: formatMoney(receipt.paidAmount) },
+        {
+          label: "Saldo pendiente",
+          value: formatMoney(receipt.balance),
+          emphasis: true,
+        },
+      ]
+    : [];
+
   // El documento de garantía se activa cuando alguna línea de mano de obra está
-  // vinculada a un servicio de catálogo de motor o cabeza de fuerza. El nombre
-  // se resuelve desde el catálogo cargado en la página.
+  // vinculada a un servicio de catálogo de motor o cabeza de fuerza, o cuando su
+  // descripción escrita a mano coincide con uno de esos nombres. El nombre del
+  // servicio vinculado se resuelve desde el catálogo cargado en la página.
   const warrantyApplies = warrantyAppliesToOrder(order.labor, serviceNameFor);
 
   const responsibleTechnician =
@@ -1238,7 +1752,10 @@ export function OrderDetailPage() {
               <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
                 Kilometraje de ingreso
               </p>
-              <p className="data-rail text-sm font-medium">
+              <p
+                data-ocid="order_detail.intake_mileage_value"
+                className="data-rail text-sm font-medium"
+              >
                 {formatNumber(order.intakeMileage)} km
               </p>
             </div>
@@ -1250,6 +1767,117 @@ export function OrderDetailPage() {
                 {formatMoney(totals.total)}
               </p>
             </div>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="space-y-1">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Kilometraje anterior
+              </p>
+              <p
+                data-ocid="order_detail.previous_mileage_value"
+                className="data-rail text-sm font-medium"
+              >
+                {previousMileage !== undefined
+                  ? `${formatNumber(previousMileage)} km`
+                  : "no registrado"}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Kilómetros recorridos
+              </p>
+              <p
+                data-ocid="order_detail.travelled_km_value"
+                className="data-rail text-sm font-medium"
+              >
+                {travelledKm !== null
+                  ? `${formatNumber(travelledKm)} km`
+                  : "no registrado"}
+              </p>
+            </div>
+            <div className="space-y-1">
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Próximo cambio de aceite
+              </p>
+              <p
+                data-ocid="order_detail.next_oil_change_value"
+                className="data-rail text-sm font-semibold text-primary"
+              >
+                {nextOilChangeKm !== null
+                  ? `${formatNumber(nextOilChangeKm)} km`
+                  : "no registrado"}
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-2 rounded-md border border-border bg-muted/30 px-4 py-3">
+            <div className="flex flex-wrap items-end justify-between gap-3">
+              <div className="space-y-1">
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Intervalo de cambio de aceite (km)
+                </p>
+                <p className="data-rail text-sm font-medium">
+                  {oilChangeInterval !== undefined
+                    ? `${formatNumber(oilChangeInterval)} km`
+                    : "no registrado"}
+                </p>
+              </div>
+              {isEditable ? (
+                <div className="flex flex-wrap items-end gap-2">
+                  <div className="space-y-1">
+                    <Label
+                      htmlFor="order-oil-interval-edit"
+                      className="text-xs text-muted-foreground"
+                    >
+                      Nuevo intervalo (km)
+                    </Label>
+                    <Input
+                      id="order-oil-interval-edit"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      step={1}
+                      value={intervalDraft}
+                      onChange={(event) => {
+                        setIntervalDraft(event.target.value);
+                        setIntervalError(null);
+                      }}
+                      placeholder="Ej. 3000"
+                      data-ocid="order_detail.oil_change_interval_input"
+                      className="data-rail h-9 w-36"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={handleSaveInterval}
+                    disabled={updateOilChangeInterval.isPending}
+                    data-ocid="order_detail.save_oil_change_interval_button"
+                    className="gap-1.5"
+                  >
+                    <Save className="size-4" aria-hidden="true" />
+                    {updateOilChangeInterval.isPending
+                      ? "Guardando…"
+                      : "Guardar intervalo"}
+                  </Button>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  {isCancelled
+                    ? "La orden está cancelada; el intervalo no se puede editar."
+                    : "La orden fue entregada; el intervalo no se puede editar."}
+                </p>
+              )}
+            </div>
+            {intervalError ? (
+              <p
+                data-ocid="order_detail.oil_change_interval_error"
+                className="text-xs text-destructive"
+              >
+                {intervalError}
+              </p>
+            ) : null}
           </div>
 
           <div className="space-y-1 rounded-md border border-border bg-muted/30 px-4 py-3">
@@ -1654,6 +2282,201 @@ export function OrderDetailPage() {
           </Card>
 
           <Card
+            data-ocid="order_detail.advance.panel"
+            className="gap-0 rounded-lg py-0 shadow-none"
+          >
+            <CardHeader className="flex-row items-center justify-between border-b border-border px-5 py-4">
+              <CardTitle className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+                <HandCoins className="size-4 text-primary" aria-hidden="true" />
+                Anticipo
+              </CardTitle>
+              <div className="flex flex-wrap items-center gap-2">
+                {advance ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => setIsReceiptOpen(true)}
+                    data-ocid="order_detail.advance.receipt_button"
+                    className="gap-1.5"
+                  >
+                    <ReceiptText className="size-4" aria-hidden="true" />
+                    Imprimir recibo de anticipo
+                  </Button>
+                ) : null}
+                {canRegisterPayment ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleOpenPaymentDialog}
+                    data-ocid="order_detail.advance.add_payment_button"
+                    className="gap-1.5"
+                  >
+                    <Plus className="size-4" aria-hidden="true" />
+                    Registrar abono
+                  </Button>
+                ) : null}
+                {canEditAdvance ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleOpenAdvanceDialog}
+                    data-ocid="order_detail.advance.edit_button"
+                    className="gap-1.5"
+                  >
+                    {advance ? "Editar" : "Registrar"}
+                  </Button>
+                ) : null}
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3 px-5 py-5">
+              {advance ? (
+                <>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Monto</span>
+                    <span
+                      data-ocid="order_detail.advance.amount"
+                      className="data-rail font-semibold"
+                    >
+                      {formatMoney(advance.amount)}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">Método</span>
+                    <span
+                      data-ocid="order_detail.advance.method"
+                      className="font-medium"
+                    >
+                      {advanceMethodLabel(advance.method)}
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    Registrado {formatDateTime(advance.registeredAt)}
+                  </p>
+                  {canEditAdvance ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setIsAdvanceDeleteOpen(true)}
+                      disabled={setOrderAdvance.isPending}
+                      data-ocid="order_detail.advance.delete_button"
+                      className="w-full gap-1.5 text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="size-4" aria-hidden="true" />
+                      Eliminar anticipo
+                    </Button>
+                  ) : null}
+                </>
+              ) : (
+                <div
+                  data-ocid="order_detail.advance.empty_state"
+                  className="space-y-1"
+                >
+                  <p className="text-sm text-muted-foreground">
+                    Sin anticipo registrado.
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    El anticipo es opcional. Regístralo para descontarlo del
+                    saldo pendiente de la orden.
+                  </p>
+                </div>
+              )}
+
+              <Separator />
+
+              <div className="space-y-2">
+                <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                  Abonos registrados
+                </p>
+                {paymentsQuery.isLoading ? (
+                  <Skeleton className="h-12 w-full" />
+                ) : payments.length === 0 ? (
+                  <p
+                    data-ocid="order_detail.advance.payments.empty_state"
+                    className="text-xs text-muted-foreground"
+                  >
+                    Sin abonos registrados.
+                  </p>
+                ) : (
+                  <ul
+                    data-ocid="order_detail.advance.payments.list"
+                    className="space-y-2"
+                  >
+                    {payments.map((payment, index) => (
+                      <li
+                        key={payment.id.toString()}
+                        data-ocid={`order_detail.advance.payments.item.${index + 1}`}
+                        className="rounded-md border border-border bg-muted/30 px-3 py-2"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold">
+                            {formatMoney(payment.amount)}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {paymentMethodLabel(payment.method)}
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground">
+                          {formatDateTime(payment.registeredAt)}
+                        </p>
+                        {payment.note && payment.note.trim() !== "" ? (
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {payment.note}
+                          </p>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+              </div>
+
+              <Separator />
+
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Total abonado</span>
+                <span
+                  data-ocid="order_detail.advance.paid_amount"
+                  className="data-rail font-medium"
+                >
+                  {formatMoney(paidAmount)}
+                </span>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="font-display text-sm font-semibold">
+                  Saldo pendiente
+                </span>
+                <span
+                  data-ocid="order_detail.advance.pending_balance"
+                  className="data-rail text-lg font-semibold text-primary"
+                >
+                  {formatMoney(pendingBalance)}
+                </span>
+              </div>
+
+              {!canEditAdvance && advanceLockedMessage ? (
+                <p
+                  data-ocid="order_detail.advance.locked_state"
+                  className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+                >
+                  {advanceLockedMessage}
+                </p>
+              ) : null}
+
+              {!canRegisterPayment && paymentLockedMessage ? (
+                <p
+                  data-ocid="order_detail.advance.payment_locked_state"
+                  className="rounded-md border border-border bg-muted/40 px-3 py-2 text-xs text-muted-foreground"
+                >
+                  {paymentLockedMessage}
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
+
+          <Card
             data-ocid="order_detail.totals.panel"
             className="gap-0 rounded-lg py-0 shadow-none"
           >
@@ -1702,6 +2525,44 @@ export function OrderDetailPage() {
                   {formatMoney(totals.total)}
                 </span>
               </div>
+              {advance ? (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Anticipo</span>
+                  <span
+                    data-ocid="order_detail.totals.advance"
+                    className="data-rail"
+                  >
+                    - {formatMoney(advance.amount)}
+                  </span>
+                </div>
+              ) : null}
+              {paymentsTotal > 0n ? (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Abonos</span>
+                  <span
+                    data-ocid="order_detail.totals.payments"
+                    className="data-rail"
+                  >
+                    - {formatMoney(paymentsTotal)}
+                  </span>
+                </div>
+              ) : null}
+              {advance || paymentsTotal > 0n ? (
+                <>
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <span className="font-display text-sm font-semibold">
+                      Saldo pendiente
+                    </span>
+                    <span
+                      data-ocid="order_detail.totals.balance"
+                      className="data-rail text-lg font-semibold text-primary"
+                    >
+                      {formatMoney(pendingBalance)}
+                    </span>
+                  </div>
+                </>
+              ) : null}
             </CardContent>
           </Card>
 
@@ -1950,6 +2811,354 @@ export function OrderDetailPage() {
         onOpenChange={setIsDeleteOpen}
         onDeleted={() => void navigate({ to: "/ordenes" })}
       />
+      <Dialog open={isAdvanceOpen} onOpenChange={setIsAdvanceOpen}>
+        <DialogContent
+          data-ocid="order_detail.advance_dialog"
+          className="sm:max-w-md"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              {advance ? "Editar anticipo" : "Registrar anticipo"}
+            </DialogTitle>
+            <DialogDescription>
+              {totals.total > 0n
+                ? `El anticipo se descuenta del total de la orden. No puede superar ${formatMoney(totals.total)}.`
+                : "El anticipo se descuenta del total de la orden. La orden aún no tiene repuestos ni mano de obra, así que puedes registrar cualquier monto; el saldo se recalculará al agregar conceptos."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="order-advance-dialog-amount">Monto (COP)</Label>
+              <Input
+                id="order-advance-dialog-amount"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={advanceAmountDraft}
+                onChange={(event) => {
+                  setAdvanceAmountDraft(event.target.value);
+                  setAdvanceError(null);
+                }}
+                placeholder="Ej. 50000"
+                data-ocid="order_detail.advance_dialog.amount_input"
+                className="data-rail"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="order-advance-dialog-method">
+                Método de pago
+              </Label>
+              <Select
+                value={advanceMethodDraft}
+                onValueChange={(value) => {
+                  setAdvanceMethodDraft(value as PaymentMethod);
+                  setAdvanceError(null);
+                }}
+              >
+                <SelectTrigger
+                  id="order-advance-dialog-method"
+                  data-ocid="order_detail.advance_dialog.method_select"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Selecciona el método" />
+                </SelectTrigger>
+                <SelectContent>
+                  {ADVANCE_METHODS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            {advanceError ? (
+              <p
+                data-ocid="order_detail.advance_dialog.error_state"
+                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
+                {advanceError}
+              </p>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAdvanceOpen(false)}
+              data-ocid="order_detail.advance_dialog.cancel_button"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSaveAdvance}
+              disabled={setOrderAdvance.isPending}
+              data-ocid="order_detail.advance_dialog.save_button"
+              className="gap-2"
+            >
+              {setOrderAdvance.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Save className="size-4" aria-hidden="true" />
+              )}
+              {setOrderAdvance.isPending ? "Guardando…" : "Guardar anticipo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isAdvanceDeleteOpen} onOpenChange={setIsAdvanceDeleteOpen}>
+        <DialogContent
+          data-ocid="order_detail.advance_delete_dialog"
+          className="sm:max-w-md"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              Eliminar anticipo
+            </DialogTitle>
+            <DialogDescription>
+              Se eliminará el anticipo de {formatMoney(advanceAmount)} de la
+              orden {order.orderNumber}. Esta acción no se puede deshacer.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsAdvanceDeleteOpen(false)}
+              data-ocid="order_detail.advance_delete_dialog.cancel_button"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              variant="destructive"
+              onClick={handleDeleteAdvance}
+              disabled={setOrderAdvance.isPending}
+              data-ocid="order_detail.advance_delete_dialog.confirm_button"
+              className="gap-2"
+            >
+              {setOrderAdvance.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Trash2 className="size-4" aria-hidden="true" />
+              )}
+              {setOrderAdvance.isPending ? "Eliminando…" : "Eliminar anticipo"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isPaymentOpen} onOpenChange={setIsPaymentOpen}>
+        <DialogContent
+          data-ocid="order_detail.payment_dialog"
+          className="sm:max-w-md"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display">Registrar abono</DialogTitle>
+            <DialogDescription>
+              {totals.total > 0n
+                ? `El abono se descuenta del saldo pendiente de la orden. No puede superar ${formatMoney(pendingBalance)}.`
+                : "El abono se descuenta del saldo pendiente de la orden. La orden aún no tiene repuestos ni mano de obra, así que puedes registrar cualquier monto; el saldo se recalculará al agregar conceptos."}
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="order-payment-dialog-amount">Monto (COP)</Label>
+              <Input
+                id="order-payment-dialog-amount"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                step={1}
+                value={paymentAmountDraft}
+                onChange={(event) => {
+                  setPaymentAmountDraft(event.target.value);
+                  setPaymentError(null);
+                }}
+                placeholder="Ej. 50000"
+                data-ocid="order_detail.payment_dialog.amount_input"
+                className="data-rail"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="order-payment-dialog-method">
+                Método de pago
+              </Label>
+              <Select
+                value={paymentMethodDraft}
+                onValueChange={(value) => {
+                  setPaymentMethodDraft(value as PaymentMethod);
+                  setPaymentError(null);
+                }}
+              >
+                <SelectTrigger
+                  id="order-payment-dialog-method"
+                  data-ocid="order_detail.payment_dialog.method_select"
+                  className="w-full"
+                >
+                  <SelectValue placeholder="Selecciona el método" />
+                </SelectTrigger>
+                <SelectContent>
+                  {PAYMENT_METHODS.map((option) => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="order-payment-dialog-note">Nota (opcional)</Label>
+              <Textarea
+                id="order-payment-dialog-note"
+                value={paymentNoteDraft}
+                onChange={(event) => {
+                  setPaymentNoteDraft(event.target.value);
+                  setPaymentError(null);
+                }}
+                rows={3}
+                placeholder="Ej. Abono parcial en efectivo"
+                data-ocid="order_detail.payment_dialog.note_textarea"
+              />
+            </div>
+
+            {paymentError ? (
+              <p
+                data-ocid="order_detail.payment_dialog.error_state"
+                className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive"
+              >
+                {paymentError}
+              </p>
+            ) : null}
+          </div>
+
+          <DialogFooter>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsPaymentOpen(false)}
+              data-ocid="order_detail.payment_dialog.cancel_button"
+            >
+              Cancelar
+            </Button>
+            <Button
+              type="button"
+              onClick={handleSavePayment}
+              disabled={addOrderPayment.isPending}
+              data-ocid="order_detail.payment_dialog.save_button"
+              className="gap-2"
+            >
+              {addOrderPayment.isPending ? (
+                <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <Save className="size-4" aria-hidden="true" />
+              )}
+              {addOrderPayment.isPending ? "Guardando…" : "Guardar abono"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={isReceiptOpen} onOpenChange={setIsReceiptOpen}>
+        <DialogContent
+          data-ocid="order_detail.advance_receipt_dialog"
+          className="max-h-[90vh] overflow-y-auto sm:max-w-3xl"
+        >
+          <DialogHeader>
+            <DialogTitle className="font-display">
+              Recibo de anticipo
+            </DialogTitle>
+            <DialogDescription>
+              Recibo de anticipo de la orden {order.orderNumber}. Previsualiza
+              en hoja A4 o tirilla de 80 mm, imprime o descarga el PDF.
+            </DialogDescription>
+          </DialogHeader>
+
+          {receiptQuery.isLoading ? (
+            <div
+              data-ocid="order_detail.advance_receipt.loading_state"
+              className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-3 text-sm text-muted-foreground"
+            >
+              <Loader2 className="size-4 animate-spin" aria-hidden="true" />
+              Cargando el recibo…
+            </div>
+          ) : receipt ? (
+            <DocumentPreview
+              title="Recibo de anticipo"
+              number={receipt.orderNumber}
+              companyName={
+                companyHeader?.legalName ??
+                business?.name ??
+                "HR SOLUCIONES INTEGRALES"
+              }
+              companyLogoUrl={companyLogoUrl}
+              companyContact={
+                companyHeader
+                  ? companyContactLine(companyHeader)
+                  : business
+                    ? [business.address, business.phone]
+                        .filter((part) => part.trim() !== "")
+                        .join(" · ")
+                    : undefined
+              }
+              companyFiscal={
+                companyHeader ? companyFiscalLines(companyHeader) : undefined
+              }
+              meta={receiptMeta}
+              lines={receiptLines}
+              totals={receiptTotals}
+              footer="Recibo generado por el sistema de taller. Conserve este comprobante como constancia del anticipo y los abonos."
+              hopeMessage={hopeMessage}
+              format={receiptFormat}
+              ocid="order_detail.advance_receipt"
+              onFormatChange={setReceiptFormat}
+              onDownloadPdf={handleDownloadReceiptPdf}
+              isDownloading={isReceiptDownloading}
+            />
+          ) : (
+            <p
+              data-ocid="order_detail.advance_receipt.empty_state"
+              className="text-sm text-muted-foreground"
+            >
+              No se pudo cargar el recibo de anticipo.
+            </p>
+          )}
+
+          {receiptDownloadError ? (
+            <div
+              data-ocid="order_detail.advance_receipt.download_error"
+              className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2.5"
+            >
+              <p className="flex items-start gap-2 text-xs text-destructive">
+                <AlertTriangle
+                  className="mt-0.5 size-3.5 shrink-0"
+                  aria-hidden="true"
+                />
+                {receiptDownloadError}
+              </p>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => void handleDownloadReceiptPdf(receiptFormat)}
+                data-ocid="order_detail.advance_receipt.download_retry_button"
+              >
+                Reintentar
+              </Button>
+            </div>
+          ) : null}
+        </DialogContent>
+      </Dialog>
+
       <NotifyCustomerDialog
         open={isNotifyOpen}
         onOpenChange={setIsNotifyOpen}

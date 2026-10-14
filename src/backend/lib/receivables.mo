@@ -8,20 +8,66 @@ import Time "mo:core/Time";
 import Common "../types/common";
 import Types "../types/receivables";
 import BillingTypes "../types/billing";
+import CashTypes "../types/cash";
+import CashLib "../lib/cash";
 import Search "../lib/search";
 
 module {
   public type Counters = {
     var nextReceivablePaymentId : Nat;
+    var nextCashMovementId : Nat;
+    var nextShiftId : Nat;
+    var nextCashRegisterId : Nat;
   };
 
   public type State = {
     invoices : Map.Map<Common.Id, BillingTypes.Invoice>;
     receivablePayments : Map.Map<Common.Id, Types.ReceivablePayment>;
+    // Estado de Caja y Bancos: un abono de cartera registra un ingreso con
+    // origen `#receivable` en el turno abierto de la cuenta correspondiente.
+    cashRegisters : Map.Map<Common.Id, CashTypes.CashRegister>;
+    shifts : Map.Map<Common.Id, CashTypes.Shift>;
+    cashMovements : Map.Map<Common.Id, CashTypes.CashMovement>;
     counters : Counters;
   };
 
   // --- helpers -------------------------------------------------------------
+
+  // Traduce el medio de pago textual de un abono de cartera a la variante de
+  // facturación que usa Caja y Bancos.
+  func paymentMethodFor(method : Text) : BillingTypes.PaymentMethod {
+    switch (method) {
+      case ("card") { #card };
+      case ("transfer") { #transfer };
+      case ("mixed") { #mixed };
+      case (_) { #cash };
+    };
+  };
+
+  // Registra el ingreso de un abono de cartera en Caja y Bancos. La cuenta se
+  // deriva del medio de pago con la misma regla que anticipos y abonos
+  // (`CashLib.accountFor`), y el movimiento se liga al turno abierto de esa
+  // cuenta, abriendo uno automáticamente si no existe
+  // (`CashLib.resolveOrOpenShiftForAccount`).
+  func recordReceivableMovement(state : State, invoice : BillingTypes.Invoice, method : BillingTypes.PaymentMethod, amount : Common.Money, performedBy : Principal) {
+    let account = CashLib.accountFor(method, #cash);
+    let shift = CashLib.resolveOrOpenShiftForAccount(state, account, performedBy, "Sistema (automático)");
+    let id = state.counters.nextCashMovementId;
+    state.counters.nextCashMovementId := id + 1;
+    let movement : CashTypes.CashMovement = {
+      id;
+      shiftId = shift.id;
+      timestamp = Time.now();
+      kind = #income;
+      paymentMethod = method;
+      amount;
+      account;
+      description = "Abono cartera factura " # invoice.number;
+      reference = ?invoice.number;
+      source = #receivable;
+    };
+    state.cashMovements.add(id, movement);
+  };
 
   func matches(haystack : Text, needle : Text) : Bool {
     Search.contains(haystack, needle);
@@ -49,9 +95,21 @@ module {
     if (balance == 0) { #paid } else if (dueDate < now) { #overdue } else { #pending };
   };
 
+  // Saldo a cobrar de una factura: total menos el anticipo aplicado menos los
+  // abonos registrados. El anticipo ya se cobró al registrar la OT, así que no
+  // forma parte de la cuenta por cobrar.
+  func balanceFor(invoice : BillingTypes.Invoice, paidAmount : Common.Money) : Common.Money {
+    let advance = switch (invoice.advanceApplied) {
+      case (?value) { value };
+      case null { 0 };
+    };
+    let charged = advance + paidAmount;
+    if (charged >= invoice.total) { 0 } else { invoice.total - charged };
+  };
+
   func toReceivable(state : State, invoice : BillingTypes.Invoice, now : Common.Timestamp) : Types.Receivable {
     let paidAmount = paidFor(state, invoice.id);
-    let balance = if (paidAmount >= invoice.total) { 0 } else { invoice.total - paidAmount };
+    let balance = balanceFor(invoice, paidAmount);
     let dueDate = dueDateFor(invoice);
     {
       invoiceId = invoice.id;
@@ -154,7 +212,7 @@ module {
       Runtime.trap("El monto del abono debe ser mayor que cero");
     };
     let paidAmount = paidFor(state, invoice.id);
-    let balance = if (paidAmount >= invoice.total) { 0 } else { invoice.total - paidAmount };
+    let balance = balanceFor(invoice, paidAmount);
     if (input.amount > balance) {
       Runtime.trap("El abono supera el saldo pendiente");
     };
@@ -174,7 +232,7 @@ module {
     state.receivablePayments.add(id, payment);
 
     let newPaid = paidAmount + input.amount;
-    let newBalance = if (newPaid >= invoice.total) { 0 } else { invoice.total - newPaid };
+    let newBalance = balanceFor(invoice, newPaid);
     let installments = switch (invoice.installments) {
       case null { null };
       case (?plan) { ?applyToInstallments(plan, input.amount, at) };
@@ -185,6 +243,10 @@ module {
       installments;
     };
     state.invoices.add(invoice.id, updated);
+
+    // El abono registra su ingreso en Caja y Bancos con el medio de pago
+    // recibido (efectivo → Caja, transferencia/tarjeta → Bancos).
+    recordReceivableMovement(state, updated, paymentMethodFor(input.method), input.amount, performedBy);
 
     payment;
   };

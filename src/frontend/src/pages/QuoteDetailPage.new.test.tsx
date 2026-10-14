@@ -69,6 +69,7 @@ vi.mock("@tanstack/react-router", () => ({
   // No id means the "nueva" (new quote) route.
   useParams: () => ({}),
   useNavigate: () => vi.fn(),
+  useSearch: () => ({}),
 }));
 
 vi.mock("sonner", () => ({
@@ -226,7 +227,10 @@ describe("QuoteDetailPage new-quote pickers", () => {
       await screen.findByTestId("quote_detail.customer_search.item.1"),
     );
 
-    await waitFor(() => expect(listMotorcyclesMock).toHaveBeenCalledWith(1n));
+    // The session token is the leading argument; the customer id is second.
+    await waitFor(() =>
+      expect(listMotorcyclesMock).toHaveBeenCalledWith(null, 1n),
+    );
     // The form no longer asks for a motorcycle: the customer's first bike is
     // shown as a read-only summary.
     expect(
@@ -238,18 +242,12 @@ describe("QuoteDetailPage new-quote pickers", () => {
     renderWithProviders(<QuoteDetailPage />);
 
     await screen.findByText("Nueva cotización");
-    await userEvent.click(screen.getByTestId("quote_detail.add_part_button"));
-
-    // The line must be activated before a search result can fill it.
-    await userEvent.click(
-      screen.getByTestId("quote_detail.part_pick_button.1"),
-    );
     await userEvent.type(
-      screen.getByTestId("quote_detail.part_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "balata",
     );
     await userEvent.click(
-      await screen.findByTestId("quote_detail.part_search.item.1"),
+      await screen.findByTestId("quote_detail.item_search.item.1"),
     );
 
     const line = within(screen.getByTestId("quote_detail.part_line.1"));
@@ -264,22 +262,22 @@ describe("QuoteDetailPage new-quote pickers", () => {
   });
 
   it("autocompletes a service line's rate from the catalog", async () => {
+    // Only the service catalog matches, so the first result is the service.
+    listPartsMock.mockResolvedValue({
+      items: [],
+      total: 0n,
+      offset: 0n,
+      limit: 1000n,
+    });
     renderWithProviders(<QuoteDetailPage />);
 
     await screen.findByText("Nueva cotización");
-    await userEvent.click(
-      screen.getByTestId("quote_detail.add_service_button"),
-    );
-
-    await userEvent.click(
-      screen.getByTestId("quote_detail.service_pick_button.1"),
-    );
     await userEvent.type(
-      screen.getByTestId("quote_detail.service_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "aceite",
     );
     await userEvent.click(
-      await screen.findByTestId("quote_detail.service_search.item.1"),
+      await screen.findByTestId("quote_detail.item_search.item.1"),
     );
 
     const line = within(screen.getByTestId("quote_detail.service_line.1"));
@@ -333,37 +331,36 @@ describe("QuoteDetailPage new-quote pickers", () => {
     );
 
     // Add a part line from the catalog.
-    await userEvent.click(screen.getByTestId("quote_detail.add_part_button"));
-    await userEvent.click(
-      screen.getByTestId("quote_detail.part_pick_button.1"),
-    );
     await userEvent.type(
-      screen.getByTestId("quote_detail.part_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "balata",
     );
     await userEvent.click(
-      await screen.findByTestId("quote_detail.part_search.item.1"),
+      await screen.findByTestId("quote_detail.item_search.item.1"),
     );
 
-    // Add a service line from the catalog.
-    await userEvent.click(
-      screen.getByTestId("quote_detail.add_service_button"),
-    );
-    await userEvent.click(
-      screen.getByTestId("quote_detail.service_pick_button.1"),
-    );
+    // Add a service line from the catalog. Only the service matches this term.
+    listPartsMock.mockResolvedValue({
+      items: [],
+      total: 0n,
+      offset: 0n,
+      limit: 1000n,
+    });
     await userEvent.type(
-      screen.getByTestId("quote_detail.service_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "aceite",
     );
-    await userEvent.click(
-      await screen.findByTestId("quote_detail.service_search.item.1"),
-    );
+    // Wait for the service result to render before selecting it, so the click
+    // cannot land on a stale part result from the previous term.
+    const serviceResult = await screen.findByText("Cambio de aceite");
+    await userEvent.click(serviceResult.closest("button") as HTMLElement);
 
     await userEvent.click(screen.getByTestId("quote_detail.save_button"));
 
     await waitFor(() => expect(createQuoteMock).toHaveBeenCalledTimes(1));
-    const input = createQuoteMock.mock.calls[0][0];
+    // The session token is the leading argument; the input is the second.
+    const [token, input] = createQuoteMock.mock.calls[0];
+    expect(token).toBeNull();
     expect(input.customerId).toBe(1n);
     expect(input.partLines).toEqual([
       { partId: 10n, quantity: 1n, unitPrice: 25000n },

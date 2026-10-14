@@ -42,7 +42,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 25;
@@ -77,6 +77,49 @@ function isDuplicateUsername(error: unknown): boolean {
     message.includes("repetido") ||
     message.includes("en uso")
   );
+}
+
+/** True when the backend rejected the write because the role does not exist. */
+function isRoleNotFound(error: unknown): boolean {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    message.includes("rolenotfound") ||
+    message.includes("rol no encontrado") ||
+    message.includes("role not found")
+  );
+}
+
+/** True when the backend rejected the write because a required field is empty. */
+function isMissingField(error: unknown): boolean {
+  const message = errorMessage(error).toLowerCase();
+  return (
+    message.includes("obligatori") ||
+    message.includes("requerid") ||
+    message.includes("invalidusername") ||
+    message.includes("invalidpassword")
+  );
+}
+
+/**
+ * Traduce el error del backend a un mensaje claro en español. El backend
+ * responde con traps en español (usuario duplicado, rol inexistente, campos
+ * obligatorios); se reconocen por su texto y, si no coinciden, se muestra el
+ * mensaje original en lugar de ocultarlo tras un texto genérico.
+ */
+function createUserErrorMessage(error: unknown): string {
+  if (isDuplicateUsername(error)) {
+    return "Ese usuario de acceso ya existe. Elige otro.";
+  }
+  if (isRoleNotFound(error)) {
+    return "El rol seleccionado ya no existe. Elige otro rol e intenta de nuevo.";
+  }
+  if (isMissingField(error)) {
+    return "Completa el nombre, el usuario, el rol y la contraseña.";
+  }
+  const message = errorMessage(error);
+  return message
+    ? `No se pudo crear el usuario: ${message}`
+    : "No se pudo crear el usuario. Intenta de nuevo.";
 }
 
 /** True when the backend refused to remove the caller's own admin account. */
@@ -210,20 +253,41 @@ function CreateUserDialog({
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
 
+  // El rol por defecto es Mecánico (id 1), no el primero por id ascendente
+  // (que sería Administrador). Así un usuario nuevo no queda como
+  // administrador salvo que el administrador lo elija explícitamente.
+  const defaultRoleId = useMemo(() => {
+    const defaultRole =
+      roles.find((role) => role.id === 1n) ??
+      roles.find((role) => role.id !== 0n);
+    return defaultRole?.id.toString() ?? "";
+  }, [roles]);
+
+  // Ref con el defecto vigente, para leerlo al abrir sin que un refetch de
+  // roles reinicie el formulario ni pise la elección del administrador.
+  const defaultRoleIdRef = useRef(defaultRoleId);
+  defaultRoleIdRef.current = defaultRoleId;
+
+  // El formulario se limpia solo al abrir el diálogo. La dependencia es `open`
+  // (no `roles`): si se dependiera de `roles`, cada refetch de la lista de
+  // roles —que entrega un arreglo nuevo— reiniciaría el rol elegido por el
+  // administrador y enviaría un valor por defecto o desactualizado.
   useEffect(() => {
     if (!open) return;
     setName("");
     setUsername("");
-    // El rol por defecto es Mecánico (id 1), no el primero por id ascendente
-    // (que sería Administrador). Así un usuario nuevo no queda como
-    // administrador salvo que el administrador lo elija explícitamente.
-    const defaultRole =
-      roles.find((role) => role.id === 1n) ??
-      roles.find((role) => role.id !== 0n);
-    setRoleId(defaultRole?.id.toString() ?? "");
     setPassword("");
     setError(null);
-  }, [open, roles]);
+    setRoleId(defaultRoleIdRef.current);
+  }, [open]);
+
+  // Si el diálogo se abre antes de que lleguen los roles, el Select queda sin
+  // valor; cuando los roles resuelven se aplica el defecto una sola vez, sin
+  // pisar una elección ya hecha por el administrador.
+  useEffect(() => {
+    if (!open) return;
+    setRoleId((current) => (current === "" ? defaultRoleId : current));
+  }, [open, defaultRoleId]);
 
   const createUser = useMutation({
     mutationFn: async (input: {
@@ -248,6 +312,7 @@ function CreateUserDialog({
 
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    if (createUser.isPending) return;
     const trimmedName = name.trim();
     const trimmedUsername = username.trim();
     const trimmedPassword = password.trim();
@@ -281,18 +346,22 @@ function CreateUserDialog({
           onOpenChange(false);
         },
         onError: (mutationError) => {
-          setError(
-            isDuplicateUsername(mutationError)
-              ? "Ese usuario de acceso ya existe. Elige otro."
-              : "No se pudo crear el usuario. Intenta de nuevo.",
-          );
+          setError(createUserErrorMessage(mutationError));
         },
       },
     );
   };
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        // Mientras se crea el usuario no se permite cerrar el diálogo: evita
+        // dejar la operación en curso sin su aviso de resultado.
+        if (createUser.isPending) return;
+        onOpenChange(next);
+      }}
+    >
       <DialogContent
         data-ocid="users.create_dialog"
         className="max-h-[90vh] overflow-y-auto sm:max-w-lg"
@@ -311,7 +380,10 @@ function CreateUserDialog({
             <Input
               id="new-user-name"
               value={name}
-              onChange={(event) => setName(event.target.value)}
+              onChange={(event) => {
+                setName(event.target.value);
+                setError(null);
+              }}
               placeholder="Juan Pérez"
               autoComplete="off"
               data-ocid="users.create_name_input"
@@ -324,7 +396,10 @@ function CreateUserDialog({
             <Input
               id="new-user-username"
               value={username}
-              onChange={(event) => setUsername(event.target.value)}
+              onChange={(event) => {
+                setUsername(event.target.value);
+                setError(null);
+              }}
               placeholder="juan.perez"
               autoComplete="off"
               className="data-rail"
@@ -338,7 +413,13 @@ function CreateUserDialog({
 
           <div className="space-y-1.5">
             <Label htmlFor="new-user-role">Rol</Label>
-            <Select value={roleId} onValueChange={setRoleId}>
+            <Select
+              value={roleId}
+              onValueChange={(value) => {
+                setRoleId(value);
+                setError(null);
+              }}
+            >
               <SelectTrigger
                 id="new-user-role"
                 aria-label="Rol del nuevo usuario"
@@ -365,7 +446,10 @@ function CreateUserDialog({
               id="new-user-password"
               type="text"
               value={password}
-              onChange={(event) => setPassword(event.target.value)}
+              onChange={(event) => {
+                setPassword(event.target.value);
+                setError(null);
+              }}
               placeholder="Mínimo 6 caracteres"
               autoComplete="off"
               className="data-rail"

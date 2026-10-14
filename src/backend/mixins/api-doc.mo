@@ -10,8 +10,10 @@ Backend Motoko para la gestión de un taller de motos y su almacén de
 repuestos: inventario por lote/serie, clientes y motos, órdenes de taller,
 cotizaciones, catálogo de servicios, técnicos, citas, proveedores y compras
 con cuentas por pagar, gastos, contabilidad, punto de venta (POS),
-facturación con datos fiscales y **respaldo manual en Google Drive**, además
-de la **copia de seguridad local** descargable en el equipo del usuario.
+facturación con datos fiscales, **caja y bancos** (catálogo de cajas y bancos
+con turnos independientes por registro y responsable del turno) y **respaldo
+manual en Google Drive**, además de la **copia de seguridad local** descargable
+en el equipo del usuario.
 
 Todos los importes (`Money`) son `Nat` en **centavos/unidad mínima entera**;
 no hay decimales. Los `Timestamp` son `Int` en **nanosegundos** desde la época
@@ -290,7 +292,99 @@ no cambia.
 - `getOrder(id : Id) : ?OrderView` — consulta. Incluye los totales
   calculados (`OrderTotals`).
 - `createOrder(input : OrderInput) : OrderView` — actualización. Crea la
-  orden en estado `#received` con número `OT-<6 dígitos>`.
+  orden en estado `#received` con número `OT-<6 dígitos>`. `input.intakeMileage`
+  es el kilometraje de ingreso (km, entero). `input.previousMileage` es el
+  kilometraje anterior (km, entero, **opcional**): los kilómetros recorridos se
+  derivan como `intakeMileage − previousMileage` y **no** se almacenan. Si
+  `previousMileage` viene con valor y `intakeMileage` es menor, la llamada falla
+  con `El kilometraje actual no puede ser menor que el kilometraje anterior`.
+  `input.oilChangeInterval` es el intervalo en km para el próximo cambio de
+  aceite (**opcional**): el próximo cambio se deriva como
+  `intakeMileage + oilChangeInterval` y **no** se almacena. Ambos campos
+  opcionales se guardan tal cual en la orden; `null` significa «no registrado».
+  `input.advance` es el **anticipo opcional** (`?OrderAdvanceInput` con `amount`
+  en centavos y `method`): `null` crea la orden sin anticipo. El monto no puede
+  superar el total de la orden **cuando la orden ya tiene un total mayor que
+  cero** (falla con `El anticipo no puede superar el total de la orden`) y el
+  medio debe ser efectivo o transferencia (falla con
+  `El medio de pago del anticipo debe ser efectivo o transferencia`). Un
+  anticipo en efectivo crea un movimiento de ingreso en Caja y uno por
+  transferencia en Bancos, con origen `#advance`. El movimiento se atribuye al
+  turno abierto de la cuenta correspondiente; si no hay ninguno, el backend
+  **abre automáticamente** un turno en la caja o banco activo de ese tipo
+  (saldos iniciales en cero, responsable `Sistema (automático)`), de modo que el
+  anticipo siempre queda registrado. Solo falla si no existe una caja o banco
+  activa del tipo requerido, con
+  `No hay una caja o banco activa para registrar el movimiento`.
+  **Importante:** la orden nace **sin líneas**, así que su total es `0` en el
+  momento de crearla. Una orden sin monto **admite un anticipo positivo**: el
+  límite anticipo <= total solo se aplica cuando el total es mayor que cero, de
+  modo que un anticipo enviado en `createOrder` se registra aunque la orden
+  todavía no tenga repuestos ni mano de obra. El anticipo también se puede
+  registrar o editar después de cargar las líneas, con `setOrderAdvance`.
+- `setOrderAdvance(id : Id, input : SetOrderAdvanceInput) : OrderView`
+  — actualización. Fija o borra el anticipo de una orden ya creada.
+  `input.amount = null` **borra** el anticipo (y su movimiento de Caja/Bancos);
+  con valor, `input.method` es obligatorio y debe ser efectivo o transferencia.
+  El monto no puede superar el total de la orden **cuando el total es mayor que
+  cero**; una orden sin monto (total `0`, sin repuestos ni mano de obra) admite
+  cualquier anticipo positivo. Falla con
+  `Orden no encontrada` si la orden no existe, con
+  `La orden está cancelada y no admite cambios` si está `#cancelled`, con
+  `La orden ya está facturada y no admite cambios de anticipo` si ya tiene una
+  factura asociada, con `El anticipo no puede superar el total de la orden` si
+  el monto excede el total (solo cuando el total es mayor que cero) y con
+  `El medio de pago del anticipo debe ser efectivo o transferencia` si el medio
+  no es válido. Editar o borrar el anticipo **ajusta** el movimiento de
+  Caja/Bancos para que refleje siempre el anticipo vigente. Fijar o cambiar el
+  anticipo **no exige abrir un turno a mano**: el movimiento se atribuye al
+  turno abierto de la cuenta correspondiente y, si no hay ninguno, el backend
+  **abre automáticamente** un turno en la caja o banco activo de ese tipo
+  (saldos iniciales en cero, responsable `Sistema (automático)`). Solo falla si
+  no existe una caja o banco activa del tipo requerido, con
+  `No hay una caja o banco activa para registrar el movimiento` (borrar el
+  anticipo no requiere turno).
+- `addOrderPayment(id : Id, input : OrderPaymentInput) : OrderView` —
+  actualización. Registra un **abono** sobre una orden de taller antes de
+  facturarla. `input.amount` debe ser mayor que cero (falla con
+  `El monto del abono debe ser mayor que cero`) y, cuando la orden tiene un
+  total mayor que cero, no puede superar el saldo pendiente de la orden,
+  calculado como `total − anticipo − abonos` (falla con
+  `El abono supera el saldo pendiente de la orden`). Una orden sin monto
+  (total = 0, sin repuestos ni mano de obra) admite cualquier abono: el saldo
+  pendiente se recalcula al agregar conceptos. El medio de
+  pago debe ser efectivo, transferencia o tarjeta (falla con
+  `El medio de pago del abono debe ser efectivo, transferencia o tarjeta`).
+  La orden no admite abonos si está `#cancelled`, `#delivered` o ya facturada
+  (falla con `La orden no admite abonos`). Cada abono crea un movimiento de
+  ingreso en Caja/Bancos asociado a la OT (origen `#advance`, con una
+  referencia única `<OT>-ABONO-<id>` que lo distingue del movimiento del
+  anticipo). El movimiento se atribuye al turno abierto de la cuenta
+  correspondiente y, si no hay ninguno, el backend **abre automáticamente** un
+  turno en la caja o banco activo de ese tipo (saldos iniciales en cero,
+  responsable `Sistema (automático)`); solo falla si no existe una caja o banco
+  activa del tipo requerido, con
+  `No hay una caja o banco activa para registrar el movimiento`. El saldo
+  pendiente se recalcula y se refleja en `OrderTotals.paidAmount` y
+  `OrderTotals.balance`.
+- `listOrderPayments(id : Id) : [OrderPayment]` — consulta. Abonos registrados
+  sobre una orden, ordenados por id ascendente. Cada abono trae `amount`,
+  `method`, `note`, `registeredAt` y `registeredBy`.
+- `getOrderAdvanceReceipt(id : Id) : OrderAdvanceReceipt` — consulta. Datos del
+  **recibo de anticipo imprimible**: cliente (`customerName`,
+  `customerDocument`), moto (`motorcycleBrand`, `motorcycleModel`,
+  `motorcyclePlate`), anticipo vigente (`advance`, `null` si no hay), total de
+  la orden (`total`), total abonado (`paidAmount`), saldo pendiente
+  (`balance`) y la lista de abonos (`payments`). Falla con
+  `Orden no encontrada` si la orden no existe.
+- `updateOilChangeInterval(id : Id, input : OilChangeIntervalInput) : OrderView`
+  — actualización. Edita el intervalo en km del próximo cambio de aceite de una
+  orden ya creada (`input.oilChangeInterval`, `?Nat`; `null` lo borra y deja el
+  valor como «no registrado»). El próximo cambio se recalcula en el frontend
+  como `intakeMileage + oilChangeInterval`; el backend solo persiste el
+  intervalo. Falla con `Orden no encontrada` si la orden no existe, con
+  `La orden está cancelada y no admite cambios` si está `#cancelled` y con
+  `La orden ya fue entregada y no admite cambios` si está `#delivered`.
 - `updateOrderStatus(id : Id, status : OrderStatus) : OrderView` —
   actualización. **Solo se permiten las transiciones**
   `#received → #inRepair → #ready → #delivered`. Cualquier otra falla con
@@ -304,8 +398,9 @@ no cambia.
   entregada falla con `Una orden entregada no se puede cancelar`. La orden
   cancelada deja de ser facturable y sale de los flujos activos.
 - `deleteOrder(id : Id) : Bool` — actualización. Elimina la orden de forma
-  **irreversible**; devuelve `false` si no existía. No hay confirmación en el
-  backend: el frontend debe pedirla explícitamente.
+  **irreversible**; devuelve `false` si no existía. Elimina también los
+  movimientos de Caja/Bancos del anticipo y de los abonos asociados a la OT.
+  No hay confirmación en el backend: el frontend debe pedirla explícitamente.
 - `addOrderPart(id : Id, input : OrderPartInput) : OrderView` —
   actualización. Añade una línea de repuesto y **no descuenta stock ni
   registra movimiento de salida**: la línea solo conserva el costo unitario de
@@ -314,7 +409,10 @@ no cambia.
   el repuesto no existe.
 - `removeOrderPart(id : Id, orderPartId : Id) : OrderView` — actualización.
   Quita la línea y **no devuelve stock** (agregarla nunca lo descontó). Falla
-  con `Línea de repuesto no encontrada` si la línea no existe.
+  con `Línea de repuesto no encontrada` si la línea no existe. Si al recalcular
+  el total este queda mayor que cero y el anticipo más los abonos lo superan,
+  falla con `El anticipo y los abonos no pueden superar el total de la orden`
+  (una orden sin monto, total `0`, no dispara esta validación).
 - `addOrderPhoto(id : Id, input : OrderPhotoInput) : OrderView` —
   actualización. Registra una foto de evidencia del proceso (máximo **6** por
   orden). Los bytes viven en el almacenamiento de archivos de la plataforma;
@@ -336,7 +434,12 @@ no cambia.
   — actualización. Cambia o quita (`null`) el técnico responsable de una línea
   de mano de obra existente. Falla con `Línea de mano de obra no encontrada`
   si la línea no existe.
-- `removeLabor(id : Id, laborId : Id) : OrderView` — actualización.
+- `removeLabor(id : Id, laborId : Id) : OrderView` — actualización. Quita una
+  línea de mano de obra. Falla con `Línea de mano de obra no encontrada` si la
+  línea no existe. Si al recalcular el total este queda mayor que cero y el
+  anticipo más los abonos lo superan, falla con
+  `El anticipo y los abonos no pueden superar el total de la orden` (una orden
+  sin monto, total `0`, no dispara esta validación).
 - `assignTechnician(id : Id, technicianId : Id) : OrderView` —
   actualización. Añade el técnico a la orden; si ya estaba asignado devuelve
   la orden sin cambios (idempotente en efecto).
@@ -353,12 +456,16 @@ no cambia.
 - `getQuote(id : Id) : ?QuoteView` — consulta. `null` si no existe.
 - `createQuote(input : QuoteInput) : QuoteView` — actualización. Crea la
   cotización en estado `#draft` con número `COT-<6 dígitos>`. Falla con
-  `Cliente no encontrado` / `Moto no encontrada`. El `taxRate` guardado se
+  `Cliente no encontrado`. La moto es **opcional**: `input.motorcycleId` puede
+  ser `null`/ausente para cotizar a un cliente sin motos registradas; si viene
+  un id, debe existir o falla con `Moto no encontrada`. El `taxRate` guardado se
   siembra con la **tasa efectiva vigente** según el régimen fiscal de la
   empresa (ver «IVA y régimen fiscal»).
 - `updateQuote(id : Id, input : QuoteInput) : QuoteView` — actualización.
   Reemplaza las líneas y recalcula. Falla con `Cotización no encontrada` /
-  `Cliente no encontrado` / `Moto no encontrada`.
+  `Cliente no encontrado`. La moto es **opcional** igual que en `createQuote`:
+  si `input.motorcycleId` viene con un id inexistente falla con
+  `Moto no encontrada`.
 - `deleteQuote(id : Id) : Bool` — actualización. `false` si no existía.
 - `updateQuoteStatus(id : Id, status : QuoteStatus) : QuoteView` —
   actualización. **Solo se permiten las transiciones**
@@ -367,7 +474,9 @@ no cambia.
   `Transición de estado inválida: <from> -> <to>`.
 - `convertQuoteToOrder(id : Id) : OrderView` — actualización. Solo una
   cotización `#accepted`; en otro caso falla con
-  `Solo se puede convertir una cotización aceptada`. Crea una orden en
+  `Solo se puede convertir una cotización aceptada`. La orden de trabajo exige
+  una moto, así que una cotización sin moto falla con
+  `La cotización no tiene moto asignada`. Crea una orden en
   `#received` con las líneas de repuestos y de servicios (como mano de obra).
 - `convertQuoteToInvoice(id : Id, paymentMethod : PaymentMethod) : Invoice`
   — actualización. Solo una cotización `#accepted`; en otro caso falla con
@@ -642,26 +751,75 @@ elimine.
   `insufficientPayment: total <n>, received <m>` si es de contado, el método
   es `cash` y lo recibido no cubre el total. `paymentMethod` es texto libre:
   `card` y `transfer` se mapean a sus variantes; cualquier otro valor se trata
-  como efectivo.
+  como efectivo. Una venta **de contado** registra además un **ingreso en Caja
+  y Bancos** con origen `#pos` por el total cobrado: efectivo → Caja (`#cash`),
+  tarjeta/transferencia → Bancos (`#bank`), ligado al turno abierto de esa
+  cuenta (se abre uno automáticamente si no existe). Una venta **a crédito** no
+  registra movimiento hasta que se cobre su factura. La factura directa `#pos`
+  no vuelve a registrar el cobro, así que no hay doble movimiento.
 
 ### Caja y Bancos
 
-Módulo de tesorería con **turnos de caja**. Todos estos métodos exigen el
-módulo `cash`; un llamador sin ese módulo en su rol falla con
-`Unauthorized: no tiene acceso al módulo de caja y bancos`. Un turno declara
-saldos iniciales de **Caja** y **Bancos**; los movimientos de ingreso y egreso
-se clasifican por medio de pago y afectan una cuenta: el **efectivo** afecta
-Caja (`#cash`), y **transferencia** y **tarjeta** afectan Bancos (`#bank`).
-Los ingresos suman y los egresos restan. `#mixed` es ambiguo y respeta la
-cuenta indicada por el llamador en `input.account`.
+Módulo de tesorería con **catálogo de cajas y bancos** y **turnos
+independientes por registro**. Todos estos métodos exigen el módulo `cash`; un
+llamador sin ese módulo en su rol falla con
+`Unauthorized: no tiene acceso al módulo de caja y bancos`.
 
-- `openShift(input : OpenShiftInput) : Shift` — actualización. Abre un turno
-  con los saldos iniciales declarados (`openingCash`, `openingBank`) y una nota
-  opcional. Falla con `Ya hay un turno de caja abierto` si ya existe un turno
-  `#open`. El turno nace `#open` con `computedClosingCash = openingCash` y
+Un **registro** (`CashRegister`) es una caja de efectivo (`kind = #cash`) o una
+cuenta bancaria (`kind = #bank`), con nombre único (comparación sin distinguir
+mayúsculas ni tildes), saldo inicial declarado (`openingBalance`) y estado
+activo/inactivo. Cada registro puede tener **como máximo un turno abierto a la
+vez**, pero **varios registros pueden tener turnos abiertos simultáneamente**.
+Los registros inactivos no permiten abrir turnos nuevos pero conservan su
+historial.
+
+Un turno declara saldos iniciales de **Caja** y **Bancos**; los movimientos de
+ingreso y egreso se clasifican por medio de pago y afectan una cuenta: el
+**efectivo** afecta Caja (`#cash`), y **transferencia** y **tarjeta** afectan
+Bancos (`#bank`). Los ingresos suman y los egresos restan. `#mixed` es ambiguo
+y respeta la cuenta indicada por el llamador en `input.account`.
+
+#### Catálogo de cajas y bancos
+
+- `createCashRegister(token : ?Text, input : CashRegisterInput) : CashRegister`
+  — actualización. Crea un registro con `name`, `kind` (`#cash | #bank`) y
+  `openingBalance` (centavos). Nace `active = true`. Falla con
+  `El nombre de la caja o banco es obligatorio` si el nombre queda vacío y con
+  `Ya existe una caja o banco con ese nombre` si ya hay uno con ese nombre
+  (comparación sin distinguir mayúsculas ni tildes).
+- `updateCashRegister(token : ?Text, id : Id, input : CashRegisterInput) : CashRegister`
+  — actualización. Edita nombre, tipo y saldo inicial. Falla con
+  `Caja o banco no encontrado`, `El nombre de la caja o banco es obligatorio` y
+  `Ya existe una caja o banco con ese nombre` (excluyendo el propio registro).
+- `setCashRegisterActive(token : ?Text, id : Id, active : Bool) : CashRegister`
+  — actualización. Activa o desactiva un registro. Falla con
+  `Caja o banco no encontrado`.
+- `deleteCashRegister(token : ?Text, id : Id) : ()` — actualización. Elimina un
+  registro. Falla con `Caja o banco no encontrado` si no existe y con
+  `No se puede eliminar una caja o banco con un turno abierto` si tiene un turno
+  `#open`. Es **irreversible**.
+- `listCashRegisters(token : ?Text, filter : CashRegisterFilter, offset : Nat, limit : Nat) : CashRegisterPage`
+  — consulta. `filter.kind` filtra por tipo; `filter.active` por estado;
+  `filter.search` busca por nombre (sin distinguir mayúsculas ni tildes).
+  Ordenado por nombre ascendente. `CashRegisterPage` devuelve `items`, `total`,
+  `offset` y `limit`.
+- `getCashRegister(token : ?Text, id : Id) : ?CashRegister` — consulta. `null`
+  si no existe.
+
+#### Turnos
+
+- `openShift(token : ?Text, input : OpenShiftInput) : Shift` — actualización.
+  Abre un turno en el registro `input.registerId`, con el responsable
+  (`responsibleName` obligatorio, `responsibleUserId` opcional) y los saldos
+  iniciales declarados (`openingCash`, `openingBank`) y una nota opcional.
+  Falla con `Caja o banco no encontrado` si el registro no existe, con
+  `La caja o banco está inactiva` si está desactivado, con
+  `Ya hay un turno abierto para esta caja o banco` si ese registro ya tiene un
+  turno `#open` y con `El responsable del turno es obligatorio` si el nombre
+  queda vacío. El turno nace `#open` con `computedClosingCash = openingCash` y
   `computedClosingBank = openingBank`.
-- `closeShift(id : Id, input : CloseShiftInput) : Shift` — actualización.
-  Cierra el turno con los saldos finales declarados
+- `closeShift(token : ?Text, id : Id, input : CloseShiftInput) : Shift` —
+  actualización. Cierra el turno con los saldos finales declarados
   (`declaredClosingCash`, `declaredClosingBank`). Calcula los saldos esperados
   como saldo inicial + ingresos − egresos de cada cuenta
   (`computedClosingCash`, `computedClosingBank`) y la diferencia
@@ -669,31 +827,67 @@ cuenta indicada por el llamador en `input.account`.
   negativa). Falla con `Turno no encontrado` si no existe y con
   `El turno ya está cerrado` si ya estaba cerrado. El turno pasa a `#closed`
   con `closedAt` y `closedBy`.
-- `listShifts(filter : ShiftFilter, offset : Nat, limit : Nat) : ShiftPage` —
-  consulta. `filter.status` filtra por `#open | #closed`; `filter.from` /
-  `filter.to` acotan por `openedAt` (inclusive). Ordenado por id descendente.
-- `getShift(id : Id) : ?Shift` — consulta. `null` si no existe.
-- `getOpenShift() : ?Shift` — consulta. El turno abierto actual, o `null` si no
-  hay ninguno.
-- `registerCashMovement(input : CashMovementInput) : CashMovement` —
-  actualización. Registra un movimiento de ingreso o egreso en el **turno
-  abierto**. Falla con `No hay un turno de caja abierto` si no hay turno
-  abierto y con `El monto del movimiento debe ser mayor que cero` si
-  `amount = 0`. La cuenta afectada se deriva del medio de pago (ver arriba).
-  `source` indica el origen (`#manual | #invoice | #receivable | #purchase |
-  #expense | #commission | #pos | #other`) y `reference` es una referencia
-  externa opcional.
-- `listCashMovements(filter : CashMovementFilter, offset : Nat, limit : Nat) : CashMovementPage`
-  — consulta. `filter.shiftId` limita a un turno; `filter.kind`, `filter.account`
-  y `filter.paymentMethod` son igualdad exacta; `filter.from` / `filter.to`
-  acotan por `timestamp` (inclusive). Ordenado por id descendente.
-- `getDailyShiftReport(shiftId : Id) : DailyShiftReport` — consulta. Informe
-  diario del turno: **todos** sus movimientos (ordenados por id ascendente),
-  los totales por medio de pago (`byPaymentMethod`, con `income` y `expense`),
-  los totales generales (`totalIncome`, `totalExpense`), los totales por cuenta
-  (`cashIncome`, `cashExpense`, `bankIncome`, `bankExpense`) y el turno con sus
-  saldos finales declarados y calculados. Falla con `Turno no encontrado` si no
-  existe.
+- `setShiftResponsible(token : ?Text, id : Id, responsibleName : Text, responsibleUserId : ?Id) : Shift`
+  — actualización. Cambia el responsable de un turno **abierto**. Falla con
+  `Turno no encontrado`, con
+  `Solo se puede cambiar el responsable de un turno abierto` si el turno ya
+  está cerrado y con `El responsable del turno es obligatorio` si el nombre
+  queda vacío.
+- `listShifts(token : ?Text, filter : ShiftFilter, offset : Nat, limit : Nat) : ShiftPage`
+  — consulta. `filter.registerId` limita a una caja/banco; `filter.responsible`
+  busca por nombre de responsable (sin distinguir mayúsculas ni tildes);
+  `filter.status` filtra por `#open | #closed`; `filter.from` / `filter.to`
+  acotan por `openedAt` (inclusive). Ordenado por `openedAt` descendente.
+- `getShift(token : ?Text, id : Id) : ?Shift` — consulta. `null` si no existe.
+- `getOpenShift(token : ?Text, registerId : Id) : ?Shift` — consulta. El turno
+  abierto de la caja/banco indicada, o `null` si no tiene ninguno.
+- `listOpenShifts(token : ?Text) : [Shift]` — consulta. **Todos** los turnos
+  abiertos (uno por caja/banco como máximo), ordenados por `registerId`
+  ascendente. Es la vía para la vista de turnos abiertos agrupados por
+  caja/banco.
+
+#### Movimientos
+
+- `registerCashMovement(token : ?Text, input : CashMovementInput) : CashMovement`
+  — actualización. Registra un movimiento de ingreso o egreso en un **turno
+  abierto**. Falla con `El valor del movimiento debe ser mayor que cero` si
+  `amount = 0` y con `No hay un turno abierto para esta caja o banco` si no hay
+  un turno abierto compatible. La cuenta afectada se deriva del medio de pago
+  (ver arriba). `source` indica el origen (`#manual | #invoice | #receivable |
+  #purchase | #expense | #commission | #pos | #advance | #other`) y `reference`
+  es una referencia externa opcional. `#advance` identifica el anticipo de una
+  orden de taller, distinto del cobro de una factura (`#invoice`).
+
+  **Resolución del turno destino (importante).** `CashMovementInput` incluye
+  `shiftId : ?Id` (opcional). Cuando `shiftId` viene con valor, el movimiento se
+  liga **exactamente a ese turno**: el turno debe existir, estar `#open` y su
+  caja/banco debe corresponder a la cuenta derivada del medio de pago. En caso
+  contrario falla con `Turno no encontrado`, con
+  `El turno seleccionado no está abierto` si ya está cerrado, o con
+  `El turno no corresponde a la cuenta del medio de pago` si el registro del
+  turno no coincide con la cuenta. Es la vía para dirigir un movimiento a una
+  caja o banco concreto cuando hay **varios turnos abiertos del mismo tipo**.
+
+  Cuando `shiftId` es `null`, el movimiento se liga al turno abierto cuya
+  caja/banco coincide con la **cuenta afectada** (`#cash` → una caja, `#bank` →
+  un banco). Si hay **varios turnos abiertos del mismo tipo** (por ejemplo dos
+  cajas abiertas a la vez), el backend elige el de **mayor id** entre los turnos
+  abiertos de ese tipo; para dirigir el movimiento a una caja concreta, envíe
+  `shiftId` con el turno deseado.
+- `listCashMovements(token : ?Text, filter : CashMovementFilter, offset : Nat, limit : Nat) : CashMovementPage`
+  — consulta. `filter.shiftId` limita a un turno; `filter.registerId` limita a
+  los movimientos de los turnos de una caja/banco; `filter.kind`,
+  `filter.account` y `filter.paymentMethod` son igualdad exacta; `filter.from` /
+  `filter.to` acotan por `timestamp` (inclusive). Ordenado por `timestamp`
+  descendente.
+- `getDailyShiftReport(token : ?Text, shiftId : Id) : DailyShiftReport` —
+  consulta. Informe del turno: **todos** sus movimientos (ordenados por
+  `timestamp` ascendente), el nombre de la caja/banco (`registerName`), el
+  responsable (`responsibleName`), los totales por medio de pago
+  (`byPaymentMethod`, con `income` y `expense`), los totales generales
+  (`totalIncome`, `totalExpense`), los totales por cuenta (`cashIncome`,
+  `cashExpense`, `bankIncome`, `bankExpense`) y el turno con sus saldos finales
+  declarados y calculados. Falla con `Turno no encontrado` si no existe.
 
 ### Contabilidad
 
@@ -796,15 +990,28 @@ Todos estos métodos exigen rol administrador; en caso contrario fallan con
   `deleteInvoice`. El
   número de factura es **consecutivo automático** (`F-<6 dígitos>`). Las
   líneas de repuesto se marcan `kind = #part` con su `unitCost` de referencia
-  y las de mano de obra `kind = #service`. La factura nace con
-  `paymentStatus = #pending`. Con `paymentCondition = #cash` no lleva plan de
-  cuotas; con `#credit` exige `creditPlan` (número de cuotas y fecha de la
-  primera cuota) y guarda el plan en `installments`.
+  y las de mano de obra `kind = #service`. Con `paymentCondition = #cash` la
+  factura nace `paymentStatus = #paid` y **registra de inmediato su cobro en
+  Caja y Bancos**: un ingreso con origen `#invoice`, referencia al número de
+  factura y monto igual al **saldo a cobrar** (`total − anticipo aplicado`), en
+  el turno abierto de la cuenta derivada del medio de pago (efectivo → Caja,
+  transferencia/tarjeta → Bancos), abriendo un turno automáticamente si no
+  existe. El anticipo ya registrado en la OT (movimiento `#advance`) no se
+  duplica: solo se registra el saldo restante. Con `#credit` la factura nace
+  `paymentStatus = #pending`, exige `creditPlan` (número de cuotas y fecha de
+  la primera cuota) y guarda el plan en `installments`; su cobro se registra al
+  marcarla pagada o al cobrar cada cuota. Si la orden tiene un **anticipo**
+  registrado, se descuenta automáticamente del total: la factura guarda el
+  monto en `advanceApplied` y el **saldo a cobrar** es
+  `total − advanceApplied`. En una factura a crédito el plan de cuotas se
+  calcula sobre el saldo a cobrar, no sobre el total. `advanceApplied` es
+  `null` cuando la orden no tenía anticipo.
 - `createInvoiceFromQuote(quoteId : Id, customerId : Id, lines : [InvoiceLine], discount : Money, paymentMethod : PaymentMethod, paymentCondition : PaymentCondition, creditPlan : ?CreditPlanInput) : Invoice`
   — actualización. Emite una factura con origen `#quote` a partir de las
   líneas y el descuento indicados. `quoteId` se acepta pero no se valida
   contra la cotización. Acepta condición de pago y plan de cuotas igual que
-  `createInvoiceFromOrder`.
+  `createInvoiceFromOrder`; una factura de contado nace `#paid` y registra su
+  cobro en Caja y Bancos con origen `#invoice`.
 - `createInvoiceFromPosSale(posSaleId : Id, customerId : ?Id, customerName : ?Text, lines : [InvoiceLine], discount : Money, paymentMethod : PaymentMethod, paymentCondition : PaymentCondition, creditPlan : ?CreditPlanInput) : Invoice`
   — actualización. Emite una factura con origen `#pos`; si no hay nombre de
   cliente usa `Cliente de mostrador`. **Una venta de mostrador solo puede
@@ -813,7 +1020,9 @@ Todos estos métodos exigen rol administrador; en caso contrario fallan con
   `La venta de mostrador ya tiene una factura asociada` hasta que esa factura
   se elimine con `deleteInvoice`. Falla con
   `Venta de mostrador no encontrada` si la venta no existe. Acepta condición
-  de pago y plan de cuotas igual que `createInvoiceFromOrder`.
+  de pago y plan de cuotas igual que `createInvoiceFromOrder`; una factura de
+  contado nace `#paid` y registra su cobro en Caja y Bancos con origen
+  `#invoice`.
 - `listInvoices(filter : InvoiceFilter, offset : Nat, limit : Nat) : InvoicePage`
   — consulta. `filter.search` busca en número y nombre del cliente;
   `filter.from` / `filter.to` acotan por `issuedAt` (inclusive). Ordenado por
@@ -838,7 +1047,11 @@ Todos estos métodos exigen rol administrador; en caso contrario fallan con
   actualización. Marca la factura como cobrada. **Rechaza un segundo cobro**:
   si la factura ya está `#paid` falla con `La factura ya fue cobrada`. En una
   factura a crédito da por pagadas todas sus cuotas. Falla con
-  `Factura no encontrada` si no existe.
+  `Factura no encontrada` si no existe. Registra un **ingreso en Caja y
+  Bancos** con origen `#invoice` por el saldo cobrado (`total − anticipo
+  aplicado`): efectivo → Caja, tarjeta/transferencia → Bancos, ligado al turno
+  abierto de esa cuenta (se abre uno automáticamente si no existe). El anticipo
+  ya se registró al crear la OT, así que no se duplica.
 - `registerInstallmentPayment(id : Id, installmentNumber : Nat) : Invoice` —
   actualización. Registra el pago de **una cuota individual** de una factura a
   crédito: marca la cuota como pagada y guarda `paidAt`. La factura pasa a
@@ -847,7 +1060,9 @@ Todos estos métodos exigen rol administrador; en caso contrario fallan con
   está `#paid` falla con `La factura ya fue cobrada`. Falla con
   `Factura no encontrada`, con `La factura no tiene plan de cuotas` si la
   factura es de contado, con `Cuota no encontrada` si el número no existe y con
-  `La cuota ya fue pagada` si esa cuota ya se había registrado.
+  `La cuota ya fue pagada` si esa cuota ya se había registrado. Cada cuota
+  cobrada registra un **ingreso en Caja y Bancos** con origen `#invoice` por el
+  valor de la cuota, usando el medio de pago de la factura.
 
 ### Plan de cuotas
 
@@ -892,6 +1107,9 @@ estos métodos exigen rol administrador; en caso contrario fallan con
   cubiertas, en orden de vencimiento, y deja la factura en `#paid` cuando el
   saldo llega a cero. El abono queda registrado en la entidad OQL
   `receivablePayment` con el llamador (`performedBy`) y la fecha (`at`).
+  Registra además un **ingreso en Caja y Bancos** con origen `#receivable` por
+  el monto abonado: efectivo → Caja, transferencia/tarjeta → Bancos, ligado al
+  turno abierto de esa cuenta (se abre uno automáticamente si no existe).
 
 ### Recordatorios de pendientes
 
@@ -937,6 +1155,34 @@ estos métodos exigen rol administrador; en caso contrario fallan con
   recorte no altera `count`: una sección con 25 pendientes devuelve
   `count = 25` e `items` con 10. La consulta no muta estado y es segura de
   repetir.
+
+- `getDashboardAlerts(token : ?Text) : DashboardAlertsSummary` — consulta.
+  Devuelve el resumen de alertas que alimenta las tarjetas del panel principal.
+  Es la misma forma que `getRemindersSummary` más dos secciones adicionales, con
+  el mismo gating por módulo (cada sección no autorizada llega como `null`) y el
+  mismo `generatedAt` en nanosegundos. Las secciones comunes
+  (`appointments`, `receivables`, `payables`, `unapprovedOrders`,
+  `pendingQuotes`, `finishedOrders`) tienen la misma semántica que en
+  `getRemindersSummary`.
+
+  Secciones adicionales:
+
+  - `lowStockParts` (módulo `inventory`) — repuestos cuya existencia total está
+    por debajo o igual a su umbral de stock bajo, ordenados por nombre
+    ascendente. Cada ítem trae `id`, `sku`, `name`, `totalStock` y
+    `lowStockThreshold`.
+  - `supplierOrders` (módulo `supplierOrders`) — pedidos a proveedor
+    registrados, ordenados por `createdAt` descendente (más recientes primero).
+    Cada ítem trae `id`, `supplierId`, `supplierName`, `sku`, `description`,
+    `quantity` y `createdAt`. Un pedido a proveedor no tiene estado: todo
+    pedido registrado cuenta como pendiente.
+  - `overdueInstallments` (módulo `billing`) — cuotas de facturas a crédito
+    (`paymentCondition = #credit`) que siguen sin pagar y cuyo `dueDate` es
+    anterior a hoy, ordenadas por `dueDate` ascendente (la más vencida primero).
+    Cada ítem trae `invoiceId`, `invoiceNumber`, `customerName`,
+    `installmentNumber`, `amount` y `dueDate`.
+
+  La consulta no muta estado y es segura de repetir.
 
 ### Pedidos a proveedor
 
@@ -1482,14 +1728,19 @@ Internet Identity). En caso contrario fallan con
   `username`, `name`, `roleId`, `roleName`, `active` y `createdAt`. Ordenado
   por id ascendente.
 - `createUser(token : ?Text, username : Text, name : Text, roleId : Id, temporaryPassword : Text) : UserListItem`
-  — actualización. Crea una credencial activa con la contraseña temporal
-  indicada (se guarda solo su hash). Falla con
-  `Ya existe un usuario con ese nombre de acceso` si el usuario ya existe,
+  — actualización. Crea una credencial **activa** con la contraseña temporal
+  indicada (se guarda solo su hash, con la sal aleatoria del usuario) y
+  devuelve la fila creada. **El rol elegido por el administrador se guarda
+  exactamente**: el rol indicado en `roleId` se respeta siempre que exista, sin
+  forzarlo a Administrador. Solo si el rol indicado no existe se usa el rol
+  Mecánico (id `1`) como respaldo; si tampoco existe, la creación falla. Falla
+  con `Ya existe un usuario con ese nombre de acceso` si el usuario ya existe
+  (comparación sin distinguir mayúsculas ni espacios externos),
   `El usuario de acceso es obligatorio` si queda vacío,
   `La contraseña temporal es obligatoria` si queda vacía y
-  `Rol no encontrado` si el rol no existe. **El primer usuario creado es
-  siempre Administrador** (rol id `0`); los siguientes usan el rol indicado o,
-  si no se indica, el rol Mecánico (id `1`).
+  `Rol no encontrado` si el rol indicado no existe y no hay rol de respaldo.
+  El usuario creado puede iniciar sesión de inmediato con su usuario y la
+  contraseña temporal mediante `login`.
 - `updateUserRole(token : ?Text, userId : Id, roleId : Id) : UserListItem` —
   actualización. Cambia el rol de un usuario. Falla con
   `Usuario no encontrado` / `Rol no encontrado`.
@@ -1583,11 +1834,12 @@ Las entidades se exponen con autorización **por entidad**:
 - `#controllerOnly` (predeterminado) — solo los controladores del canister
   leen todas las filas. Es el nivel de los datos operativos y financieros:
   `part`, `lot`, `movement`, `customer`, `motorcycle`, `workshopOrder`,
-  `supplier`, `purchase`, `payment`, `invoice`, `businessSetting`, `quote`,
+  `orderPayment`, `supplier`, `purchase`, `payment`, `invoice`,
+  `businessSetting`, `quote`,
   `service`, `serviceCategory`, `technician`, `technicianLoan`,
   `commissionPayment`, `paidCommissionLine`, `appointment`, `expense`,
   `expenseCategory`, `posSale`, `receivablePayment`, `supplierOrder`,
-  `purchaseInvoice`, `shift`, `cashMovement`, `companyProfile`,
+  `purchaseInvoice`, `cashRegister`, `shift`, `cashMovement`, `companyProfile`,
   `driveCredential`, `credential`, `role`, `hopeSetting`,
   `serviceTermsSetting` y `warrantyTermsSetting`.
 - `#scopedPerUser` — cada llamador firmado lee solo sus propias filas. Es el
@@ -1643,34 +1895,54 @@ siempre tiene exactamente una fila (la configuración vigente), porque la fila
 vacío: en ese caso la API devuelve el texto por defecto, mientras que la entidad
 OQL refleja el valor realmente persistido.
 
-Las entidades `shift` y `cashMovement` exponen la tesorería de Caja y Bancos
-como **solo controladores**. `shift` publica `id` (`Nat`), `openedAt` y
-`closedAt` (`?Timestamp`, centinela `0`), `openingCash`, `openingBank`,
-`declaredClosingCash` y `declaredClosingBank` (`?Money`, centinela `0`),
-`computedClosingCash`, `computedClosingBank` (`Money`), `differenceCash` y
-`differenceBank` (`Int`, pueden ser negativos), `status` (`open | closed`),
-`openedBy` (`Principal`), `closedBy` (`?Principal`, centinela de cadena vacía)
-y `notes` (`?Text`, centinela de cadena vacía). `cashMovement` publica `id`,
-`shiftId` (`Nat`), `timestamp` (`Timestamp`), `kind` (`income | expense`),
-`paymentMethod` (`cash | card | transfer | mixed`), `amount` (`Money`),
-`account` (`cash | bank`), `description` (`Text`), `reference` (`?Text`,
-centinela de cadena vacía) y `source`
-(`manual | invoice | receivable | purchase | expense | commission | pos | other`).
+Las entidades `cashRegister`, `shift` y `cashMovement` exponen la tesorería de
+Caja y Bancos como **solo controladores**. `cashRegister` publica `id` (`Nat`),
+`name` (`Text`), `kind` (`cash | bank`), `openingBalance` (`Money`), `active`
+(`Bool`), `createdAt` y `updatedAt` (`Timestamp`). `shift` publica `id` (`Nat`),
+`registerId` (`Nat`), `responsibleName` (`Text`), `responsibleUserId` (`?Nat`,
+centinela `0`), `openedAt` y `closedAt` (`?Timestamp`, centinela `0`),
+`openingCash`, `openingBank`, `declaredClosingCash` y `declaredClosingBank`
+(`?Money`, centinela `0`), `computedClosingCash`, `computedClosingBank`
+(`Money`), `differenceCash` y `differenceBank` (`Int`, pueden ser negativos),
+`status` (`open | closed`), `openedBy` (`Principal`), `closedBy` (`?Principal`,
+centinela de cadena vacía) y `notes` (`?Text`, centinela de cadena vacía).
+`cashMovement` publica `id`, `shiftId` (`Nat`), `timestamp` (`Timestamp`),
+`kind` (`income | expense`), `paymentMethod` (`cash | card | transfer | mixed`),
+`amount` (`Money`), `account` (`cash | bank`), `description` (`Text`),
+`reference` (`?Text`, centinela de cadena vacía) y `source`
+(`manual | invoice | receivable | purchase | expense | commission | pos | advance | other`).
 Los importes son centavos enteros y los timestamps nanosegundos, igual que el
 resto del backend.
 
-Las entidades `lot`, `movement`, `motorcycle`, `workshopOrder`, `purchase`,
-`payment`, `invoice`, `quote`, `technicianLoan`, `commissionPayment`,
+La entidad `orderPayment` expone los **abonos** de las órdenes de taller como
+**una fila por abono**, aplanando la colección `workshopOrder.payments` (que no
+se expone como columna). Es `#controllerOnly` y publica `id` (`Nat`, único
+global), `orderId` (`Nat`, la OT a la que pertenece el abono), `amount`
+(`Money`, centavos enteros), `method` (`cash | card | transfer | mixed`),
+`note` (`?Text`, centinela de cadena vacía), `registeredAt` (`Timestamp`,
+nanosegundos) y `registeredBy` (`Principal`). Su clave foránea `orderId` apunta
+a `workshopOrder`, de modo que una consulta puede recorrer
+`orderPayment.orderId.orderNumber` o `orderPayment.orderId.status` para
+resolver la OT de un abono sin una segunda consulta. Para el detalle de los
+abonos de una orden concreta también está `listOrderPayments`.
+
+Las entidades `lot`, `movement`, `motorcycle`, `workshopOrder`, `orderPayment`,
+`purchase`, `payment`, `invoice`, `quote`, `technicianLoan`, `commissionPayment`,
 `appointment`, `expense`, `posSale`, `receivablePayment`, `supplierOrder`,
 `purchaseInvoice` y `cashMovement`
 declaran claves foráneas (`part`, `customer`, `supplier`, `workshopOrder`,
 `motorcycle`, `technician`, `invoice`, `shift`) que permiten rutas con punto,
 por ejemplo `part.name` o `customer.name`. En particular, `receivablePayment`
 apunta a `invoice` (`invoiceId`), `supplierOrder` apunta a `supplier`
-(`supplierId`), `purchaseInvoice` apunta a `supplier` (`supplierId`) y
+(`supplierId`), `purchaseInvoice` apunta a `supplier` (`supplierId`),
+`orderPayment` apunta a `workshopOrder` (`orderId`) y
 `cashMovement` apunta a `shift` (`shiftId`), de modo que una consulta puede
 recorrer `cashMovement.shiftId.status` para resolver el estado del turno de un
-movimiento sin una segunda consulta.
+movimiento sin una segunda consulta. La entidad `shift` **no** declara una
+clave foránea hacia `cashRegister`: `registerId` es una columna `Nat` normal,
+así que para resolver el nombre de la caja/banco de un turno hay que cruzar
+manualmente contra `cashRegister.id` (o usar `getDailyShiftReport`, que ya
+incluye `registerName`).
 La entidad `credential` apunta a `role` (`roleId`), de modo que una consulta
 puede recorrer `credential.roleId.name` para resolver el nombre del rol de una
 credencial sin una segunda consulta.
@@ -1699,7 +1971,7 @@ credencial sin una segunda consulta.
   `CashMovementKind` → `income | expense`;
   `CashAccount` → `cash | bank`;
   `CashMovementSource` →
-  `manual | invoice | receivable | purchase | expense | commission | pos | other`;
+  `manual | invoice | receivable | purchase | expense | commission | pos | advance | other`;
   `HopeMode` → `auto | manual`.
   La categoría de un gasto **ya no es un variante**: `expense.categoryId` es un
   `Nat` y `expense.categoryName` es texto libre; consulta la entidad
@@ -1709,7 +1981,9 @@ credencial sin una segunda consulta.
   `statusHistory`, `partLines`, `serviceLines`) **no** se exponen como
   columnas OQL; consulta las entidades relacionadas (`invoice` no tiene
   líneas; usa `workshopOrder`, `purchase`, `quote` o `posSale` para el
-  detalle de líneas).
+  detalle de líneas). La colección `workshopOrder.payments` tampoco se expone
+  como columna: los abonos se consultan con la entidad `orderPayment` (una fila
+  por abono) o con `listOrderPayments`.
 - `paymentMethod` en `expense` y `posSale` es **texto libre**, no un
   variante; en `invoice` sí es el variante `PaymentMethod`.
 - Campos nuevos consultables por OQL: `workshopOrder.cancelReason` (`?Text`,
@@ -1721,6 +1995,23 @@ credencial sin una segunda consulta.
   `commissionPayment.lines` son colecciones y **no** se exponen como columnas;
   el desglose de líneas pagadas de un comprobante se lee desde
   `commissionPayment` solo por sus campos escalares.
+- **Anticipos consultables por OQL.** `workshopOrder.advance` (`?OrderAdvance`)
+  se expone como una columna de texto: el monto del anticipo en centavos
+  enteros (por ejemplo `\"50000\"`), o la cadena vacía cuando la orden no tiene
+  anticipo (centinela). Filtra con `eq \"\"` para encontrar las órdenes sin
+  anticipo. La columna **no** expone el medio de pago ni la fecha de registro
+  del anticipo: para el detalle completo usa `getOrder`. `invoice.advanceApplied`
+  (`?Money`) se expone como una columna numérica: el anticipo aplicado en
+  centavos enteros, o `0` cuando la factura no proviene de una OT con anticipo
+  (centinela). El **saldo a cobrar** de una factura es `total − advanceApplied`
+  y se deriva al leer; no se almacena ni se expone como columna propia.
+  `cashMovement.source` incluye el valor `advance` para los movimientos de
+  anticipo, de modo que una consulta puede separarlos del cobro de una factura
+  (`invoice`). Los **abonos** de una OT se consultan con la entidad
+  `orderPayment` (una fila por abono, con `orderId` como clave foránea hacia
+  `workshopOrder`); su movimiento de Caja/Bancos también usa
+  `source = advance`, pero se distingue del anticipo por su `reference` única
+  `<OT>-ABONO-<id>` (el movimiento del anticipo usa `reference = <OT>`).
 - `receivablePayment.note` es `?Text` (centinela de cadena vacía) y
   `receivablePayment.at` es un `Timestamp` en nanosegundos. `supplierOrder`
   expone `quantity` (`Nat`), `sku` y `description` (`Text`), `createdBy`
@@ -1748,19 +2039,28 @@ credencial sin una segunda consulta.
   No hay retroceso ni salto de estados. Una orden puede cancelarse con
   `cancelOrder` (motivo obligatorio) y pasa a `#cancelled`, que es terminal:
   deja de ser facturable y sale de los flujos activos. `deleteOrder` la
-  elimina de forma irreversible.
+  elimina de forma irreversible. Mientras no esté cancelada, entregada ni
+  facturada, la orden admite **abonos** con `addOrderPayment`; el saldo
+  pendiente es `total − anticipo − suma de abonos` y se refleja en
+  `OrderTotals.paidAmount` y `OrderTotals.balance`. Una orden sin monto
+  (total `0`, sin repuestos ni mano de obra) admite un **anticipo positivo**:
+  el límite anticipo <= total solo se aplica cuando el total es mayor que cero.
+  Al facturar la orden, el
+  anticipo se descuenta del total (`invoice.advanceApplied`); los abonos ya
+  registrados no se vuelven a aplicar a la factura.
 - Una cotización nace `#draft` y avanza a `#sent`, `#accepted`, `#rejected`
   o `#expired`; solo una cotización `#accepted` se puede convertir en orden o
   factura.
 - Una cita nace `#scheduled` y avanza a `#confirmed`, `#attended`,
   `#cancelled` o `#noShow`; solo una cita `#attended` se puede convertir en
   orden.
-- Una factura nace `#pending` y pasa a `#paid` con `markInvoicePaid`. Las
-  facturas de POS **de contado** nacen directamente `#paid`; las de POS **a
-  crédito** nacen `#pending` con su plan de cuotas y pasan a `#paid` cuando
-  todas las cuotas se registran con `registerInstallmentPayment` o cuando un
-  abono deja el saldo en cero. Una factura `#pending` sin cobros se puede
-  eliminar con `deleteInvoice`; una factura ya cobrada no.
+- Una factura **de contado** nace directamente `#paid` y registra su cobro en
+  Caja y Bancos al emitirse (origen `#invoice`, monto = saldo a cobrar). Una
+  factura **a crédito** nace `#pending` con su plan de cuotas y pasa a `#paid`
+  con `markInvoicePaid` o cuando todas las cuotas se registran con
+  `registerInstallmentPayment` (o cuando un abono deja el saldo en cero). Una
+  factura `#pending` sin cobros se puede eliminar con `deleteInvoice`; una
+  factura ya cobrada no.
 - Una compra nace con `accepted = false` y `paidAmount = 0`; los pagos
   parciales incrementan `paidAmount`. El estado de la cuenta por pagar es
   `#paid` cuando el saldo llega a `0`. Una compra no aceptada y sin pagos se
@@ -1768,7 +2068,11 @@ credencial sin una segunda consulta.
 - Un turno de caja nace `#open` con sus saldos iniciales y pasa a `#closed`
   con `closeShift`, que calcula los saldos esperados y la diferencia contra lo
   declarado. Mientras está abierto se registran movimientos con
-  `registerCashMovement`; no puede haber dos turnos abiertos a la vez.
+  `registerCashMovement` y se puede cambiar el responsable con
+  `setShiftResponsible`. **Puede haber varios turnos abiertos a la vez**, como
+  máximo uno por caja/banco; abrir un segundo turno sobre un registro que ya
+  tiene uno abierto falla con `Ya hay un turno abierto para esta caja o banco`.
+  Un registro inactivo no permite abrir turnos nuevos.
 - Una cuenta por cobrar se **deriva** de una factura a crédito
   (`paymentCondition = #credit`); no es una entidad propia. Su estado se
   calcula contra la hora actual en cada lectura: `#paid` si el saldo es `0`,
@@ -1833,14 +2137,30 @@ credencial sin una segunda consulta.
 - `createInvoiceFromOrder`, `createInvoiceFromQuote`,
   `createInvoiceFromPosSale`, `convertQuoteToInvoice` y
   `convertQuoteToOrder` **consumen un número consecutivo** en cada llamada
-  correcta; un reintento emite otro documento con el siguiente número.
+  correcta; un reintento emite otro documento con el siguiente número. Una
+  factura **de contado** además registra un movimiento de ingreso en Caja y
+  Bancos al emitirse, así que un reintento duplica el cobro; vuelve a consultar
+  `listInvoices` antes de repetir.
 - `addOrderPart` **no** descuenta stock y `removeOrderPart` **no** lo
   devuelve; repetir cualquiera de las dos llamadas solo añade o quita otra
   línea.
 - `cancelOrder` es idempotente en efecto negativo: repetirla falla con
   `La orden ya está cancelada` en lugar de duplicar el efecto.
+- `setOrderAdvance` es **idempotente en efecto**: fijar el mismo anticipo dos
+  veces deja el mismo estado, porque el movimiento de Caja/Bancos se **ajusta
+  en sitio** (conserva su id y su turno cuando la cuenta no cambia) en lugar de
+  crear uno nuevo. Borrar el anticipo (`amount = null`) elimina el movimiento;
+  repetir el borrado no falla ni duplica nada. Un reintento tras un error de red
+  es seguro en cuanto al movimiento, pero vuelve a consultar `getOrder` para
+  confirmar el anticipo vigente.
+- `addOrderPayment` **no es idempotente**: cada llamada correcta consume un id
+  de abono, suma al saldo pagado y crea un movimiento de ingreso en
+  Caja/Bancos. Un reintento tras un error de red duplica el abono (y puede
+  fallar con `El abono supera el saldo pendiente de la orden` si ya no queda
+  saldo); vuelve a consultar `listOrderPayments` o `getOrder` antes de repetir.
 - `deleteOrder` es **irreversible**: un reintento devuelve `false` porque la
-  orden ya no existe.
+  orden ya no existe. Elimina también los movimientos de Caja/Bancos del
+  anticipo y de todos los abonos de la OT.
 - `zeroServices` es **destructivo e irreversible**: elimina todo el catálogo de
   servicios. Un reintento devuelve `deleted = 0` porque ya no queda ningún
   servicio, pero la primera llamada no se puede deshacer.
@@ -1867,11 +2187,21 @@ credencial sin una segunda consulta.
   si la factura ya tiene cobros; `deletePurchase` falla con
   `No se puede eliminar una compra ya aceptada` o
   `No se puede eliminar una compra con pagos registrados` según el caso.
+- `createCashRegister` **no es idempotente**: cada llamada correcta consume un
+  id y crea un registro nuevo. Un reintento tras un error de red falla con
+  `Ya existe una caja o banco con ese nombre` si el primer intento sí se aplicó,
+  así que vuelve a consultar `listCashRegisters` antes de repetir.
+  `updateCashRegister` y `setCashRegisterActive` son idempotentes en efecto:
+  repetir la misma llamada deja el mismo estado (solo cambia `updatedAt`).
+  `deleteCashRegister` es **irreversible**: un reintento falla con
+  `Caja o banco no encontrado` porque el registro ya no existe.
 - `openShift` **no es idempotente**: cada llamada correcta abre un turno nuevo.
-  Un reintento tras un error de red falla con `Ya hay un turno de caja abierto`
-  si el primer intento sí se aplicó, así que vuelve a consultar `getOpenShift`
-  antes de repetir. `closeShift` es idempotente en efecto negativo: repetirla
-  falla con `El turno ya está cerrado`.
+  Un reintento tras un error de red falla con
+  `Ya hay un turno abierto para esta caja o banco` si el primer intento sí se
+  aplicó, así que vuelve a consultar `getOpenShift` antes de repetir.
+  `closeShift` es idempotente en efecto negativo: repetirla falla con
+  `El turno ya está cerrado`. `setShiftResponsible` es idempotente en efecto:
+  repetir la misma asignación deja el mismo responsable.
 - `registerCashMovement` **no es idempotente**: cada llamada correcta consume
   un id y suma al turno. Un reintento duplica el movimiento; vuelve a consultar
   `listCashMovements` antes de repetir.
@@ -1975,6 +2305,14 @@ relevantes son: `User is not registered`,
 `Una orden entregada no se puede cancelar`,
 `La orden está cancelada y no admite cambios`,
 `La orden ya fue entregada y no admite cambios`,
+`El anticipo no puede superar el total de la orden`,
+`El medio de pago del anticipo debe ser efectivo o transferencia`,
+`La orden ya está facturada y no admite cambios de anticipo`,
+`No hay una caja o banco activa para registrar el movimiento`,
+`El monto del abono debe ser mayor que cero`,
+`El abono supera el saldo pendiente de la orden`,
+`El medio de pago del abono debe ser efectivo, transferencia o tarjeta`,
+`La orden no admite abonos`,
 `Repuesto no encontrado`, `Línea de repuesto no encontrada`,
 `Foto no encontrada`, `La orden ya tiene el máximo de 6 fotos`,
 `Solo se puede facturar una orden entregada`,
@@ -2014,11 +2352,18 @@ relevantes son: `User is not registered`,
 `Compra no encontrada`,
 `No se puede eliminar una compra ya aceptada`,
 `No se puede eliminar una compra con pagos registrados`,
-`Ya hay un turno de caja abierto`,
+`Ya hay un turno abierto para esta caja o banco`,
 `Turno no encontrado`,
 `El turno ya está cerrado`,
-`No hay un turno de caja abierto`,
-`El monto del movimiento debe ser mayor que cero`,
+`No hay un turno abierto para esta caja o banco`,
+`El valor del movimiento debe ser mayor que cero`,
+`Caja o banco no encontrado`,
+`El nombre de la caja o banco es obligatorio`,
+`Ya existe una caja o banco con ese nombre`,
+`La caja o banco está inactiva`,
+`No se puede eliminar una caja o banco con un turno abierto`,
+`El responsable del turno es obligatorio`,
+`Solo se puede cambiar el responsable de un turno abierto`,
 `La cantidad debe ser mayor que cero`, `Proveedor no encontrado`,
 `Unauthorized: Only admins can manage purchase invoices`,
 `invalidFile: el archivo de la factura es obligatorio`,
@@ -2144,6 +2489,25 @@ relevantes son: `User is not registered`,
 - Las credenciales OAuth del administrador se guardan en el estado estable y
   **no** se exponen por la API ni por OQL: la entidad `driveCredential` solo
   publica el correo, la fecha de conexión y si hay `refreshToken`.
+- **Caja y Bancos: varios turnos abiertos a la vez.** El catálogo de cajas y
+  bancos permite tener un turno abierto por registro y varios registros abiertos
+  simultáneamente. `listOpenShifts` devuelve todos los turnos abiertos con su
+  `registerId` y responsable. `registerCashMovement` **no** recibe `registerId`:
+  resuelve el turno destino por la cuenta afectada (`#cash` → caja, `#bank` →
+  banco) y, si hay varios turnos abiertos del mismo tipo, elige el de mayor id.
+  Para dirigir un movimiento a una caja/banco concreta cuando hay más de una del
+  mismo tipo abierta, cierra los demás turnos de ese tipo o usa una cuenta que
+  resuelva al registro deseado. El historial (`listShifts`) y el libro de
+  movimientos (`listCashMovements`) se filtran por `registerId`, y el informe
+  (`getDailyShiftReport`) incluye `registerName` y `responsibleName`.
+- **Compatibilidad de datos existentes.** Al actualizar, la migración crea
+  automáticamente una caja principal (`id = 0`, nombre `Caja principal`,
+  `kind = #cash`) que agrupa todos los turnos y movimientos previos: cada turno
+  existente queda con `registerId = 0` y su responsable heredado del principal
+  que lo abrió (`responsibleName = openedBy.toText()`, `responsibleUserId =
+  null`). Los turnos y movimientos previos siguen visibles y operables bajo esa
+  caja principal, sin pérdida de datos. El contador de registros arranca en `1`,
+  de modo que el primer registro creado recibe el id `1`.
 ";
   };
 };

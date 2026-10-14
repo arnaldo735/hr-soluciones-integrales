@@ -23,6 +23,8 @@ interface CloseShiftDialogProps {
   onOpenChange: (open: boolean) => void;
   /** The open shift being closed. */
   shift: Shift;
+  /** Display name of the shift's caja/banco, when known. */
+  registerName?: string;
 }
 
 interface CloseShiftFormState {
@@ -84,14 +86,16 @@ function DifferenceRow({
 }
 
 /**
- * Closes the open shift with the declared closing balances of Caja and Bancos.
- * The computed balances come from the backend ledger; the difference between
- * the declared and the computed amount is shown live before confirming.
+ * Closes one specific open shift with the declared closing balances of its
+ * Caja and Bancos. The computed balances come from the backend ledger; the
+ * difference between the declared and the computed amount is shown live before
+ * confirming.
  */
 export function CloseShiftDialog({
   open,
   onOpenChange,
   shift,
+  registerName,
 }: CloseShiftDialogProps) {
   const [form, setForm] = useState<CloseShiftFormState>(() =>
     initialForm(shift),
@@ -166,8 +170,10 @@ export function CloseShiftDialog({
             Cerrar turno de caja
           </DialogTitle>
           <DialogDescription>
-            Declara el saldo final contado en caja y en bancos. La diferencia se
-            calcula contra el saldo que el sistema registró en el turno.
+            {registerName ? `${registerName} · ` : ""}Turno #
+            {shift.id.toString()} · Responsable {shift.responsibleName}. Declara
+            el saldo final contado en caja y en bancos; la diferencia se calcula
+            contra el saldo que el sistema registró en este turno.
           </DialogDescription>
         </DialogHeader>
 

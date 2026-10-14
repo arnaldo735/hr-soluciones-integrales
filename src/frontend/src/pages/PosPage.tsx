@@ -22,12 +22,8 @@ import {
 } from "@/hooks/use-company";
 import { useCustomers } from "@/hooks/use-customers";
 import { useDailyHopeMessage } from "@/hooks/use-hope";
-import { useParts } from "@/hooks/use-orders";
+import { usePart, useParts } from "@/hooks/use-orders";
 import { useCreatePosSale, useFindPartByCode } from "@/hooks/use-pos";
-import {
-  SERVICE_TERMS_DEFAULT_TEXT,
-  useServiceTermsSettings,
-} from "@/hooks/use-service-terms";
 import {
   companyContactLine,
   companyFiscalLines,
@@ -57,6 +53,7 @@ import {
   WhatsAppContext,
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
+import { useNavigate, useSearch } from "@tanstack/react-router";
 import type { jsPDF } from "jspdf";
 import {
   AlertTriangle,
@@ -285,6 +282,98 @@ function CartRow({
 }
 
 /**
+ * One product result in the POS picker. The product area stays a one-tap add
+ * button, and a compact quantity stepper sits beside it so the user can choose
+ * how many units to append before tapping. The chosen quantity is handed to
+ * `onAdd`; a barcode scan or a plain tap appends one unit.
+ */
+function ProductResultRow({
+  part,
+  index,
+  onAdd,
+}: {
+  part: PartView;
+  index: number;
+  onAdd: (part: PartView, quantity: number) => void;
+}) {
+  const [quantity, setQuantity] = useState(1);
+  const outOfStock = Number(part.totalStock) <= 0;
+
+  return (
+    <li className="flex items-stretch gap-2 px-3 py-2.5 transition-smooth hover:bg-muted/40">
+      <button
+        type="button"
+        disabled={outOfStock}
+        onClick={() => onAdd(part, quantity)}
+        data-ocid={`pos.product_item.${index + 1}`}
+        className="flex min-w-0 flex-1 items-center gap-3 text-left disabled:cursor-not-allowed disabled:opacity-50"
+      >
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-medium">{part.name}</p>
+          <p className="data-rail text-[11px] text-muted-foreground">
+            {part.sku} · {part.brand}
+          </p>
+        </div>
+        <div className="shrink-0 text-right">
+          <p className="data-rail text-sm font-semibold">
+            {formatMoney(part.salePrice)}
+          </p>
+          <p
+            className={cn(
+              "data-rail text-[11px]",
+              outOfStock ? "text-destructive" : "text-muted-foreground",
+            )}
+          >
+            {outOfStock
+              ? "Sin existencia"
+              : `${formatNumber(part.totalStock)} disp.`}
+          </p>
+        </div>
+      </button>
+
+      <div
+        data-ocid={`pos.result_quantity_control.${index + 1}`}
+        className="flex shrink-0 flex-col items-center justify-center gap-1"
+      >
+        <div className="flex items-center rounded-sm border border-input">
+          <button
+            type="button"
+            disabled={outOfStock}
+            aria-label={`Disminuir cantidad de ${part.name}`}
+            data-ocid={`pos.result_quantity_decrease.${index + 1}`}
+            onClick={() => setQuantity((current) => Math.max(1, current - 1))}
+            className="flex size-7 items-center justify-center text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Minus className="size-3.5" aria-hidden="true" />
+          </button>
+          <input
+            type="number"
+            min={1}
+            value={quantity}
+            disabled={outOfStock}
+            aria-label={`Cantidad a agregar de ${part.name}`}
+            data-ocid={`pos.result_quantity_input.${index + 1}`}
+            onChange={(event) => setQuantity(parseQuantity(event.target.value))}
+            className="data-rail h-7 w-10 border-x border-input bg-transparent text-center text-sm outline-none disabled:cursor-not-allowed disabled:opacity-40"
+          />
+          <button
+            type="button"
+            disabled={outOfStock}
+            aria-label={`Aumentar cantidad de ${part.name}`}
+            data-ocid={`pos.result_quantity_increase.${index + 1}`}
+            onClick={() => setQuantity((current) => current + 1)}
+            className="flex size-7 items-center justify-center text-muted-foreground transition-smooth hover:bg-muted hover:text-foreground disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Plus className="size-3.5" aria-hidden="true" />
+          </button>
+        </div>
+        <span className="text-[10px] text-muted-foreground">Cantidad</span>
+      </div>
+    </li>
+  );
+}
+
+/**
  * Builds the POS sale receipt PDF in the selected format (A4 sheet or 80 mm
  * tirilla) with the same content the on-screen preview shows. The blob is
  * handed to the shared mobile-safe `downloadFile` helper so the receipt is
@@ -297,7 +386,6 @@ async function buildReceiptPdf(
   meta: DocumentMeta[],
   lines: DocumentLine[],
   totals: DocumentTotals[],
-  footer: string,
   hope: HopeMessageContent | null,
 ): Promise<jsPDF> {
   const { jsPDF, autoTable } = await loadPdfLibs();
@@ -419,16 +507,10 @@ async function buildReceiptPdf(
     (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
       ?.finalY ?? afterLines + 4;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(narrow ? 6 : 7.5);
-  doc.setTextColor(100, 116, 139);
-  const footerY = afterTotals + (narrow ? 6 : 10);
-  const footerLines = doc.splitTextToSize(footer, right - margin);
-  doc.text(footerLines, margin, footerY);
   drawHopeMessage(doc, hope, {
     x: margin,
     right,
-    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    y: afterTotals + (narrow ? 6 : 10),
     narrow,
   });
 
@@ -436,6 +518,7 @@ async function buildReceiptPdf(
 }
 
 export function PosPage() {
+  const navigate = useNavigate();
   const [search, setSearch] = useState("");
   const [barcode, setBarcode] = useState("");
   const [cart, setCart] = useState<CartLine[]>([]);
@@ -482,7 +565,6 @@ export function PosPage() {
   const companyQuery = useCompanyProfile();
   const dailyHopeQuery = useDailyHopeMessage();
   const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
-  const serviceTermsQuery = useServiceTermsSettings();
   const { isIvaResponsible, taxRate: effectiveTaxRate } = useIvaSettings();
   const createSale = useCreatePosSale();
   const findPartByCode = useFindPartByCode();
@@ -582,30 +664,79 @@ export function PosPage() {
     (!isCredit || creditReady) &&
     !createSale.isPending;
 
-  const addPart = (part: PartView) => {
+  const addPart = (part: PartView, quantity = 1) => {
+    const qty = Math.max(1, quantity);
     setCart((current) => {
       const existing = current.find((line) => line.partId === part.id);
       if (existing) {
+        // The chosen quantity is added to the line already in the cart instead
+        // of duplicating the product.
         return current.map((line) =>
           line.partId === part.id
-            ? { ...line, quantity: line.quantity + 1 }
+            ? { ...line, quantity: line.quantity + qty }
             : line,
         );
       }
+      // A newly appended line goes first, so the item just added is visible at
+      // the top of the cart without scrolling.
       return [
-        ...current,
         {
           partId: part.id,
           sku: part.sku,
           name: part.name,
           unitPrice: Number(part.salePrice),
-          quantity: 1,
+          quantity: qty,
           discount: 0,
           stock: Number(part.totalStock),
         },
+        ...current,
       ];
     });
   };
+
+  // A factura is immutable, so its item search sends the chosen part and
+  // quantity here as query params. On mount the part is appended to the cart as
+  // the first line, then the params are cleared from the URL.
+  const addSearch = useSearch({ from: "/pos" });
+  const addPartId = addSearch.addPartId;
+  const addQuantity = addSearch.addQuantity;
+  const addPartQuery = usePart(
+    addPartId !== undefined ? BigInt(addPartId) : null,
+  );
+  const addAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (addAppliedRef.current) return;
+    if (addPartId === undefined) return;
+    const part = addPartQuery.data;
+    if (!part) return;
+    addAppliedRef.current = true;
+    const qty = Math.max(1, Number.parseInt(addQuantity ?? "1", 10) || 1);
+    setCart((current) => {
+      const existing = current.find((line) => line.partId === part.id);
+      if (existing) {
+        return current.map((line) =>
+          line.partId === part.id
+            ? { ...line, quantity: line.quantity + qty }
+            : line,
+        );
+      }
+      return [
+        {
+          partId: part.id,
+          sku: part.sku,
+          name: part.name,
+          unitPrice: Number(part.salePrice),
+          quantity: qty,
+          discount: 0,
+          stock: Number(part.totalStock),
+        },
+        ...current,
+      ];
+    });
+    toast.success(`${part.name} agregado al carrito`);
+    void navigate({ to: "/pos", search: {}, replace: true });
+  }, [addPartId, addQuantity, addPartQuery.data, navigate]);
 
   const handleBarcode = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -790,13 +921,6 @@ export function PosPage() {
       ]
     : [];
 
-  // Pie de página editable "Términos y condiciones del Servicio". Mientras la
-  // configuración carga, o cuando el administrador la dejó vacía, se usa el
-  // texto de recepción por defecto para que el comprobante nunca quede sin pie.
-  const serviceTermsText = serviceTermsQuery.data?.text?.trim() ?? "";
-  const receiptFooter =
-    serviceTermsText !== "" ? serviceTermsText : SERVICE_TERMS_DEFAULT_TEXT;
-
   async function handleDownloadReceipt(nextFormat: DocumentFormat) {
     if (!completedSale) return;
     setDownloadError(null);
@@ -809,7 +933,6 @@ export function PosPage() {
         receiptMeta,
         receiptLines,
         receiptTotals,
-        receiptFooter,
         hopeMessage,
       );
       await downloadFile({
@@ -883,7 +1006,6 @@ export function PosPage() {
             meta={receiptMeta}
             lines={receiptLines}
             totals={receiptTotals}
-            footer={receiptFooter}
             hopeMessage={hopeMessage}
             format="a4"
             ocid="pos.receipt_a4"
@@ -900,7 +1022,6 @@ export function PosPage() {
             meta={receiptMeta}
             lines={receiptLines}
             totals={receiptTotals}
-            footer={receiptFooter}
             hopeMessage={hopeMessage}
             format="receipt80"
             ocid="pos.receipt_80mm"
@@ -1106,46 +1227,14 @@ export function PosPage() {
                 data-ocid="pos.product_list"
                 className="divide-y divide-border"
               >
-                {parts.map((part, index) => {
-                  const outOfStock = Number(part.totalStock) <= 0;
-                  return (
-                    <li key={part.id.toString()}>
-                      <button
-                        type="button"
-                        disabled={outOfStock}
-                        onClick={() => addPart(part)}
-                        data-ocid={`pos.product_item.${index + 1}`}
-                        className="flex w-full items-center gap-3 px-4 py-3 text-left transition-smooth hover:bg-muted/60 disabled:cursor-not-allowed disabled:opacity-50"
-                      >
-                        <div className="min-w-0 flex-1">
-                          <p className="truncate text-sm font-medium">
-                            {part.name}
-                          </p>
-                          <p className="data-rail text-[11px] text-muted-foreground">
-                            {part.sku} · {part.brand}
-                          </p>
-                        </div>
-                        <div className="shrink-0 text-right">
-                          <p className="data-rail text-sm font-semibold">
-                            {formatMoney(part.salePrice)}
-                          </p>
-                          <p
-                            className={cn(
-                              "data-rail text-[11px]",
-                              outOfStock
-                                ? "text-destructive"
-                                : "text-muted-foreground",
-                            )}
-                          >
-                            {outOfStock
-                              ? "Sin existencia"
-                              : `${formatNumber(part.totalStock)} disp.`}
-                          </p>
-                        </div>
-                      </button>
-                    </li>
-                  );
-                })}
+                {parts.map((part, index) => (
+                  <ProductResultRow
+                    key={part.id.toString()}
+                    part={part}
+                    index={index}
+                    onAdd={addPart}
+                  />
+                ))}
               </ul>
             )}
           </div>

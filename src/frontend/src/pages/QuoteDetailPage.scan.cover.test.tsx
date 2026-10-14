@@ -72,6 +72,7 @@ vi.mock("@tanstack/react-router", () => ({
   // No id means the "nueva" (new quote) route.
   useParams: () => ({}),
   useNavigate: () => vi.fn(),
+  useSearch: () => ({}),
 }));
 
 vi.mock("sonner", () => ({

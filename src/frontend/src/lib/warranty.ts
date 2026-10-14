@@ -85,17 +85,22 @@ export function isWarrantyService(serviceName: string): boolean {
 }
 
 /**
- * True cuando al menos una línea de mano de obra de la orden está vinculada a
- * un servicio de catálogo que activa la garantía. `serviceNameFor` resuelve el
- * nombre del servicio a partir de su id; devuelve `null` cuando no lo conoce.
+ * True cuando una línea de mano de obra activa la garantía, ya sea porque está
+ * vinculada a un servicio de catálogo de garantía o porque su descripción
+ * escrita a mano coincide con un nombre de garantía. `serviceNameFor` resuelve
+ * el nombre del servicio a partir de su id; devuelve `null` cuando no lo
+ * conoce. La comparación usa `normalizeServiceName`, así que mayúsculas,
+ * acentos y espacios sobrantes no importan en ninguna de las dos rutas.
  */
 export function warrantyAppliesToOrder(
   laborLines: LaborItem[],
   serviceNameFor: (serviceId: bigint) => string | null,
 ): boolean {
   return laborLines.some((line) => {
-    if (line.serviceId === undefined) return false;
-    const name = serviceNameFor(line.serviceId);
-    return name !== null && isWarrantyService(name);
+    if (line.serviceId !== undefined) {
+      const name = serviceNameFor(line.serviceId);
+      if (name !== null && isWarrantyService(name)) return true;
+    }
+    return isWarrantyService(line.description);
   });
 }

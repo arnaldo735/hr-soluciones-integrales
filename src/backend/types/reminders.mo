@@ -66,6 +66,43 @@ module {
     daysInWorkshop : Nat;
   };
 
+  // ── Inventario por agotarse ───────────────────────────────────────────────
+  // Repuesto cuya existencia total está por debajo (o igual a) su umbral de
+  // stock bajo. `totalStock` es la existencia sumada de todos sus lotes.
+  public type ReminderLowStockPart = {
+    id : Id;
+    sku : Text;
+    name : Text;
+    totalStock : Nat;
+    lowStockThreshold : Nat;
+  };
+
+  // ── Cuotas vencidas de facturas a crédito ─────────────────────────────────
+  // Cuota de una factura a crédito que sigue sin pagar y cuyo vencimiento es
+  // anterior a hoy. `installmentNumber` es el número de la cuota dentro del
+  // plan y `amount` su valor.
+  public type ReminderOverdueInstallment = {
+    invoiceId : Id;
+    invoiceNumber : Text;
+    customerName : Text;
+    installmentNumber : Nat;
+    amount : Money;
+    dueDate : Timestamp;
+  };
+
+  // ── Pedidos a proveedor pendientes ────────────────────────────────────────
+  // Pedido a proveedor registrado (solicitud de compra en borrador). No tiene
+  // estado: todo pedido registrado cuenta como pendiente.
+  public type ReminderSupplierOrder = {
+    id : Id;
+    supplierId : Id;
+    supplierName : Text;
+    sku : Text;
+    description : Text;
+    quantity : Nat;
+    createdAt : Timestamp;
+  };
+
   // Sección de recordatorios: conteo total de pendientes y lista acotada de
   // los ítems más relevantes. `items` se recorta a `MAX_SECTION_ITEMS`.
   public type ReminderSection<T> = {
@@ -82,6 +119,23 @@ module {
     unapprovedOrders : ?ReminderSection<ReminderOrder>;
     pendingQuotes : ?ReminderSection<ReminderQuote>;
     finishedOrders : ?ReminderSection<ReminderFinishedOrder>;
+    generatedAt : Timestamp;
+  };
+
+  // Resumen de alertas del panel principal. Extiende `RemindersSummary` con las
+  // secciones de inventario por agotarse, pedidos a proveedor pendientes y
+  // cuotas vencidas de facturas a crédito. Cada sección es `null` cuando el rol
+  // activo no tiene acceso al módulo correspondiente.
+  public type DashboardAlertsSummary = {
+    appointments : ?ReminderSection<ReminderAppointment>;
+    receivables : ?ReminderSection<ReminderReceivable>;
+    payables : ?ReminderSection<ReminderPayable>;
+    unapprovedOrders : ?ReminderSection<ReminderOrder>;
+    pendingQuotes : ?ReminderSection<ReminderQuote>;
+    finishedOrders : ?ReminderSection<ReminderFinishedOrder>;
+    lowStockParts : ?ReminderSection<ReminderLowStockPart>;
+    supplierOrders : ?ReminderSection<ReminderSupplierOrder>;
+    overdueInstallments : ?ReminderSection<ReminderOverdueInstallment>;
     generatedAt : Timestamp;
   };
 };

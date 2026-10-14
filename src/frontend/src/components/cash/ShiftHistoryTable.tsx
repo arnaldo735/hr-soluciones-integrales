@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useShifts } from "@/hooks/use-cash";
+import { useCashRegisters, useShifts } from "@/hooks/use-cash";
 import {
   colombiaEndOfDay,
   colombiaStartOfDay,
@@ -49,14 +49,35 @@ interface ShiftHistoryTableProps {
  */
 export function ShiftHistoryTable({ onOpenReport }: ShiftHistoryTableProps) {
   const [status, setStatus] = useState<ShiftStatus | "all">(ShiftStatus.closed);
+  const [registerId, setRegisterId] = useState<string>("all");
+  const [responsible, setResponsible] = useState("");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
+
+  const registersQuery = useCashRegisters({
+    kind: null,
+    active: null,
+    search: "",
+    offset: 0,
+    limit: 100,
+  });
+  const registers = registersQuery.data?.items ?? [];
+
+  const registerNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const register of registers) {
+      map.set(register.id.toString(), register.name);
+    }
+    return map;
+  }, [registers]);
 
   const fromTimestamp = useMemo(() => colombiaStartOfDay(from), [from]);
   const toTimestamp = useMemo(() => colombiaEndOfDay(to), [to]);
 
   const shiftsQuery = useShifts({
+    registerId: registerId === "all" ? null : BigInt(registerId),
+    responsible,
     status: status === "all" ? null : status,
     from: fromTimestamp,
     to: toTimestamp,
@@ -68,10 +89,17 @@ export function ShiftHistoryTable({ onOpenReport }: ShiftHistoryTableProps) {
   const total = Number(shiftsQuery.data?.total ?? 0n);
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
-  const hasFilters = status !== ShiftStatus.closed || from !== "" || to !== "";
+  const hasFilters =
+    status !== ShiftStatus.closed ||
+    registerId !== "all" ||
+    responsible.trim() !== "" ||
+    from !== "" ||
+    to !== "";
 
   function clearFilters() {
     setStatus(ShiftStatus.closed);
+    setRegisterId("all");
+    setResponsible("");
     setFrom("");
     setTo("");
     setPage(1);
@@ -85,6 +113,25 @@ export function ShiftHistoryTable({ onOpenReport }: ShiftHistoryTableProps) {
         render: (shift) => (
           <span className="data-rail text-sm font-medium">
             #{shift.id.toString()}
+          </span>
+        ),
+      },
+      {
+        key: "register",
+        header: "Caja o banco",
+        render: (shift) => (
+          <span className="text-sm">
+            {registerNames.get(shift.registerId.toString()) ??
+              `Caja #${shift.registerId.toString()}`}
+          </span>
+        ),
+      },
+      {
+        key: "responsible",
+        header: "Responsable",
+        render: (shift) => (
+          <span className="text-sm text-muted-foreground">
+            {shift.responsibleName || "—"}
           </span>
         ),
       },
@@ -169,7 +216,7 @@ export function ShiftHistoryTable({ onOpenReport }: ShiftHistoryTableProps) {
         },
       },
     ],
-    [],
+    [registerNames],
   );
 
   const actions = useMemo<Array<RowAction<Shift>>>(
@@ -190,6 +237,62 @@ export function ShiftHistoryTable({ onOpenReport }: ShiftHistoryTableProps) {
         className="rounded-lg border border-border bg-card p-3 shadow-subtle"
       >
         <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <Label
+              htmlFor="history-register"
+              className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Caja o banco
+            </Label>
+            <Select
+              value={registerId}
+              onValueChange={(value) => {
+                setRegisterId(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger
+                id="history-register"
+                aria-label="Filtrar por caja o banco"
+                data-ocid="caja.history.register_filter"
+                className="w-[180px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {registers.map((register) => (
+                  <SelectItem
+                    key={register.id.toString()}
+                    value={register.id.toString()}
+                  >
+                    {register.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="space-y-1">
+            <Label
+              htmlFor="history-responsible"
+              className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Responsable
+            </Label>
+            <Input
+              id="history-responsible"
+              value={responsible}
+              onChange={(event) => {
+                setResponsible(event.target.value);
+                setPage(1);
+              }}
+              placeholder="Nombre del responsable"
+              className="w-[180px]"
+              data-ocid="caja.history.responsible_input"
+            />
+          </div>
+
           <div className="space-y-1">
             <Label
               htmlFor="history-status"

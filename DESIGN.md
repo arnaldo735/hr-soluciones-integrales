@@ -551,3 +551,88 @@ A quiet **estampa devocional** at the foot of the ledger: a soft green-tinted ca
 ## Signature Detail (addendum)
 
 The **green-railed estampa** — a soft-tinted devotional card whose 2px taller-green left rail echoes the system's signature rail, with a large faded `“` in the corner and an amber bold citation, turning the document footer into a calm, deliberate benediction rather than a line of grey legal text.
+
+---
+
+# Addendum — Panel principal: cuadrícula de tarjetas de alerta
+
+## Scope
+
+New alert-card grid on the operation panel (`/`, `DashboardPage`), below the company nameplate and above/replacing the flow shortcut bands as the panel's primary content. Each card is a clickable link to its module with a live count and a Spanish message. No new route, no new nav entry. Tokens extend the existing system in place; no token is renamed or removed.
+
+## Direction
+
+A **switchboard of pending work**: the workshop's own instrument panel where every open obligation lights up as a tone-striped card, and a clean shop reads as a row of quiet grey "al día" plates. Borrows the legacy SIFAC alert-grid idea but renders it in the calibrated Taller Nocturno console language — header strip, mono count, no chrome.
+
+## New Tokens (extend, do not replace)
+
+| Token family | Light | Dark | Role |
+| --- | --- | --- | --- |
+| `alert-info` | 0.55 0.12 240 | 0.7 0.13 240 | Informative count (blue 240) |
+| `alert-warning` | 0.66 0.15 78 | 0.78 0.16 75 | Attention count (amber 78) |
+| `alert-danger` | 0.58 0.22 25 | 0.66 0.21 25 | Urgent count (red 25) |
+| `alert-ok` | 0.55 0.14 148 | 0.72 0.16 148 | Positive/healthy count (green 148) |
+| `alert-clear-surface` | 0.955 0.004 85 | 0.225 0.01 85 | "Al día" muted card surface |
+| `alert-clear-border` | 0.9 0.006 85 | 0.3 0.014 85 | "Al día" card border + strip |
+| `alert-clear-foreground` | 0.5 0.012 82 | 0.6 0.01 83 | "Al día" muted text |
+
+- Utilities in `@layer utilities`: `.alert-grid`, `.alert-card[data-tone]`, `.alert-card-strip`, `.alert-card-body/-head/-icon/-title/-module/-count/-message/-cta`, `.alert-card[data-clear="true"]`.
+- Tailwind theme key added: `shadow.alert`. No existing token renamed or removed.
+- Tones reuse existing system hues only (info 240, warning 78, danger 25, ok 148); no new hue is introduced.
+
+## Alert Card
+
+| Element | Treatment |
+| --- | --- |
+| Card | `.alert-card` — `bg-card`, 1px `border-border`, 6px radius, `shadow-alert`, `overflow-hidden`, whole card is the link |
+| Header strip | `.alert-card-strip` — full-width 4px bar in the tone color (grey when `data-clear="true"`) |
+| Icon | `.alert-card-icon` — 36px rounded square, tone-tinted `bg` at 12–14% + tone color |
+| Title | `.alert-card-title` — `text-sm font-semibold`, Spanish alert name |
+| Module label | `.alert-card-module` — `text-xs text-muted-foreground`, destination module |
+| Count | `.alert-card-count` — `font-mono text-4xl font-bold tabular-nums`, tone-colored |
+| Message | `.alert-card-message` — `text-sm text-muted-foreground`, e.g. "Tiene N pendiente(s), haga clic aquí para verlo(s)" |
+| CTA | `.alert-card-cta` — bottom border-top row, muted → `text-primary` on hover, arrow shifts 2px |
+
+- Grid: `.alert-grid` (`sm:grid-cols-2 xl:grid-cols-3`); one column on mobile.
+- Hover: `border-primary/40` + 2px lift + soft shadow; `focus-visible` ring. No close (×) button on any card.
+
+## Alert Set (role-gated)
+
+| Alert | Tone | Module | Gate |
+| --- | --- | --- | --- |
+| OT sin aprobar (Recibida) | `warning` | `/ordenes` | taller |
+| Citas pendientes (Agendada/Confirmada) | `info` | `/citas` | taller |
+| Motos terminadas (>3 días Lista) | `warning` | `/ordenes` | taller |
+| Cuotas vencidas (crédito no pagado) | `danger` | `/facturas` | ventas |
+| Cuentas por cobrar (saldo pendiente/vencido) | `danger` | `/cuentas-por-cobrar` | admin |
+| Cotizaciones pendientes (Borrador/Enviada) | `info` | `/cotizaciones` | ventas |
+| Inventario por agotarse (bajo umbral) | `warning` | `/inventario` | catálogo |
+| Pedidos a proveedor registrados | `info` | `/proveedores` | compras |
+| Cuentas por pagar (saldo pendiente/vencido) | `danger` | `/cuentas-por-pagar` | admin |
+
+- Mechanic role never sees admin, compras, cost, or cuentas-por-pagar cards; those cards are not rendered at all (no placeholder).
+- A card with count 0 renders `data-clear="true"` (muted "al día" state), consistently for every alert.
+
+## Structural Zones (addendum)
+
+| Zone | Background | Border | Notes |
+| --- | --- | --- | --- |
+| Panel content | `bg-background` | — | Nameplate, then alert grid, 24px section gaps |
+| Alert card | `bg-card` | `border` + 4px tone strip | `shadow-alert`; hover lift + `border-primary/40` |
+| "Al día" card | `alert-clear-surface` | `alert-clear-border` | No shadow, no lift, grey strip |
+| Panel states | `bg-card` | `border` | Loading `Skeleton` cards in the same grid geometry; error panel `bg-destructive/10 text-destructive` + `Reintentar` |
+
+## Constraints (addendum)
+
+- Sidebar must stay exactly **6 flows** (Panel, Taller, Catálogo, Ventas, Compras, Administración) — the alert grid adds no nav entry
+- The mechanic must **never** see cost, purchases, or accounts-payable alerts; gating is enforced in the backend, not only hidden in the UI
+- The low-stock list stays **off** the panel as a list — it appears only as the "Inventario por agotarse" alert card
+- No close (×) button on any alert card; no birthday alert (clients have no birth-date field)
+- Do NOT build: alerta de cumpleaños, botón de cerrar, fecha de nacimiento en clientes, estado "pendiente" en pedidos a proveedor
+- Panel keeps the company nameplate and the `Actualizar` button; loading = skeletons, error = `Reintentar`
+- Spanish (Colombia) copy throughout; counts are integers, `.data-rail`/mono for the number
+- Semantic tokens only — no raw hex, `rgb()`, or arbitrary color classes
+
+## Signature Detail (addendum)
+
+The **tone strip over a mono count** — a 4px colored header bar sits above a 4xl tabular-mono number, so each alert reads as a single calibrated gauge on the switchboard; when a count hits zero the strip and number grey out together into an "al día" plate, and the whole dashboard becomes a scan of what is lit versus what is quiet.

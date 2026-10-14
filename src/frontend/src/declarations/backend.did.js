@@ -56,7 +56,21 @@ export const OrderStatus = IDL.Variant({
   'received' : IDL.Null,
   'ready' : IDL.Null,
 });
+export const PaymentMethod = IDL.Variant({
+  'mixed' : IDL.Null,
+  'card' : IDL.Null,
+  'cash' : IDL.Null,
+  'transfer' : IDL.Null,
+});
 export const Timestamp = IDL.Int;
+export const OrderPayment = IDL.Record({
+  'id' : Id,
+  'method' : PaymentMethod,
+  'note' : IDL.Opt(IDL.Text),
+  'registeredAt' : Timestamp,
+  'registeredBy' : IDL.Principal,
+  'amount' : Money,
+});
 export const StatusChange = IDL.Record({
   'at' : Timestamp,
   'to' : OrderStatus,
@@ -79,6 +93,12 @@ export const OrderPart = IDL.Record({
   'partId' : Id,
   'unitCost' : Money,
 });
+export const OrderAdvance = IDL.Record({
+  'method' : PaymentMethod,
+  'registeredAt' : Timestamp,
+  'registeredBy' : IDL.Principal,
+  'amount' : Money,
+});
 export const ExternalBlob = IDL.Vec(IDL.Nat8);
 export const OrderPhoto = IDL.Record({
   'id' : Id,
@@ -91,10 +111,12 @@ export const OrderPhoto = IDL.Record({
 export const WorkshopOrder = IDL.Record({
   'id' : Id,
   'status' : OrderStatus,
+  'payments' : IDL.Vec(OrderPayment),
   'createdAt' : Timestamp,
   'statusHistory' : IDL.Vec(StatusChange),
   'labor' : IDL.Vec(LaborItem),
   'cancelledAt' : IDL.Opt(Timestamp),
+  'oilChangeInterval' : IDL.Opt(IDL.Nat),
   'updatedAt' : Timestamp,
   'motorcycleId' : Id,
   'customerId' : Id,
@@ -103,15 +125,19 @@ export const WorkshopOrder = IDL.Record({
   'intakeMileage' : IDL.Nat,
   'technicianIds' : IDL.Vec(Id),
   'orderNumber' : IDL.Text,
+  'advance' : IDL.Opt(OrderAdvance),
   'problem' : IDL.Text,
   'photos' : IDL.Vec(OrderPhoto),
+  'previousMileage' : IDL.Opt(IDL.Nat),
 });
 export const TaxRate = IDL.Nat;
 export const OrderTotals = IDL.Record({
   'tax' : Money,
   'total' : Money,
+  'balance' : Money,
   'partsSubtotal' : Money,
   'laborSubtotal' : Money,
+  'paidAmount' : Money,
   'taxRate' : TaxRate,
   'subtotal' : Money,
 });
@@ -123,6 +149,11 @@ export const OrderPartInput = IDL.Record({
   'lotId' : IDL.Opt(Id),
   'quantity' : IDL.Nat,
   'partId' : Id,
+});
+export const OrderPaymentInput = IDL.Record({
+  'method' : PaymentMethod,
+  'note' : IDL.Opt(IDL.Text),
+  'amount' : Money,
 });
 export const OrderPhotoInput = IDL.Record({
   'blob' : ExternalBlob,
@@ -224,11 +255,13 @@ export const ShiftStatus = IDL.Variant({
 });
 export const Shift = IDL.Record({
   'id' : Id,
+  'responsibleUserId' : IDL.Opt(Id),
   'status' : ShiftStatus,
   'openingBank' : Money,
   'openingCash' : Money,
   'differenceBank' : IDL.Int,
   'differenceCash' : IDL.Int,
+  'responsibleName' : IDL.Text,
   'closedAt' : IDL.Opt(Timestamp),
   'closedBy' : IDL.Opt(IDL.Principal),
   'notes' : IDL.Opt(IDL.Text),
@@ -236,6 +269,7 @@ export const Shift = IDL.Record({
   'declaredClosingCash' : IDL.Opt(Money),
   'computedClosingBank' : Money,
   'computedClosingCash' : Money,
+  'registerId' : Id,
   'openedAt' : Timestamp,
   'openedBy' : IDL.Principal,
 });
@@ -271,12 +305,6 @@ export const InvoiceApplyResult = IDL.Record({
   'lines' : IDL.Vec(InvoiceApplyLineResult),
   'updated' : IDL.Nat,
   'failed' : IDL.Nat,
-});
-export const PaymentMethod = IDL.Variant({
-  'mixed' : IDL.Null,
-  'card' : IDL.Null,
-  'cash' : IDL.Null,
-  'transfer' : IDL.Null,
 });
 export const PaymentStatus = IDL.Variant({
   'pending' : IDL.Null,
@@ -319,6 +347,7 @@ export const Invoice = IDL.Record({
   'id' : Id,
   'tax' : Money,
   'customerName' : IDL.Text,
+  'advanceApplied' : IDL.Opt(Money),
   'total' : Money,
   'paymentStatus' : PaymentStatus,
   'posSaleId' : IDL.Opt(Id),
@@ -379,6 +408,24 @@ export const BackupError = IDL.Variant({
 export const BackupOutcome = IDL.Variant({
   'ok' : BackupResult,
   'err' : BackupError,
+});
+export const CashRegisterKind = IDL.Variant({
+  'bank' : IDL.Null,
+  'cash' : IDL.Null,
+});
+export const CashRegisterInput = IDL.Record({
+  'kind' : CashRegisterKind,
+  'name' : IDL.Text,
+  'openingBalance' : Money,
+});
+export const CashRegister = IDL.Record({
+  'id' : Id,
+  'active' : IDL.Bool,
+  'kind' : CashRegisterKind,
+  'name' : IDL.Text,
+  'createdAt' : Timestamp,
+  'updatedAt' : Timestamp,
+  'openingBalance' : Money,
 });
 export const Customer = IDL.Record({
   'id' : Id,
@@ -445,12 +492,19 @@ export const Motorcycle = IDL.Record({
   'brand' : IDL.Text,
   'plate' : IDL.Text,
 });
+export const OrderAdvanceInput = IDL.Record({
+  'method' : PaymentMethod,
+  'amount' : Money,
+});
 export const OrderInput = IDL.Record({
+  'oilChangeInterval' : IDL.Opt(IDL.Nat),
   'motorcycleId' : Id,
   'customerId' : Id,
   'intakeMileage' : IDL.Nat,
   'technicianIds' : IDL.Vec(Id),
+  'advance' : IDL.Opt(OrderAdvanceInput),
   'problem' : IDL.Text,
+  'previousMileage' : IDL.Opt(IDL.Nat),
 });
 export const PartView = IDL.Record({
   'id' : Id,
@@ -617,7 +671,7 @@ export const QuoteInput = IDL.Record({
   'serviceLines' : IDL.Vec(QuoteServiceLineInput),
   'notes' : IDL.Opt(IDL.Text),
   'discount' : Money,
-  'motorcycleId' : Id,
+  'motorcycleId' : IDL.Opt(Id),
   'customerId' : Id,
   'partLines' : IDL.Vec(QuotePartLineInput),
 });
@@ -651,7 +705,7 @@ export const Quote = IDL.Record({
   'updatedAt' : Timestamp,
   'notes' : IDL.Opt(IDL.Text),
   'discount' : Money,
-  'motorcycleId' : Id,
+  'motorcycleId' : IDL.Opt(Id),
   'customerId' : Id,
   'partLines' : IDL.Vec(QuotePartLine),
   'taxRate' : TaxRate,
@@ -1032,6 +1086,7 @@ export const CashMovementSource = IDL.Variant({
   'receivable' : IDL.Null,
   'manual' : IDL.Null,
   'purchase' : IDL.Null,
+  'advance' : IDL.Null,
 });
 export const CashMovementKind = IDL.Variant({
   'expense' : IDL.Null,
@@ -1062,12 +1117,128 @@ export const DailyShiftReport = IDL.Record({
   'movements' : IDL.Vec(CashMovement),
   'bankIncome' : Money,
   'totalIncome' : Money,
+  'responsibleName' : IDL.Text,
   'byPaymentMethod' : IDL.Vec(PaymentMethodTotal),
   'shift' : Shift,
   'cashExpense' : Money,
   'cashIncome' : Money,
   'bankExpense' : Money,
+  'registerName' : IDL.Text,
   'totalExpense' : Money,
+});
+export const ReminderOverdueInstallment = IDL.Record({
+  'customerName' : IDL.Text,
+  'installmentNumber' : IDL.Nat,
+  'dueDate' : Timestamp,
+  'invoiceId' : Id,
+  'invoiceNumber' : IDL.Text,
+  'amount' : Money,
+});
+export const ReminderSection_7 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderOverdueInstallment),
+});
+export const ReminderPayable = IDL.Record({
+  'status' : IDL.Text,
+  'balance' : Money,
+  'supplierName' : IDL.Text,
+  'dueDate' : Timestamp,
+  'supplierId' : Id,
+});
+export const ReminderSection_2 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderPayable),
+});
+export const ReminderOrder = IDL.Record({
+  'id' : Id,
+  'customerName' : IDL.Text,
+  'plate' : IDL.Text,
+  'orderNumber' : IDL.Text,
+});
+export const ReminderSection_5 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderOrder),
+});
+export const ReminderAppointment = IDL.Record({
+  'id' : Id,
+  'customerName' : IDL.Text,
+  'status' : IDL.Text,
+  'customerId' : Id,
+  'scheduledAt' : Timestamp,
+});
+export const ReminderSection = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderAppointment),
+});
+export const ReminderFinishedOrder = IDL.Record({
+  'id' : Id,
+  'customerName' : IDL.Text,
+  'plate' : IDL.Text,
+  'orderNumber' : IDL.Text,
+  'daysInWorkshop' : IDL.Nat,
+});
+export const ReminderSection_1 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderFinishedOrder),
+});
+export const ReminderSupplierOrder = IDL.Record({
+  'id' : Id,
+  'sku' : IDL.Text,
+  'supplierName' : IDL.Text,
+  'createdAt' : Timestamp,
+  'description' : IDL.Text,
+  'quantity' : IDL.Nat,
+  'supplierId' : Id,
+});
+export const ReminderSection_8 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderSupplierOrder),
+});
+export const ReminderReceivable = IDL.Record({
+  'customerName' : IDL.Text,
+  'status' : IDL.Text,
+  'balance' : Money,
+  'dueDate' : Timestamp,
+  'invoiceId' : Id,
+  'invoiceNumber' : IDL.Text,
+});
+export const ReminderSection_4 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderReceivable),
+});
+export const ReminderLowStockPart = IDL.Record({
+  'id' : Id,
+  'sku' : IDL.Text,
+  'lowStockThreshold' : IDL.Nat,
+  'name' : IDL.Text,
+  'totalStock' : IDL.Nat,
+});
+export const ReminderSection_6 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderLowStockPart),
+});
+export const ReminderQuote = IDL.Record({
+  'id' : Id,
+  'customerName' : IDL.Text,
+  'status' : IDL.Text,
+  'createdAt' : Timestamp,
+  'quoteNumber' : IDL.Text,
+});
+export const ReminderSection_3 = IDL.Record({
+  'count' : IDL.Nat,
+  'items' : IDL.Vec(ReminderQuote),
+});
+export const DashboardAlertsSummary = IDL.Record({
+  'overdueInstallments' : IDL.Opt(ReminderSection_7),
+  'payables' : IDL.Opt(ReminderSection_2),
+  'generatedAt' : Timestamp,
+  'unapprovedOrders' : IDL.Opt(ReminderSection_5),
+  'appointments' : IDL.Opt(ReminderSection),
+  'finishedOrders' : IDL.Opt(ReminderSection_1),
+  'supplierOrders' : IDL.Opt(ReminderSection_8),
+  'receivables' : IDL.Opt(ReminderSection_4),
+  'lowStockParts' : IDL.Opt(ReminderSection_6),
+  'pendingQuotes' : IDL.Opt(ReminderSection_3),
 });
 export const OrderStatusCount = IDL.Record({
   'status' : IDL.Text,
@@ -1160,6 +1331,21 @@ export const LocalBackupManifest = IDL.Record({
   'maxPageSize' : IDL.Nat,
   'totalSections' : IDL.Nat,
 });
+export const OrderAdvanceReceipt = IDL.Record({
+  'customerName' : IDL.Text,
+  'total' : Money,
+  'motorcycleModel' : IDL.Text,
+  'balance' : Money,
+  'payments' : IDL.Vec(OrderPayment),
+  'orderId' : Id,
+  'issuedAt' : Timestamp,
+  'motorcycleBrand' : IDL.Text,
+  'paidAmount' : Money,
+  'motorcyclePlate' : IDL.Text,
+  'customerDocument' : IDL.Opt(IDL.Text),
+  'orderNumber' : IDL.Text,
+  'advance' : IDL.Opt(OrderAdvance),
+});
 export const PayableStatus = IDL.Variant({
   'pending' : IDL.Null,
   'paid' : IDL.Null,
@@ -1178,72 +1364,6 @@ export const ReceivableSummary = IDL.Record({
   'totalOverdue' : Money,
   'totalOutstanding' : Money,
   'openCount' : IDL.Nat,
-});
-export const ReminderPayable = IDL.Record({
-  'status' : IDL.Text,
-  'balance' : Money,
-  'supplierName' : IDL.Text,
-  'dueDate' : Timestamp,
-  'supplierId' : Id,
-});
-export const ReminderSection_2 = IDL.Record({
-  'count' : IDL.Nat,
-  'items' : IDL.Vec(ReminderPayable),
-});
-export const ReminderOrder = IDL.Record({
-  'id' : Id,
-  'customerName' : IDL.Text,
-  'plate' : IDL.Text,
-  'orderNumber' : IDL.Text,
-});
-export const ReminderSection_5 = IDL.Record({
-  'count' : IDL.Nat,
-  'items' : IDL.Vec(ReminderOrder),
-});
-export const ReminderAppointment = IDL.Record({
-  'id' : Id,
-  'customerName' : IDL.Text,
-  'status' : IDL.Text,
-  'customerId' : Id,
-  'scheduledAt' : Timestamp,
-});
-export const ReminderSection = IDL.Record({
-  'count' : IDL.Nat,
-  'items' : IDL.Vec(ReminderAppointment),
-});
-export const ReminderFinishedOrder = IDL.Record({
-  'id' : Id,
-  'customerName' : IDL.Text,
-  'plate' : IDL.Text,
-  'orderNumber' : IDL.Text,
-  'daysInWorkshop' : IDL.Nat,
-});
-export const ReminderSection_1 = IDL.Record({
-  'count' : IDL.Nat,
-  'items' : IDL.Vec(ReminderFinishedOrder),
-});
-export const ReminderReceivable = IDL.Record({
-  'customerName' : IDL.Text,
-  'status' : IDL.Text,
-  'balance' : Money,
-  'dueDate' : Timestamp,
-  'invoiceId' : Id,
-  'invoiceNumber' : IDL.Text,
-});
-export const ReminderSection_4 = IDL.Record({
-  'count' : IDL.Nat,
-  'items' : IDL.Vec(ReminderReceivable),
-});
-export const ReminderQuote = IDL.Record({
-  'id' : Id,
-  'customerName' : IDL.Text,
-  'status' : IDL.Text,
-  'createdAt' : Timestamp,
-  'quoteNumber' : IDL.Text,
-});
-export const ReminderSection_3 = IDL.Record({
-  'count' : IDL.Nat,
-  'items' : IDL.Vec(ReminderQuote),
 });
 export const RemindersSummary = IDL.Record({
   'payables' : IDL.Opt(ReminderSection_2),
@@ -1329,6 +1449,7 @@ export const CashMovementFilter = IDL.Record({
   'from' : IDL.Opt(Timestamp),
   'kind' : IDL.Opt(CashMovementKind),
   'account' : IDL.Opt(CashAccount),
+  'registerId' : IDL.Opt(Id),
   'shiftId' : IDL.Opt(Id),
 });
 export const CashMovementPage = IDL.Record({
@@ -1336,6 +1457,17 @@ export const CashMovementPage = IDL.Record({
   'offset' : IDL.Nat,
   'limit' : IDL.Nat,
   'items' : IDL.Vec(CashMovement),
+});
+export const CashRegisterFilter = IDL.Record({
+  'active' : IDL.Opt(IDL.Bool),
+  'kind' : IDL.Opt(CashRegisterKind),
+  'search' : IDL.Opt(IDL.Text),
+});
+export const CashRegisterPage = IDL.Record({
+  'total' : IDL.Nat,
+  'offset' : IDL.Nat,
+  'limit' : IDL.Nat,
+  'items' : IDL.Vec(CashRegister),
 });
 export const CommissionPaymentFilter = IDL.Record({
   'to' : IDL.Opt(Timestamp),
@@ -1565,6 +1697,8 @@ export const ShiftFilter = IDL.Record({
   'to' : IDL.Opt(Timestamp),
   'status' : IDL.Opt(ShiftStatus),
   'from' : IDL.Opt(Timestamp),
+  'responsible' : IDL.Opt(IDL.Text),
+  'registerId' : IDL.Opt(Id),
 });
 export const ShiftPage = IDL.Record({
   'total' : IDL.Nat,
@@ -1616,9 +1750,12 @@ export const CustomerNotificationResult = IDL.Record({
   'customerId' : Id,
 });
 export const OpenShiftInput = IDL.Record({
+  'responsibleUserId' : IDL.Opt(Id),
   'openingBank' : Money,
   'openingCash' : Money,
+  'responsibleName' : IDL.Text,
   'notes' : IDL.Opt(IDL.Text),
+  'registerId' : Id,
 });
 export const CommissionPaymentInput = IDL.Record({
   'period' : CommissionPeriod,
@@ -1658,6 +1795,7 @@ export const CashMovementInput = IDL.Record({
   'description' : IDL.Text,
   'account' : CashAccount,
   'amount' : Money,
+  'shiftId' : IDL.Opt(Id),
 });
 export const PaymentInput = IDL.Record({
   'method' : PaymentMethod,
@@ -1708,6 +1846,10 @@ export const RestoreSectionOutcome = IDL.Variant({
   'ok' : RestoreSectionResult,
   'err' : RestoreError,
 });
+export const SetOrderAdvanceInput = IDL.Record({
+  'method' : IDL.Opt(PaymentMethod),
+  'amount' : IDL.Opt(Money),
+});
 export const DriveAuthStart = IDL.Record({
   'authorizationUrl' : IDL.Text,
   'state' : IDL.Text,
@@ -1748,6 +1890,9 @@ export const HopeSettingsRawInput = IDL.Record({
   'enabled' : IDL.Bool,
   'manualText' : IDL.Text,
   'manualCitation' : IDL.Text,
+});
+export const OilChangeIntervalInput = IDL.Record({
+  'oilChangeInterval' : IDL.Opt(IDL.Nat),
 });
 export const InvoiceLineInput = IDL.Record({
   'id' : IDL.Opt(Id),
@@ -1825,6 +1970,11 @@ export const idlService = IDL.Service({
   'addLabor' : IDL.Func([IDL.Opt(IDL.Text), Id, LaborInput], [OrderView], []),
   'addOrderPart' : IDL.Func(
       [IDL.Opt(IDL.Text), Id, OrderPartInput],
+      [OrderView],
+      [],
+    ),
+  'addOrderPayment' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, OrderPaymentInput],
       [OrderView],
       [],
     ),
@@ -1908,6 +2058,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'createBackup' : IDL.Func([IDL.Opt(IDL.Text)], [BackupOutcome], []),
+  'createCashRegister' : IDL.Func(
+      [IDL.Opt(IDL.Text), CashRegisterInput],
+      [CashRegister],
+      [],
+    ),
   'createCustomer' : IDL.Func(
       [IDL.Opt(IDL.Text), CustomerInput],
       [Customer],
@@ -2011,6 +2166,7 @@ export const idlService = IDL.Service({
       [],
     ),
   'deleteAppointment' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+  'deleteCashRegister' : IDL.Func([IDL.Opt(IDL.Text), Id], [], []),
   'deleteExpense' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
   'deleteExpenseCategory' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
   'deleteInvoice' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
@@ -2073,6 +2229,11 @@ export const idlService = IDL.Service({
     ),
   'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
   'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+  'getCashRegister' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(CashRegister)],
+      ['query'],
+    ),
   'getCommissionPayment' : IDL.Func(
       [IDL.Opt(IDL.Text), Id],
       [IDL.Opt(CommissionPayment)],
@@ -2102,6 +2263,11 @@ export const idlService = IDL.Service({
   'getDailyShiftReport' : IDL.Func(
       [IDL.Opt(IDL.Text), Id],
       [DailyShiftReport],
+      ['query'],
+    ),
+  'getDashboardAlerts' : IDL.Func(
+      [IDL.Opt(IDL.Text)],
+      [DashboardAlertsSummary],
       ['query'],
     ),
   'getDashboardSummary' : IDL.Func(
@@ -2145,10 +2311,19 @@ export const idlService = IDL.Service({
       [LocalBackupManifest],
       ['query'],
     ),
-  'getOpenShift' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Opt(Shift)], ['query']),
+  'getOpenShift' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Opt(Shift)],
+      ['query'],
+    ),
   'getOrder' : IDL.Func(
       [IDL.Opt(IDL.Text), Id],
       [IDL.Opt(OrderView)],
+      ['query'],
+    ),
+  'getOrderAdvanceReceipt' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [OrderAdvanceReceipt],
       ['query'],
     ),
   'getPart' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Opt(PartView)], ['query']),
@@ -2246,6 +2421,11 @@ export const idlService = IDL.Service({
       [CashMovementPage],
       ['query'],
     ),
+  'listCashRegisters' : IDL.Func(
+      [IDL.Opt(IDL.Text), CashRegisterFilter, IDL.Nat, IDL.Nat],
+      [CashRegisterPage],
+      ['query'],
+    ),
   'listCommissionLines' : IDL.Func(
       [IDL.Opt(IDL.Text), IDL.Opt(Id), CommissionPeriod],
       [IDL.Vec(CommissionLine)],
@@ -2329,6 +2509,12 @@ export const idlService = IDL.Service({
   'listMovements' : IDL.Func(
       [IDL.Opt(IDL.Text), Id],
       [IDL.Vec(Movement)],
+      ['query'],
+    ),
+  'listOpenShifts' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Vec(Shift)], ['query']),
+  'listOrderPayments' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id],
+      [IDL.Vec(OrderPayment)],
       ['query'],
     ),
   'listOrders' : IDL.Func(
@@ -2492,6 +2678,21 @@ export const idlService = IDL.Service({
     ),
   'saveCallerUserProfile' : IDL.Func([IDL.Text], [UserProfile], []),
   'schema' : IDL.Func([], [IDL.Text], ['query']),
+  'setCashRegisterActive' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, IDL.Bool],
+      [CashRegister],
+      [],
+    ),
+  'setOrderAdvance' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, SetOrderAdvanceInput],
+      [OrderView],
+      [],
+    ),
+  'setShiftResponsible' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, IDL.Text, IDL.Opt(Id)],
+      [Shift],
+      [],
+    ),
   'setUserActive' : IDL.Func(
       [IDL.Opt(IDL.Text), Id, IDL.Bool],
       [UserListItem],
@@ -2524,6 +2725,11 @@ export const idlService = IDL.Service({
       [],
     ),
   'updateCallerName' : IDL.Func([IDL.Text, IDL.Text], [SessionInfo], []),
+  'updateCashRegister' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, CashRegisterInput],
+      [CashRegister],
+      [],
+    ),
   'updateCompanyProfile' : IDL.Func(
       [IDL.Opt(IDL.Text), CompanyProfileRawInput],
       [CompanyProfile],
@@ -2557,6 +2763,11 @@ export const idlService = IDL.Service({
   'updateMotorcycle' : IDL.Func(
       [IDL.Opt(IDL.Text), Id, MotorcycleInput],
       [Motorcycle],
+      [],
+    ),
+  'updateOilChangeInterval' : IDL.Func(
+      [IDL.Opt(IDL.Text), Id, OilChangeIntervalInput],
+      [OrderView],
       [],
     ),
   'updateOrderStatus' : IDL.Func(
@@ -2672,7 +2883,21 @@ export const idlFactory = ({ IDL }) => {
     'received' : IDL.Null,
     'ready' : IDL.Null,
   });
+  const PaymentMethod = IDL.Variant({
+    'mixed' : IDL.Null,
+    'card' : IDL.Null,
+    'cash' : IDL.Null,
+    'transfer' : IDL.Null,
+  });
   const Timestamp = IDL.Int;
+  const OrderPayment = IDL.Record({
+    'id' : Id,
+    'method' : PaymentMethod,
+    'note' : IDL.Opt(IDL.Text),
+    'registeredAt' : Timestamp,
+    'registeredBy' : IDL.Principal,
+    'amount' : Money,
+  });
   const StatusChange = IDL.Record({
     'at' : Timestamp,
     'to' : OrderStatus,
@@ -2695,6 +2920,12 @@ export const idlFactory = ({ IDL }) => {
     'partId' : Id,
     'unitCost' : Money,
   });
+  const OrderAdvance = IDL.Record({
+    'method' : PaymentMethod,
+    'registeredAt' : Timestamp,
+    'registeredBy' : IDL.Principal,
+    'amount' : Money,
+  });
   const ExternalBlob = IDL.Vec(IDL.Nat8);
   const OrderPhoto = IDL.Record({
     'id' : Id,
@@ -2707,10 +2938,12 @@ export const idlFactory = ({ IDL }) => {
   const WorkshopOrder = IDL.Record({
     'id' : Id,
     'status' : OrderStatus,
+    'payments' : IDL.Vec(OrderPayment),
     'createdAt' : Timestamp,
     'statusHistory' : IDL.Vec(StatusChange),
     'labor' : IDL.Vec(LaborItem),
     'cancelledAt' : IDL.Opt(Timestamp),
+    'oilChangeInterval' : IDL.Opt(IDL.Nat),
     'updatedAt' : Timestamp,
     'motorcycleId' : Id,
     'customerId' : Id,
@@ -2719,15 +2952,19 @@ export const idlFactory = ({ IDL }) => {
     'intakeMileage' : IDL.Nat,
     'technicianIds' : IDL.Vec(Id),
     'orderNumber' : IDL.Text,
+    'advance' : IDL.Opt(OrderAdvance),
     'problem' : IDL.Text,
     'photos' : IDL.Vec(OrderPhoto),
+    'previousMileage' : IDL.Opt(IDL.Nat),
   });
   const TaxRate = IDL.Nat;
   const OrderTotals = IDL.Record({
     'tax' : Money,
     'total' : Money,
+    'balance' : Money,
     'partsSubtotal' : Money,
     'laborSubtotal' : Money,
+    'paidAmount' : Money,
     'taxRate' : TaxRate,
     'subtotal' : Money,
   });
@@ -2739,6 +2976,11 @@ export const idlFactory = ({ IDL }) => {
     'lotId' : IDL.Opt(Id),
     'quantity' : IDL.Nat,
     'partId' : Id,
+  });
+  const OrderPaymentInput = IDL.Record({
+    'method' : PaymentMethod,
+    'note' : IDL.Opt(IDL.Text),
+    'amount' : Money,
   });
   const OrderPhotoInput = IDL.Record({
     'blob' : ExternalBlob,
@@ -2837,11 +3079,13 @@ export const idlFactory = ({ IDL }) => {
   const ShiftStatus = IDL.Variant({ 'closed' : IDL.Null, 'open' : IDL.Null });
   const Shift = IDL.Record({
     'id' : Id,
+    'responsibleUserId' : IDL.Opt(Id),
     'status' : ShiftStatus,
     'openingBank' : Money,
     'openingCash' : Money,
     'differenceBank' : IDL.Int,
     'differenceCash' : IDL.Int,
+    'responsibleName' : IDL.Text,
     'closedAt' : IDL.Opt(Timestamp),
     'closedBy' : IDL.Opt(IDL.Principal),
     'notes' : IDL.Opt(IDL.Text),
@@ -2849,6 +3093,7 @@ export const idlFactory = ({ IDL }) => {
     'declaredClosingCash' : IDL.Opt(Money),
     'computedClosingBank' : Money,
     'computedClosingCash' : Money,
+    'registerId' : Id,
     'openedAt' : Timestamp,
     'openedBy' : IDL.Principal,
   });
@@ -2884,12 +3129,6 @@ export const idlFactory = ({ IDL }) => {
     'lines' : IDL.Vec(InvoiceApplyLineResult),
     'updated' : IDL.Nat,
     'failed' : IDL.Nat,
-  });
-  const PaymentMethod = IDL.Variant({
-    'mixed' : IDL.Null,
-    'card' : IDL.Null,
-    'cash' : IDL.Null,
-    'transfer' : IDL.Null,
   });
   const PaymentStatus = IDL.Variant({
     'pending' : IDL.Null,
@@ -2932,6 +3171,7 @@ export const idlFactory = ({ IDL }) => {
     'id' : Id,
     'tax' : Money,
     'customerName' : IDL.Text,
+    'advanceApplied' : IDL.Opt(Money),
     'total' : Money,
     'paymentStatus' : PaymentStatus,
     'posSaleId' : IDL.Opt(Id),
@@ -2992,6 +3232,24 @@ export const idlFactory = ({ IDL }) => {
   const BackupOutcome = IDL.Variant({
     'ok' : BackupResult,
     'err' : BackupError,
+  });
+  const CashRegisterKind = IDL.Variant({
+    'bank' : IDL.Null,
+    'cash' : IDL.Null,
+  });
+  const CashRegisterInput = IDL.Record({
+    'kind' : CashRegisterKind,
+    'name' : IDL.Text,
+    'openingBalance' : Money,
+  });
+  const CashRegister = IDL.Record({
+    'id' : Id,
+    'active' : IDL.Bool,
+    'kind' : CashRegisterKind,
+    'name' : IDL.Text,
+    'createdAt' : Timestamp,
+    'updatedAt' : Timestamp,
+    'openingBalance' : Money,
   });
   const Customer = IDL.Record({
     'id' : Id,
@@ -3058,12 +3316,19 @@ export const idlFactory = ({ IDL }) => {
     'brand' : IDL.Text,
     'plate' : IDL.Text,
   });
+  const OrderAdvanceInput = IDL.Record({
+    'method' : PaymentMethod,
+    'amount' : Money,
+  });
   const OrderInput = IDL.Record({
+    'oilChangeInterval' : IDL.Opt(IDL.Nat),
     'motorcycleId' : Id,
     'customerId' : Id,
     'intakeMileage' : IDL.Nat,
     'technicianIds' : IDL.Vec(Id),
+    'advance' : IDL.Opt(OrderAdvanceInput),
     'problem' : IDL.Text,
+    'previousMileage' : IDL.Opt(IDL.Nat),
   });
   const PartView = IDL.Record({
     'id' : Id,
@@ -3227,7 +3492,7 @@ export const idlFactory = ({ IDL }) => {
     'serviceLines' : IDL.Vec(QuoteServiceLineInput),
     'notes' : IDL.Opt(IDL.Text),
     'discount' : Money,
-    'motorcycleId' : Id,
+    'motorcycleId' : IDL.Opt(Id),
     'customerId' : Id,
     'partLines' : IDL.Vec(QuotePartLineInput),
   });
@@ -3261,7 +3526,7 @@ export const idlFactory = ({ IDL }) => {
     'updatedAt' : Timestamp,
     'notes' : IDL.Opt(IDL.Text),
     'discount' : Money,
-    'motorcycleId' : Id,
+    'motorcycleId' : IDL.Opt(Id),
     'customerId' : Id,
     'partLines' : IDL.Vec(QuotePartLine),
     'taxRate' : TaxRate,
@@ -3636,6 +3901,7 @@ export const idlFactory = ({ IDL }) => {
     'receivable' : IDL.Null,
     'manual' : IDL.Null,
     'purchase' : IDL.Null,
+    'advance' : IDL.Null,
   });
   const CashMovementKind = IDL.Variant({
     'expense' : IDL.Null,
@@ -3663,12 +3929,128 @@ export const idlFactory = ({ IDL }) => {
     'movements' : IDL.Vec(CashMovement),
     'bankIncome' : Money,
     'totalIncome' : Money,
+    'responsibleName' : IDL.Text,
     'byPaymentMethod' : IDL.Vec(PaymentMethodTotal),
     'shift' : Shift,
     'cashExpense' : Money,
     'cashIncome' : Money,
     'bankExpense' : Money,
+    'registerName' : IDL.Text,
     'totalExpense' : Money,
+  });
+  const ReminderOverdueInstallment = IDL.Record({
+    'customerName' : IDL.Text,
+    'installmentNumber' : IDL.Nat,
+    'dueDate' : Timestamp,
+    'invoiceId' : Id,
+    'invoiceNumber' : IDL.Text,
+    'amount' : Money,
+  });
+  const ReminderSection_7 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderOverdueInstallment),
+  });
+  const ReminderPayable = IDL.Record({
+    'status' : IDL.Text,
+    'balance' : Money,
+    'supplierName' : IDL.Text,
+    'dueDate' : Timestamp,
+    'supplierId' : Id,
+  });
+  const ReminderSection_2 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderPayable),
+  });
+  const ReminderOrder = IDL.Record({
+    'id' : Id,
+    'customerName' : IDL.Text,
+    'plate' : IDL.Text,
+    'orderNumber' : IDL.Text,
+  });
+  const ReminderSection_5 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderOrder),
+  });
+  const ReminderAppointment = IDL.Record({
+    'id' : Id,
+    'customerName' : IDL.Text,
+    'status' : IDL.Text,
+    'customerId' : Id,
+    'scheduledAt' : Timestamp,
+  });
+  const ReminderSection = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderAppointment),
+  });
+  const ReminderFinishedOrder = IDL.Record({
+    'id' : Id,
+    'customerName' : IDL.Text,
+    'plate' : IDL.Text,
+    'orderNumber' : IDL.Text,
+    'daysInWorkshop' : IDL.Nat,
+  });
+  const ReminderSection_1 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderFinishedOrder),
+  });
+  const ReminderSupplierOrder = IDL.Record({
+    'id' : Id,
+    'sku' : IDL.Text,
+    'supplierName' : IDL.Text,
+    'createdAt' : Timestamp,
+    'description' : IDL.Text,
+    'quantity' : IDL.Nat,
+    'supplierId' : Id,
+  });
+  const ReminderSection_8 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderSupplierOrder),
+  });
+  const ReminderReceivable = IDL.Record({
+    'customerName' : IDL.Text,
+    'status' : IDL.Text,
+    'balance' : Money,
+    'dueDate' : Timestamp,
+    'invoiceId' : Id,
+    'invoiceNumber' : IDL.Text,
+  });
+  const ReminderSection_4 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderReceivable),
+  });
+  const ReminderLowStockPart = IDL.Record({
+    'id' : Id,
+    'sku' : IDL.Text,
+    'lowStockThreshold' : IDL.Nat,
+    'name' : IDL.Text,
+    'totalStock' : IDL.Nat,
+  });
+  const ReminderSection_6 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderLowStockPart),
+  });
+  const ReminderQuote = IDL.Record({
+    'id' : Id,
+    'customerName' : IDL.Text,
+    'status' : IDL.Text,
+    'createdAt' : Timestamp,
+    'quoteNumber' : IDL.Text,
+  });
+  const ReminderSection_3 = IDL.Record({
+    'count' : IDL.Nat,
+    'items' : IDL.Vec(ReminderQuote),
+  });
+  const DashboardAlertsSummary = IDL.Record({
+    'overdueInstallments' : IDL.Opt(ReminderSection_7),
+    'payables' : IDL.Opt(ReminderSection_2),
+    'generatedAt' : Timestamp,
+    'unapprovedOrders' : IDL.Opt(ReminderSection_5),
+    'appointments' : IDL.Opt(ReminderSection),
+    'finishedOrders' : IDL.Opt(ReminderSection_1),
+    'supplierOrders' : IDL.Opt(ReminderSection_8),
+    'receivables' : IDL.Opt(ReminderSection_4),
+    'lowStockParts' : IDL.Opt(ReminderSection_6),
+    'pendingQuotes' : IDL.Opt(ReminderSection_3),
   });
   const OrderStatusCount = IDL.Record({
     'status' : IDL.Text,
@@ -3761,6 +4143,21 @@ export const idlFactory = ({ IDL }) => {
     'maxPageSize' : IDL.Nat,
     'totalSections' : IDL.Nat,
   });
+  const OrderAdvanceReceipt = IDL.Record({
+    'customerName' : IDL.Text,
+    'total' : Money,
+    'motorcycleModel' : IDL.Text,
+    'balance' : Money,
+    'payments' : IDL.Vec(OrderPayment),
+    'orderId' : Id,
+    'issuedAt' : Timestamp,
+    'motorcycleBrand' : IDL.Text,
+    'paidAmount' : Money,
+    'motorcyclePlate' : IDL.Text,
+    'customerDocument' : IDL.Opt(IDL.Text),
+    'orderNumber' : IDL.Text,
+    'advance' : IDL.Opt(OrderAdvance),
+  });
   const PayableStatus = IDL.Variant({
     'pending' : IDL.Null,
     'paid' : IDL.Null,
@@ -3779,72 +4176,6 @@ export const idlFactory = ({ IDL }) => {
     'totalOverdue' : Money,
     'totalOutstanding' : Money,
     'openCount' : IDL.Nat,
-  });
-  const ReminderPayable = IDL.Record({
-    'status' : IDL.Text,
-    'balance' : Money,
-    'supplierName' : IDL.Text,
-    'dueDate' : Timestamp,
-    'supplierId' : Id,
-  });
-  const ReminderSection_2 = IDL.Record({
-    'count' : IDL.Nat,
-    'items' : IDL.Vec(ReminderPayable),
-  });
-  const ReminderOrder = IDL.Record({
-    'id' : Id,
-    'customerName' : IDL.Text,
-    'plate' : IDL.Text,
-    'orderNumber' : IDL.Text,
-  });
-  const ReminderSection_5 = IDL.Record({
-    'count' : IDL.Nat,
-    'items' : IDL.Vec(ReminderOrder),
-  });
-  const ReminderAppointment = IDL.Record({
-    'id' : Id,
-    'customerName' : IDL.Text,
-    'status' : IDL.Text,
-    'customerId' : Id,
-    'scheduledAt' : Timestamp,
-  });
-  const ReminderSection = IDL.Record({
-    'count' : IDL.Nat,
-    'items' : IDL.Vec(ReminderAppointment),
-  });
-  const ReminderFinishedOrder = IDL.Record({
-    'id' : Id,
-    'customerName' : IDL.Text,
-    'plate' : IDL.Text,
-    'orderNumber' : IDL.Text,
-    'daysInWorkshop' : IDL.Nat,
-  });
-  const ReminderSection_1 = IDL.Record({
-    'count' : IDL.Nat,
-    'items' : IDL.Vec(ReminderFinishedOrder),
-  });
-  const ReminderReceivable = IDL.Record({
-    'customerName' : IDL.Text,
-    'status' : IDL.Text,
-    'balance' : Money,
-    'dueDate' : Timestamp,
-    'invoiceId' : Id,
-    'invoiceNumber' : IDL.Text,
-  });
-  const ReminderSection_4 = IDL.Record({
-    'count' : IDL.Nat,
-    'items' : IDL.Vec(ReminderReceivable),
-  });
-  const ReminderQuote = IDL.Record({
-    'id' : Id,
-    'customerName' : IDL.Text,
-    'status' : IDL.Text,
-    'createdAt' : Timestamp,
-    'quoteNumber' : IDL.Text,
-  });
-  const ReminderSection_3 = IDL.Record({
-    'count' : IDL.Nat,
-    'items' : IDL.Vec(ReminderQuote),
   });
   const RemindersSummary = IDL.Record({
     'payables' : IDL.Opt(ReminderSection_2),
@@ -3930,6 +4261,7 @@ export const idlFactory = ({ IDL }) => {
     'from' : IDL.Opt(Timestamp),
     'kind' : IDL.Opt(CashMovementKind),
     'account' : IDL.Opt(CashAccount),
+    'registerId' : IDL.Opt(Id),
     'shiftId' : IDL.Opt(Id),
   });
   const CashMovementPage = IDL.Record({
@@ -3937,6 +4269,17 @@ export const idlFactory = ({ IDL }) => {
     'offset' : IDL.Nat,
     'limit' : IDL.Nat,
     'items' : IDL.Vec(CashMovement),
+  });
+  const CashRegisterFilter = IDL.Record({
+    'active' : IDL.Opt(IDL.Bool),
+    'kind' : IDL.Opt(CashRegisterKind),
+    'search' : IDL.Opt(IDL.Text),
+  });
+  const CashRegisterPage = IDL.Record({
+    'total' : IDL.Nat,
+    'offset' : IDL.Nat,
+    'limit' : IDL.Nat,
+    'items' : IDL.Vec(CashRegister),
   });
   const CommissionPaymentFilter = IDL.Record({
     'to' : IDL.Opt(Timestamp),
@@ -4162,6 +4505,8 @@ export const idlFactory = ({ IDL }) => {
     'to' : IDL.Opt(Timestamp),
     'status' : IDL.Opt(ShiftStatus),
     'from' : IDL.Opt(Timestamp),
+    'responsible' : IDL.Opt(IDL.Text),
+    'registerId' : IDL.Opt(Id),
   });
   const ShiftPage = IDL.Record({
     'total' : IDL.Nat,
@@ -4213,9 +4558,12 @@ export const idlFactory = ({ IDL }) => {
     'customerId' : Id,
   });
   const OpenShiftInput = IDL.Record({
+    'responsibleUserId' : IDL.Opt(Id),
     'openingBank' : Money,
     'openingCash' : Money,
+    'responsibleName' : IDL.Text,
     'notes' : IDL.Opt(IDL.Text),
+    'registerId' : Id,
   });
   const CommissionPaymentInput = IDL.Record({
     'period' : CommissionPeriod,
@@ -4255,6 +4603,7 @@ export const idlFactory = ({ IDL }) => {
     'description' : IDL.Text,
     'account' : CashAccount,
     'amount' : Money,
+    'shiftId' : IDL.Opt(Id),
   });
   const PaymentInput = IDL.Record({
     'method' : PaymentMethod,
@@ -4305,6 +4654,10 @@ export const idlFactory = ({ IDL }) => {
     'ok' : RestoreSectionResult,
     'err' : RestoreError,
   });
+  const SetOrderAdvanceInput = IDL.Record({
+    'method' : IDL.Opt(PaymentMethod),
+    'amount' : IDL.Opt(Money),
+  });
   const DriveAuthStart = IDL.Record({
     'authorizationUrl' : IDL.Text,
     'state' : IDL.Text,
@@ -4345,6 +4698,9 @@ export const idlFactory = ({ IDL }) => {
     'enabled' : IDL.Bool,
     'manualText' : IDL.Text,
     'manualCitation' : IDL.Text,
+  });
+  const OilChangeIntervalInput = IDL.Record({
+    'oilChangeInterval' : IDL.Opt(IDL.Nat),
   });
   const InvoiceLineInput = IDL.Record({
     'id' : IDL.Opt(Id),
@@ -4422,6 +4778,11 @@ export const idlFactory = ({ IDL }) => {
     'addLabor' : IDL.Func([IDL.Opt(IDL.Text), Id, LaborInput], [OrderView], []),
     'addOrderPart' : IDL.Func(
         [IDL.Opt(IDL.Text), Id, OrderPartInput],
+        [OrderView],
+        [],
+      ),
+    'addOrderPayment' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, OrderPaymentInput],
         [OrderView],
         [],
       ),
@@ -4509,6 +4870,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'createBackup' : IDL.Func([IDL.Opt(IDL.Text)], [BackupOutcome], []),
+    'createCashRegister' : IDL.Func(
+        [IDL.Opt(IDL.Text), CashRegisterInput],
+        [CashRegister],
+        [],
+      ),
     'createCustomer' : IDL.Func(
         [IDL.Opt(IDL.Text), CustomerInput],
         [Customer],
@@ -4624,6 +4990,7 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'deleteAppointment' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
+    'deleteCashRegister' : IDL.Func([IDL.Opt(IDL.Text), Id], [], []),
     'deleteExpense' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
     'deleteExpenseCategory' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
     'deleteInvoice' : IDL.Func([IDL.Opt(IDL.Text), Id], [IDL.Bool], []),
@@ -4686,6 +5053,11 @@ export const idlFactory = ({ IDL }) => {
       ),
     'getCallerUserProfile' : IDL.Func([], [IDL.Opt(UserProfile)], ['query']),
     'getCallerUserRole' : IDL.Func([], [UserRole], ['query']),
+    'getCashRegister' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(CashRegister)],
+        ['query'],
+      ),
     'getCommissionPayment' : IDL.Func(
         [IDL.Opt(IDL.Text), Id],
         [IDL.Opt(CommissionPayment)],
@@ -4715,6 +5087,11 @@ export const idlFactory = ({ IDL }) => {
     'getDailyShiftReport' : IDL.Func(
         [IDL.Opt(IDL.Text), Id],
         [DailyShiftReport],
+        ['query'],
+      ),
+    'getDashboardAlerts' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [DashboardAlertsSummary],
         ['query'],
       ),
     'getDashboardSummary' : IDL.Func(
@@ -4762,10 +5139,19 @@ export const idlFactory = ({ IDL }) => {
         [LocalBackupManifest],
         ['query'],
       ),
-    'getOpenShift' : IDL.Func([IDL.Opt(IDL.Text)], [IDL.Opt(Shift)], ['query']),
+    'getOpenShift' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Opt(Shift)],
+        ['query'],
+      ),
     'getOrder' : IDL.Func(
         [IDL.Opt(IDL.Text), Id],
         [IDL.Opt(OrderView)],
+        ['query'],
+      ),
+    'getOrderAdvanceReceipt' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [OrderAdvanceReceipt],
         ['query'],
       ),
     'getPart' : IDL.Func(
@@ -4867,6 +5253,11 @@ export const idlFactory = ({ IDL }) => {
         [CashMovementPage],
         ['query'],
       ),
+    'listCashRegisters' : IDL.Func(
+        [IDL.Opt(IDL.Text), CashRegisterFilter, IDL.Nat, IDL.Nat],
+        [CashRegisterPage],
+        ['query'],
+      ),
     'listCommissionLines' : IDL.Func(
         [IDL.Opt(IDL.Text), IDL.Opt(Id), CommissionPeriod],
         [IDL.Vec(CommissionLine)],
@@ -4950,6 +5341,16 @@ export const idlFactory = ({ IDL }) => {
     'listMovements' : IDL.Func(
         [IDL.Opt(IDL.Text), Id],
         [IDL.Vec(Movement)],
+        ['query'],
+      ),
+    'listOpenShifts' : IDL.Func(
+        [IDL.Opt(IDL.Text)],
+        [IDL.Vec(Shift)],
+        ['query'],
+      ),
+    'listOrderPayments' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id],
+        [IDL.Vec(OrderPayment)],
         ['query'],
       ),
     'listOrders' : IDL.Func(
@@ -5117,6 +5518,21 @@ export const idlFactory = ({ IDL }) => {
       ),
     'saveCallerUserProfile' : IDL.Func([IDL.Text], [UserProfile], []),
     'schema' : IDL.Func([], [IDL.Text], ['query']),
+    'setCashRegisterActive' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, IDL.Bool],
+        [CashRegister],
+        [],
+      ),
+    'setOrderAdvance' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, SetOrderAdvanceInput],
+        [OrderView],
+        [],
+      ),
+    'setShiftResponsible' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, IDL.Text, IDL.Opt(Id)],
+        [Shift],
+        [],
+      ),
     'setUserActive' : IDL.Func(
         [IDL.Opt(IDL.Text), Id, IDL.Bool],
         [UserListItem],
@@ -5153,6 +5569,11 @@ export const idlFactory = ({ IDL }) => {
         [],
       ),
     'updateCallerName' : IDL.Func([IDL.Text, IDL.Text], [SessionInfo], []),
+    'updateCashRegister' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, CashRegisterInput],
+        [CashRegister],
+        [],
+      ),
     'updateCompanyProfile' : IDL.Func(
         [IDL.Opt(IDL.Text), CompanyProfileRawInput],
         [CompanyProfile],
@@ -5186,6 +5607,11 @@ export const idlFactory = ({ IDL }) => {
     'updateMotorcycle' : IDL.Func(
         [IDL.Opt(IDL.Text), Id, MotorcycleInput],
         [Motorcycle],
+        [],
+      ),
+    'updateOilChangeInterval' : IDL.Func(
+        [IDL.Opt(IDL.Text), Id, OilChangeIntervalInput],
+        [OrderView],
         [],
       ),
     'updateOrderStatus' : IDL.Func(

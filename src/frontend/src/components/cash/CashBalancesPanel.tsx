@@ -7,8 +7,10 @@ import { cn } from "@/lib/utils";
 import { Banknote, Landmark, Wallet } from "lucide-react";
 
 interface CashBalancesPanelProps {
-  /** The currently open shift, or `null` when the register is closed. */
-  shift: Shift | null;
+  /** Every open shift, one per caja/banco. */
+  shifts: Shift[];
+  /** Display name per register id, when known. */
+  registerNames: Map<string, string>;
   isLoading: boolean;
   isError: boolean;
 }
@@ -55,14 +57,74 @@ function BalanceTile({
   );
 }
 
+interface RegisterBalancesProps {
+  shift: Shift;
+  registerName: string;
+  index: number;
+}
+
+/** One card per open shift with its own Caja, Bancos and total balances. */
+function RegisterBalances({
+  shift,
+  registerName,
+  index,
+}: RegisterBalancesProps) {
+  const total = shift.computedClosingCash + shift.computedClosingBank;
+  return (
+    <Card
+      data-ocid={`caja.balances.register.${index + 1}`}
+      className="gap-0 overflow-hidden rounded-lg py-0 shadow-none"
+    >
+      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-3">
+        <div className="min-w-0">
+          <p className="truncate font-display text-sm font-semibold">
+            {registerName}
+          </p>
+          <p className="data-rail text-[11px] text-muted-foreground">
+            Turno #{shift.id.toString()} · {shift.responsibleName || "—"}
+          </p>
+        </div>
+        <StatusBadge label="Turno abierto" tone="accepted" />
+      </div>
+      <CardContent className="grid gap-4 px-5 py-4 sm:grid-cols-3">
+        <BalanceTile
+          ocid={`caja.balances.register.${index + 1}.cash`}
+          label="Caja (efectivo)"
+          value={formatMoney(shift.computedClosingCash)}
+          hint={`Saldo inicial ${formatMoney(shift.openingCash)}`}
+          icon={<Banknote className="size-4" />}
+          accentClass="bg-primary"
+        />
+        <BalanceTile
+          ocid={`caja.balances.register.${index + 1}.bank`}
+          label="Bancos"
+          value={formatMoney(shift.computedClosingBank)}
+          hint={`Saldo inicial ${formatMoney(shift.openingBank)}`}
+          icon={<Landmark className="size-4" />}
+          accentClass="bg-info"
+        />
+        <BalanceTile
+          ocid={`caja.balances.register.${index + 1}.total`}
+          label="Total disponible"
+          value={formatMoney(total)}
+          hint="Caja más bancos del turno"
+          icon={<Wallet className="size-4" />}
+          accentClass="bg-accent"
+        />
+      </CardContent>
+    </Card>
+  );
+}
+
 /**
- * Caja y Bancos balance panel. Shows the opening balances of the open shift
- * and the computed closing balances the backend derives from the ledger, so
- * the operator always sees how much cash and how much bank money the register
- * currently holds.
+ * Caja y Bancos balance panel. Shows one card per open shift with the opening
+ * balances and the computed closing balances the backend derives from the
+ * ledger, so the operator always sees how much cash and how much bank money
+ * each caja/banco currently holds.
  */
 export function CashBalancesPanel({
-  shift,
+  shifts,
+  registerNames,
   isLoading,
   isError,
 }: CashBalancesPanelProps) {
@@ -71,13 +133,13 @@ export function CashBalancesPanel({
       <section
         data-ocid="caja.balances.loading_state"
         aria-label="Saldos de caja y bancos"
-        className="grid gap-4 sm:grid-cols-3"
+        className="space-y-4"
       >
         {Array.from(
-          { length: 3 },
+          { length: 2 },
           (_, index) => `balance-skeleton-${index}`,
         ).map((id) => (
-          <Skeleton key={id} className="h-[104px] w-full rounded-lg" />
+          <Skeleton key={id} className="h-[180px] w-full rounded-lg" />
         ))}
       </section>
     );
@@ -95,7 +157,7 @@ export function CashBalancesPanel({
     );
   }
 
-  if (!shift) {
+  if (shifts.length === 0) {
     return (
       <section
         data-ocid="caja.balances.closed_state"
@@ -106,62 +168,51 @@ export function CashBalancesPanel({
           <Wallet className="size-5 text-muted-foreground" aria-hidden="true" />
         </div>
         <p className="font-display text-sm font-semibold">
-          La caja está cerrada
+          No hay turnos abiertos
         </p>
         <p className="max-w-md text-xs text-muted-foreground">
-          Abre un turno con el saldo inicial de caja y bancos para empezar a
+          Abre un turno en una caja o banco con su saldo inicial para empezar a
           registrar movimientos del día.
         </p>
       </section>
     );
   }
 
-  const isOpen = shift.status === "open";
+  const grandTotal = shifts.reduce(
+    (sum, shift) => sum + shift.computedClosingCash + shift.computedClosingBank,
+    0n,
+  );
 
   return (
     <section
       data-ocid="caja.balances.section"
       aria-label="Saldos de caja y bancos"
-      className="space-y-3"
+      className="space-y-4"
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground">
-          Turno #{shift.id.toString()} · abierto{" "}
-          {formatDateTime(shift.openedAt)}
+          {shifts.length} turno{shifts.length === 1 ? "" : "s"} abierto
+          {shifts.length === 1 ? "" : "s"} · Total disponible{" "}
+          {formatMoney(grandTotal)}
         </p>
-        <StatusBadge
-          label={isOpen ? "Turno abierto" : "Turno cerrado"}
-          tone={isOpen ? "accepted" : "neutral"}
-        />
+        <p className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          {shifts.length} turno{shifts.length === 1 ? "" : "s"} · Saldos
+          calculados en vivo
+        </p>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <BalanceTile
-          ocid="caja.balances.cash"
-          label="Caja (efectivo)"
-          value={formatMoney(shift.computedClosingCash)}
-          hint={`Saldo inicial ${formatMoney(shift.openingCash)}`}
-          icon={<Banknote className="size-4" />}
-          accentClass="bg-primary"
-        />
-        <BalanceTile
-          ocid="caja.balances.bank"
-          label="Bancos"
-          value={formatMoney(shift.computedClosingBank)}
-          hint={`Saldo inicial ${formatMoney(shift.openingBank)}`}
-          icon={<Landmark className="size-4" />}
-          accentClass="bg-info"
-        />
-        <BalanceTile
-          ocid="caja.balances.total"
-          label="Total disponible"
-          value={formatMoney(
-            shift.computedClosingCash + shift.computedClosingBank,
-          )}
-          hint="Caja más bancos del turno"
-          icon={<Wallet className="size-4" />}
-          accentClass="bg-accent"
-        />
+      <div className="space-y-4">
+        {shifts.map((shift, index) => (
+          <RegisterBalances
+            key={shift.id.toString()}
+            shift={shift}
+            registerName={
+              registerNames.get(shift.registerId.toString()) ??
+              `Caja #${shift.registerId.toString()}`
+            }
+            index={index}
+          />
+        ))}
       </div>
     </section>
   );

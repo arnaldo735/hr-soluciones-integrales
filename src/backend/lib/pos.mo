@@ -11,6 +11,8 @@ import InventoryTypes "../types/inventory";
 import CustomerTypes "../types/customers";
 import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
+import CashTypes "../types/cash";
+import CashLib "../lib/cash";
 import Search "../lib/search";
 
 module {
@@ -20,6 +22,9 @@ module {
     var nextMovementId : Nat;
     var nextInvoiceId : Nat;
     var nextInvoiceNumber : Nat;
+    var nextCashMovementId : Nat;
+    var nextShiftId : Nat;
+    var nextCashRegisterId : Nat;
   };
 
   public type State = {
@@ -31,6 +36,11 @@ module {
     invoices : Map.Map<Common.Id, BillingTypes.Invoice>;
     businessSettings : { var settings : BillingTypes.BusinessSettings };
     company : { var profile : CompanyTypes.CompanyProfile };
+    // Estado de Caja y Bancos: una venta de contado registra un ingreso con
+    // origen `#pos` en el turno abierto de la cuenta correspondiente.
+    cashRegisters : Map.Map<Common.Id, CashTypes.CashRegister>;
+    shifts : Map.Map<Common.Id, CashTypes.Shift>;
+    cashMovements : Map.Map<Common.Id, CashTypes.CashMovement>;
     counters : Counters;
   };
 
@@ -88,6 +98,44 @@ module {
       performedBy;
       at = Time.now();
     });
+  };
+
+  // Traduce el medio de pago textual de una venta POS a la variante de
+  // facturación que usa Caja y Bancos.
+  func paymentMethodFor(method : Text) : BillingTypes.PaymentMethod {
+    switch (method) {
+      case ("card") { #card };
+      case ("transfer") { #transfer };
+      case ("mixed") { #mixed };
+      case (_) { #cash };
+    };
+  };
+
+  // Registra el ingreso de una venta de contado en Caja y Bancos. La cuenta se
+  // deriva del medio de pago con la misma regla que anticipos y abonos
+  // (`CashLib.accountFor`), y el movimiento se liga al turno abierto de esa
+  // cuenta, abriendo uno automáticamente si no existe
+  // (`CashLib.resolveOrOpenShiftForAccount`). Punto único de registro para una
+  // venta POS: la factura directa `#pos` que genera `createPosSale` no vuelve a
+  // registrar el cobro, así que no hay doble movimiento.
+  func recordSaleMovement(state : State, saleNumber : Text, method : BillingTypes.PaymentMethod, amount : Common.Money, performedBy : Principal) {
+    let account = CashLib.accountFor(method, #cash);
+    let shift = CashLib.resolveOrOpenShiftForAccount(state, account, performedBy, "Sistema (automático)");
+    let id = state.counters.nextCashMovementId;
+    state.counters.nextCashMovementId := id + 1;
+    let movement : CashTypes.CashMovement = {
+      id;
+      shiftId = shift.id;
+      timestamp = Time.now();
+      kind = #income;
+      paymentMethod = method;
+      amount;
+      account;
+      description = "Venta POS " # saleNumber;
+      reference = ?saleNumber;
+      source = #pos;
+    };
+    state.cashMovements.add(id, movement);
   };
 
   func deductFromAvailableLots(
@@ -344,6 +392,7 @@ module {
       taxRate;
       tax;
       total;
+      advanceApplied = null;
       paymentMethod;
       paymentCondition = input.paymentCondition;
       paymentStatus = if (credit) { #pending } else { #paid };
@@ -374,6 +423,13 @@ module {
       soldAt = now;
     };
     state.posSales.add(saleId, sale);
+
+    // 7. Una venta de contado cobra en el acto: registra su ingreso en Caja y
+    // Bancos (efectivo → Caja, tarjeta/transferencia → Bancos). Una venta a
+    // crédito no registra movimiento hasta que se cobre su factura.
+    if (not credit) {
+      recordSaleMovement(state, sale.saleNumber, paymentMethod, total, performedBy);
+    };
     sale;
   };
 };

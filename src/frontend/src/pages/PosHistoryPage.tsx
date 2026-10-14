@@ -20,10 +20,6 @@ import {
 import { useDailyHopeMessage } from "@/hooks/use-hope";
 import { usePosSale, usePosSales } from "@/hooks/use-pos";
 import {
-  SERVICE_TERMS_DEFAULT_TEXT,
-  useServiceTermsSettings,
-} from "@/hooks/use-service-terms";
-import {
   companyContactLine,
   companyFiscalLines,
   companyHeaderFromProfile,
@@ -99,7 +95,6 @@ async function buildReceiptPdf(
   meta: DocumentMeta[],
   lines: DocumentLine[],
   totals: DocumentTotals[],
-  footer: string,
   hope: HopeMessageContent | null,
 ): Promise<jsPDF> {
   const { jsPDF, autoTable } = await loadPdfLibs();
@@ -221,16 +216,10 @@ async function buildReceiptPdf(
     (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
       ?.finalY ?? afterLines + 4;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(narrow ? 6 : 7.5);
-  doc.setTextColor(100, 116, 139);
-  const footerY = afterTotals + (narrow ? 6 : 10);
-  const footerLines = doc.splitTextToSize(footer, right - margin);
-  doc.text(footerLines, margin, footerY);
   drawHopeMessage(doc, hope, {
     x: margin,
     right,
-    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    y: afterTotals + (narrow ? 6 : 10),
     narrow,
   });
 
@@ -249,7 +238,6 @@ function ReceiptDialog({
   const companyQuery = useCompanyProfile();
   const dailyHopeQuery = useDailyHopeMessage();
   const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
-  const serviceTermsQuery = useServiceTermsSettings();
   const { isIvaResponsible } = useIvaSettings();
   const [isDownloading, setIsDownloading] = useState(false);
   const [downloadError, setDownloadError] = useState<string | null>(null);
@@ -302,13 +290,6 @@ function ReceiptDialog({
       ]
     : [];
 
-  // Pie de página editable "Términos y condiciones del Servicio". Mientras la
-  // configuración carga, o cuando el administrador la dejó vacía, se usa el
-  // texto de recepción por defecto para que el comprobante nunca quede sin pie.
-  const serviceTermsText = serviceTermsQuery.data?.text?.trim() ?? "";
-  const receiptFooter =
-    serviceTermsText !== "" ? serviceTermsText : SERVICE_TERMS_DEFAULT_TEXT;
-
   async function handleDownloadPdf(nextFormat: DocumentFormat) {
     if (!sale) return;
     setDownloadError(null);
@@ -321,7 +302,6 @@ function ReceiptDialog({
         meta,
         lines,
         totals,
-        receiptFooter,
         hopeMessage,
       );
       await downloadFile({
@@ -388,7 +368,6 @@ function ReceiptDialog({
               meta={meta}
               lines={lines}
               totals={totals}
-              footer={receiptFooter}
               hopeMessage={hopeMessage}
               format="a4"
               ocid="pos_history.receipt_a4"
@@ -405,7 +384,6 @@ function ReceiptDialog({
               meta={meta}
               lines={lines}
               totals={totals}
-              footer={receiptFooter}
               hopeMessage={hopeMessage}
               format="receipt80"
               ocid="pos_history.receipt_80mm"
@@ -534,7 +512,7 @@ export function PosHistoryPage() {
         description="Todas las ventas de mostrador con su factura asociada. Busca por número de venta o cliente y reimprime el comprobante."
         actions={
           <Button type="button" asChild className="gap-2">
-            <Link to="/pos" data-ocid="pos_history.new_sale_link">
+            <Link to="/pos" search={{}} data-ocid="pos_history.new_sale_link">
               <ShoppingCart className="size-4" aria-hidden="true" />
               Nueva venta
             </Link>

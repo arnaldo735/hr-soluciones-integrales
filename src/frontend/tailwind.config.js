@@ -188,6 +188,8 @@ export default {
           "0 1px 2px -1px rgb(0 0 0 / 0.10), 0 0 0 1px rgb(0 0 0 / 0.03)",
         "company":
           "0 2px 10px -4px rgb(0 0 0 / 0.14), 0 0 0 1px rgb(0 0 0 / 0.04)",
+        "alert":
+          "0 1px 2px -1px rgb(0 0 0 / 0.10), 0 0 0 1px rgb(0 0 0 / 0.03)",
       },
       keyframes: {
         "accordion-down": {

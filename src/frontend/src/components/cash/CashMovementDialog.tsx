@@ -17,7 +17,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { useRegisterCashMovement } from "@/hooks/use-cash";
+import {
+  useCashRegisters,
+  useOpenShifts,
+  useRegisterCashMovement,
+} from "@/hooks/use-cash";
 import {
   CashAccount,
   type CashMovementInput,
@@ -27,7 +31,7 @@ import {
 } from "@/lib/types";
 import { cn } from "@/lib/utils";
 import { Banknote, Landmark } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import {
   PAYMENT_METHOD_LABELS,
@@ -41,9 +45,12 @@ import {
 interface CashMovementDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  /** Pre-selected open shift, when the dialog is opened from a shift card. */
+  initialShiftId?: string | null;
 }
 
 interface MovementFormState {
+  shiftId: string;
   kind: CashMovementKind;
   paymentMethod: PaymentMethod;
   account: CashAccount;
@@ -52,8 +59,9 @@ interface MovementFormState {
   reference: string;
 }
 
-function emptyForm(): MovementFormState {
+function emptyForm(shiftId: string): MovementFormState {
   return {
+    shiftId,
     kind: CashMovementKind.income,
     paymentMethod: PaymentMethod.cash,
     account: CashAccount.cash,
@@ -64,24 +72,59 @@ function emptyForm(): MovementFormState {
 }
 
 /**
- * Registers an ingreso or egreso classified by payment method. The account is
- * derived from the method — efectivo affects Caja, transferencia and tarjeta
- * affect Bancos — and can be chosen explicitly for a mixed payment.
+ * Registers an ingreso or egreso against a specific open shift. The operator
+ * picks the caja/banco (open shift) the movement belongs to; the account is
+ * derived from the payment method — efectivo affects Caja, transferencia and
+ * tarjeta affect Bancos — and can be chosen explicitly for a mixed payment.
  */
 export function CashMovementDialog({
   open,
   onOpenChange,
+  initialShiftId = null,
 }: CashMovementDialogProps) {
-  const [form, setForm] = useState<MovementFormState>(emptyForm);
+  const [form, setForm] = useState<MovementFormState>(() =>
+    emptyForm(initialShiftId ?? ""),
+  );
   const [error, setError] = useState<string | null>(null);
   const registerMovement = useRegisterCashMovement();
+  const openShiftsQuery = useOpenShifts();
+  const registersQuery = useCashRegisters({
+    kind: null,
+    active: null,
+    search: "",
+    offset: 0,
+    limit: 100,
+  });
+
+  const openShifts = useMemo(
+    () => openShiftsQuery.data ?? [],
+    [openShiftsQuery.data],
+  );
+  const registerNames = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const register of registersQuery.data?.items ?? []) {
+      map.set(register.id.toString(), register.name);
+    }
+    return map;
+  }, [registersQuery.data]);
 
   useEffect(() => {
     if (open) {
-      setForm(emptyForm());
+      setForm(emptyForm(initialShiftId ?? ""));
       setError(null);
     }
-  }, [open]);
+  }, [open, initialShiftId]);
+
+  // Fill an empty selection once the open shifts load, without clobbering a
+  // choice the operator already made.
+  useEffect(() => {
+    if (!open) return;
+    setForm((current) =>
+      current.shiftId === "" && openShifts.length > 0
+        ? { ...current, shiftId: openShifts[0].id.toString() }
+        : current,
+    );
+  }, [open, openShifts]);
 
   function update<K extends keyof MovementFormState>(
     key: K,
@@ -104,6 +147,10 @@ export function CashMovementDialog({
 
   function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (form.shiftId === "") {
+      setError("Elige el turno abierto al que pertenece el movimiento.");
+      return;
+    }
     const description = form.description.trim();
     if (description === "") {
       setError("Describe el movimiento para poder identificarlo.");
@@ -124,6 +171,7 @@ export function CashMovementDialog({
       reference:
         form.reference.trim() === "" ? undefined : form.reference.trim(),
       source: CashMovementSource.manual,
+      shiftId: BigInt(form.shiftId),
     };
 
     setError(null);
@@ -156,12 +204,47 @@ export function CashMovementDialog({
             Registrar movimiento
           </DialogTitle>
           <DialogDescription>
-            Clasifica el movimiento por medio de pago. El efectivo afecta Caja;
-            la transferencia y la tarjeta afectan Bancos.
+            Elige el turno abierto (caja o banco) y clasifica el movimiento por
+            medio de pago. El efectivo afecta Caja; la transferencia y la
+            tarjeta afectan Bancos.
           </DialogDescription>
         </DialogHeader>
 
         <form onSubmit={handleSubmit} className="space-y-4">
+          <div className="space-y-1.5">
+            <Label htmlFor="movement-shift">Turno / caja o banco</Label>
+            <Select
+              value={form.shiftId}
+              onValueChange={(value) => update("shiftId", value)}
+            >
+              <SelectTrigger
+                id="movement-shift"
+                aria-label="Turno abierto"
+                data-ocid="caja.movement.shift_select"
+              >
+                <SelectValue placeholder="Elige un turno abierto" />
+              </SelectTrigger>
+              <SelectContent>
+                {openShifts.length === 0 ? (
+                  <SelectItem value="__none__" disabled>
+                    No hay turnos abiertos
+                  </SelectItem>
+                ) : (
+                  openShifts.map((shift) => (
+                    <SelectItem
+                      key={shift.id.toString()}
+                      value={shift.id.toString()}
+                    >
+                      {registerNames.get(shift.registerId.toString()) ??
+                        `Caja #${shift.registerId.toString()}`}{" "}
+                      · Turno #{shift.id.toString()} · {shift.responsibleName}
+                    </SelectItem>
+                  ))
+                )}
+              </SelectContent>
+            </Select>
+          </div>
+
           <fieldset className="space-y-1.5">
             <legend className="text-sm font-medium">Tipo de movimiento</legend>
             <div className="grid grid-cols-2 gap-2">

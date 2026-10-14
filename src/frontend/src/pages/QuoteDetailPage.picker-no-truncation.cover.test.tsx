@@ -20,17 +20,18 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Cover for the accepted no-truncation behavior of the new-quote pickers.
+ * Cover for the accepted no-truncation behavior of the new-quote unified
+ * search.
  *
- * The accepted change stops the type-to-narrow selectors from truncating: the
- * part picker asks the backend for a page large enough to cover the whole
- * catalog (1000 rows, not the old 50) and the service picker does the same
- * (1000, not the old 100), and each renders every row the backend returns. The
- * accent folding itself is resolved in the backend, so it is exercised in the
- * PocketIC lane, not here; this file pins the frontend seam the change touches.
+ * The accepted change stops the type-to-narrow search from truncating: the
+ * single box asks the backend for a page large enough to cover the whole
+ * catalog (1000 rows, not the old 50/100) for both parts and services, and
+ * renders every row the backend returns. The accent folding itself is resolved
+ * in the backend, so it is exercised in the PocketIC lane, not here; this file
+ * pins the frontend seam the change touches.
  *
  * The actor is mocked with the current call shape (session token first), so
- * these tests fail if the picker regresses to a small page or drops rows.
+ * these tests fail if the search regresses to a small page or drops rows.
  */
 
 const listCustomersMock = vi.fn();
@@ -70,6 +71,7 @@ vi.mock("@tanstack/react-router", () => ({
   // No id means the "nueva" (new quote) route.
   useParams: () => ({}),
   useNavigate: () => vi.fn(),
+  useSearch: () => ({}),
 }));
 
 vi.mock("sonner", () => ({
@@ -163,7 +165,7 @@ function companyProfile(): CompanyProfile {
   };
 }
 
-describe("QuoteDetailPage picker no-truncation (cover)", () => {
+describe("QuoteDetailPage unified search no-truncation (cover)", () => {
   beforeEach(() => {
     listCustomersMock.mockReset();
     listMotorcyclesMock.mockReset();
@@ -189,7 +191,7 @@ describe("QuoteDetailPage picker no-truncation (cover)", () => {
     getCompanyProfileMock.mockResolvedValue(companyProfile());
   });
 
-  it("requests a whole-catalog page for the part picker and lists every returned row", async () => {
+  it("requests a whole-catalog page for parts and lists every returned row", async () => {
     // More than the old 50-row cap, so a regression to a small page would drop
     // rows and fail the count assertion below.
     const parts = Array.from({ length: 60 }, (_, index) => part(index + 1));
@@ -204,7 +206,7 @@ describe("QuoteDetailPage picker no-truncation (cover)", () => {
     await screen.findByText("Nueva cotización");
 
     await userEvent.type(
-      screen.getByTestId("quote_detail.part_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "balata",
     );
 
@@ -219,7 +221,7 @@ describe("QuoteDetailPage picker no-truncation (cover)", () => {
     );
 
     const list = within(
-      await screen.findByTestId("quote_detail.part_search.list"),
+      await screen.findByTestId("quote_detail.item_search.list"),
     );
     // Every one of the 60 rows is rendered, not a truncated first page.
     expect(list.getAllByRole("button")).toHaveLength(60);
@@ -227,7 +229,7 @@ describe("QuoteDetailPage picker no-truncation (cover)", () => {
     expect(list.getByText("BAL-060")).toBeInTheDocument();
   });
 
-  it("requests a whole-catalog page for the service picker and lists every returned row", async () => {
+  it("requests a whole-catalog page for services and lists every returned row", async () => {
     const services = Array.from({ length: 60 }, (_, index) =>
       service(index + 1),
     );
@@ -242,7 +244,7 @@ describe("QuoteDetailPage picker no-truncation (cover)", () => {
     await screen.findByText("Nueva cotización");
 
     await userEvent.type(
-      screen.getByTestId("quote_detail.service_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "servicio",
     );
 
@@ -257,7 +259,7 @@ describe("QuoteDetailPage picker no-truncation (cover)", () => {
     );
 
     const list = within(
-      await screen.findByTestId("quote_detail.service_search.list"),
+      await screen.findByTestId("quote_detail.item_search.list"),
     );
     expect(list.getAllByRole("button")).toHaveLength(60);
     expect(list.getByText("SRV-001")).toBeInTheDocument();

@@ -9,6 +9,7 @@ import InventoryTypes "../types/inventory";
 import CustomerTypes "../types/customers";
 import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
+import CashTypes "../types/cash";
 import UserTypes "../types/users";
 import PosLib "../lib/pos";
 import UsersLib "../lib/users";
@@ -23,12 +24,15 @@ mixin (
   invoices : Map.Map<Common.Id, BillingTypes.Invoice>,
   businessSettings : { var settings : BillingTypes.BusinessSettings },
   company : { var profile : CompanyTypes.CompanyProfile },
+  cashRegisters : Map.Map<Common.Id, CashTypes.CashRegister>,
+  shifts : Map.Map<Common.Id, CashTypes.Shift>,
+  cashMovements : Map.Map<Common.Id, CashTypes.CashMovement>,
   counters : PosLib.Counters,
   credentials : Map.Map<Common.Id, UserTypes.Credential>,
   sessions : Map.Map<Text, UserTypes.Session>,
   roles : Map.Map<Common.Id, UserTypes.Role>,
 ) {
-  func posState() : PosLib.State = { posSales; parts; lots; movements; customers; invoices; businessSettings; company; counters };
+  func posState() : PosLib.State = { posSales; parts; lots; movements; customers; invoices; businessSettings; company; cashRegisters; shifts; cashMovements; counters };
 
   func requirePosModule(caller : Principal, token : ?Text) {
     if (not UsersLib.canAccessModule({ credentials; sessions; roles }, accessControlState, caller, token, "pos")) {

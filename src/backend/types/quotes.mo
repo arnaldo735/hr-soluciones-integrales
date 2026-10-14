@@ -28,7 +28,9 @@ module {
     id : Id;
     quoteNumber : Text;
     customerId : Id;
-    motorcycleId : Id;
+    // La moto es opcional: se puede cotizar para un cliente sin motos
+    // registradas. Cuando viene, debe existir en el catálogo de motos.
+    motorcycleId : ?Id;
     status : QuoteStatus;
     partLines : [QuotePartLine];
     serviceLines : [QuoteServiceLine];
@@ -70,7 +72,8 @@ module {
 
   public type QuoteInput = {
     customerId : Id;
-    motorcycleId : Id;
+    // Opcional: null/ausente cuando el cliente no tiene moto registrada.
+    motorcycleId : ?Id;
     partLines : [QuotePartLineInput];
     serviceLines : [QuoteServiceLineInput];
     discount : Money;

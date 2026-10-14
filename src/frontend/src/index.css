@@ -177,6 +177,24 @@
     --temp-password: 0.66 0.15 78;
     --temp-password-foreground: 0.2 0.02 78;
 
+    /* Panel de alertas — tarjetas de conteo del panel principal.
+       Cada tono tiene un par `-foreground`; los cuatro tonos reutilizan los
+       matices del sistema (info azul 240, warning ámbar 78, danger rojo 25,
+       ok verde 148) para no introducir colores nuevos. */
+    --alert-info: 0.55 0.12 240;
+    --alert-info-foreground: 0.99 0.005 240;
+    --alert-warning: 0.66 0.15 78;
+    --alert-warning-foreground: 0.2 0.02 78;
+    --alert-danger: 0.58 0.22 25;
+    --alert-danger-foreground: 0.99 0.005 25;
+    --alert-ok: 0.55 0.14 148;
+    --alert-ok-foreground: 0.99 0.01 148;
+    /* Superficie del estado "al día": gris acero desaturado, sin tinte de
+       color, para que una tarjeta sin pendientes se lea como inerte. */
+    --alert-clear-surface: 0.955 0.004 85;
+    --alert-clear-border: 0.9 0.006 85;
+    --alert-clear-foreground: 0.5 0.012 82;
+
     /* Print geometry — single source of truth shared by the on-screen
        preview and the @page rules, so preview equals print. */
     --doc-a4-width: 210mm;
@@ -338,6 +356,21 @@
 
     --temp-password: 0.78 0.16 75;
     --temp-password-foreground: 0.18 0.02 75;
+
+    /* Panel de alertas — tarjetas de conteo del panel principal.
+       Mismos matices del sistema, aclarados para el modo oscuro. */
+    --alert-info: 0.7 0.13 240;
+    --alert-info-foreground: 0.16 0.012 240;
+    --alert-warning: 0.78 0.16 75;
+    --alert-warning-foreground: 0.18 0.02 75;
+    --alert-danger: 0.66 0.21 25;
+    --alert-danger-foreground: 0.16 0.012 25;
+    --alert-ok: 0.72 0.16 148;
+    --alert-ok-foreground: 0.16 0.012 148;
+    /* Superficie "al día": gris acero apagado, un paso por debajo de la card. */
+    --alert-clear-surface: 0.225 0.01 85;
+    --alert-clear-border: 0.3 0.014 85;
+    --alert-clear-foreground: 0.6 0.01 83;
 
     /* Print geometry — same values in both modes; the sheet is always paper. */
     --doc-a4-width: 210mm;
@@ -738,15 +771,34 @@
   /* Términos y Condiciones de Garantía — documento de la orden de trabajo.
      Compartido por WarrantyDocument (pantalla) y lib/pdf.ts (A4 y tirilla
      80mm): bloque de identificación, 8 cláusulas numeradas y aviso IMPORTANTE
-     en tarjeta ámbar. Reutiliza el lenguaje visual del bloque de esperanza. */
+     en tarjeta ámbar. Reutiliza el lenguaje visual del bloque de esperanza.
+
+     Separación en flujo normal: el encabezado de empresa ocupa su propia
+     altura y cada bloque siguiente arranca debajo con su propio margen
+     superior. Sin posicionamiento absoluto ni alturas fijas, de modo que el
+     encabezado nunca se monta sobre la identidad del cliente ni sobre el
+     cuerpo de cláusulas, en pantalla ni en papel. */
   .doc-warranty-identity {
+    margin-top: 4mm;
     page-break-inside: avoid;
     break-inside: avoid;
+  }
+  /* Cada fila de identificación es un par etiqueta/valor que puede encogerse:
+     `min-w-0` deja que el valor largo haga wrap dentro de su celda en vez de
+     desbordar sobre la columna vecina. */
+  .doc-warranty-identity dl > div {
+    min-width: 0;
+  }
+  .doc-warranty-identity dt,
+  .doc-warranty-identity dd {
+    min-width: 0;
+    overflow-wrap: anywhere;
   }
   .doc-warranty-clauses {
     display: flex;
     flex-direction: column;
     gap: 3mm;
+    margin-top: 4mm;
   }
   .doc-warranty-clause {
     page-break-inside: avoid;
@@ -798,6 +850,18 @@
   .doc-preview-a4 .doc-warranty-clause-body,
   .doc-preview-a4 .doc-warranty-important-body {
     font-size: 11px;
+  }
+  /* Tirilla 80mm: la identificación pasa a una sola columna. En 74mm de ancho
+     útil dos columnas de etiqueta/valor quedan demasiado estrechas y los
+     valores largos (motocicleta, técnico) se montan sobre la columna vecina;
+     apiladas, cada dato ocupa su propia fila y se lee completo. */
+  .doc-preview-80mm .doc-warranty-identity dl {
+    grid-template-columns: minmax(0, 1fr);
+    column-gap: 0;
+    row-gap: 1.5mm;
+  }
+  .doc-preview-80mm .doc-warranty-identity dl > div {
+    gap: 2mm;
   }
   /* Tirilla 80mm: tipografía y espaciado reducidos para el rollo. */
   .doc-preview-80mm .doc-warranty-clauses {
@@ -1212,6 +1276,147 @@
   }
 
   /* ==========================================================================
+     Panel de alertas — cuadrícula de tarjetas de conteo del panel principal.
+     Cada tarjeta es un enlace al módulo correspondiente: franja de encabezado
+     de color, ícono, conteo grande en mono y mensaje en español. Una tarjeta
+     con conteo cero cae al estado "al día" (atenuada, sin color de alarma).
+     ========================================================================== */
+
+  .alert-grid {
+    @apply grid gap-3 sm:grid-cols-2 xl:grid-cols-3;
+  }
+
+  /* La tarjeta es un <a>: toda la superficie es el objetivo de clic. */
+  .alert-card {
+    @apply relative flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left shadow-shortcut transition-smooth animate-shortcut-in;
+  }
+  .alert-card:hover {
+    @apply border-primary/40;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 18px -6px oklch(var(--foreground) / 0.18);
+  }
+  .alert-card:focus-visible {
+    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+  }
+
+  /* Franja de encabezado — 4px de color del tono, la firma de la tarjeta. */
+  .alert-card-strip {
+    @apply h-1 w-full shrink-0;
+    background-color: oklch(var(--alert-warning));
+  }
+  .alert-card[data-tone="info"] .alert-card-strip {
+    background-color: oklch(var(--alert-info));
+  }
+  .alert-card[data-tone="warning"] .alert-card-strip {
+    background-color: oklch(var(--alert-warning));
+  }
+  .alert-card[data-tone="danger"] .alert-card-strip {
+    background-color: oklch(var(--alert-danger));
+  }
+  .alert-card[data-tone="ok"] .alert-card-strip {
+    background-color: oklch(var(--alert-ok));
+  }
+
+  .alert-card-body {
+    @apply flex flex-1 flex-col gap-3 p-4;
+  }
+  .alert-card-head {
+    @apply flex items-start gap-3;
+  }
+
+  /* Ícono tintado por tono — mismo lenguaje que .flow-shortcut-icon. */
+  .alert-card-icon {
+    @apply flex size-9 shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground;
+  }
+  .alert-card[data-tone="info"] .alert-card-icon {
+    background-color: oklch(var(--alert-info) / 0.12);
+    color: oklch(var(--alert-info));
+  }
+  .alert-card[data-tone="warning"] .alert-card-icon {
+    background-color: oklch(var(--alert-warning) / 0.14);
+    color: oklch(var(--alert-warning));
+  }
+  .alert-card[data-tone="danger"] .alert-card-icon {
+    background-color: oklch(var(--alert-danger) / 0.14);
+    color: oklch(var(--alert-danger));
+  }
+  .alert-card[data-tone="ok"] .alert-card-icon {
+    background-color: oklch(var(--alert-ok) / 0.12);
+    color: oklch(var(--alert-ok));
+  }
+
+  .alert-card-title {
+    @apply text-sm font-semibold leading-tight text-foreground;
+  }
+  .alert-card-module {
+    @apply mt-0.5 text-xs text-muted-foreground;
+  }
+
+  /* Conteo grande en mono — el dato que se escanea de un vistazo. */
+  .alert-card-count {
+    @apply font-mono text-4xl font-bold tabular-nums leading-none tracking-tight;
+  }
+  .alert-card[data-tone="info"] .alert-card-count {
+    color: oklch(var(--alert-info));
+  }
+  .alert-card[data-tone="warning"] .alert-card-count {
+    color: oklch(var(--alert-warning));
+  }
+  .alert-card[data-tone="danger"] .alert-card-count {
+    color: oklch(var(--alert-danger));
+  }
+  .alert-card[data-tone="ok"] .alert-card-count {
+    color: oklch(var(--alert-ok));
+  }
+
+  .alert-card-message {
+    @apply text-sm leading-snug text-muted-foreground;
+  }
+  /* Afordancia de navegación — aparece al pasar el cursor o enfocar. */
+  .alert-card-cta {
+    @apply mt-auto inline-flex items-center gap-1.5 border-t border-border/60 pt-3 text-xs font-medium text-muted-foreground transition-smooth;
+  }
+  .alert-card:hover .alert-card-cta,
+  .alert-card:focus-visible .alert-card-cta {
+    @apply text-primary;
+  }
+  .alert-card-cta svg {
+    @apply size-3.5 transition-transform duration-200;
+  }
+  .alert-card:hover .alert-card-cta svg {
+    transform: translateX(2px);
+  }
+
+  /* Estado "al día" — conteo cero: superficie apagada, sin color de alarma,
+     el conteo pierde su color y la tarjeta deja de invitar al clic. */
+  .alert-card[data-clear="true"] {
+    background-color: oklch(var(--alert-clear-surface));
+    border-color: oklch(var(--alert-clear-border));
+    box-shadow: none;
+  }
+  .alert-card[data-clear="true"] .alert-card-strip {
+    background-color: oklch(var(--alert-clear-border));
+  }
+  .alert-card[data-clear="true"] .alert-card-icon {
+    @apply bg-muted text-muted-foreground;
+  }
+  .alert-card[data-clear="true"] .alert-card-count {
+    color: oklch(var(--alert-clear-foreground));
+  }
+  .alert-card[data-clear="true"] .alert-card-title,
+  .alert-card[data-clear="true"] .alert-card-message {
+    color: oklch(var(--alert-clear-foreground));
+  }
+  .alert-card[data-clear="true"]:hover {
+    transform: none;
+    border-color: oklch(var(--alert-clear-border));
+    box-shadow: none;
+  }
+  .alert-card[data-clear="true"] .alert-card-cta {
+    @apply text-muted-foreground;
+  }
+
+  /* ==========================================================================
      Acceso y usuarios — login, roles y estado de cuenta.
      The login screen is the workshop's front door: a centered nameplate-style
      card on a graphite-green backdrop with the same hairline grid texture used
@@ -1581,6 +1786,23 @@
   }
   .doc-preview .doc-hope-citation {
     color: #8a5a12 !important;
+  }
+
+  /* Términos y Condiciones de Garantía: el encabezado de empresa, la
+     identificación del cliente y el cuerpo de cláusulas se mantienen en flujo
+     normal con su propio margen superior, así que en papel tampoco se montan
+     uno sobre otro. */
+  .doc-preview .doc-warranty-identity {
+    margin-top: 4mm !important;
+  }
+  .doc-preview .doc-warranty-clauses {
+    margin-top: 4mm !important;
+  }
+  /* Tirilla 80mm impresa: la identificación también va a una sola columna. */
+  .doc-preview-80mm .doc-warranty-identity dl {
+    grid-template-columns: minmax(0, 1fr) !important;
+    column-gap: 0 !important;
+    row-gap: 1.5mm !important;
   }
 
   /* Términos y Condiciones de Garantía: el aviso IMPORTANTE conserva su tarjeta

@@ -6,9 +6,9 @@
 - Montos en centavos enteros COP, sin decimales
 - No romper funcionalidad ni datos existentes
 - Diseño responsive: la app se usa desde celular
-- Los buscadores ignoran mayúsculas y tildes (á=a, é=e, ñ=n, ü=u)
-- Los selectores de servicios e inventario solo muestran resultados al escribir un término de búsqueda, no listan todo por defecto
-- Mostrar un mensaje claro cuando una búsqueda no arroje resultados
+- Mantener la identidad visual 'Taller Nocturno' (tokens semánticos, sin colores crudos)
+- El panel principal usa tarjetas de alerta clicables con conteo y mensaje en español
+- Todo el contenido de las alertas del panel debe abrirse en modales dentro del mismo marco del panel, sin navegar a otra ruta
 
 ## Verified Commands
 
@@ -18,28 +18,28 @@
 
 ## Learnings
 
-- El diálogo de recordatorios se monta en Layout.tsx (shell autenticado) y usa sessionStorage 'hr-reminders-dismissed' para no reaparecer tras cerrarlo; el listener de visibilitychange se registra dentro del efecto y se limpia en su return.
-- getRemindersSummary(token) agrega pendientes reutilizando ReceivablesLib.listReceivables y PurchasingLib.listPayables; el gating por módulo se resuelve sección a sección con UsersLib.canAccessModule y las secciones no autorizadas se devuelven como null.
-- El momento de finalización de una orden #ready se toma de la última transición a #ready en statusHistory y, si no existe, de updatedAt; los días transcurridos se calculan con Time.now() en nanosegundos dividido entre 24h.
-- En un literal Text de Motoko que contiene Markdown, toda comilla doble interna debe escaparse como \" o el literal termina antes de tiempo y produce M0097/M0057 en el mixin.
-- Una constante de módulo como 24 * 60 * 60 * 1_000_000_000 se infiere Nat y la multiplicación no es estática, lo que falla con M0014; hay que escribir el valor como literal Int (86_400_000_000_000).
-- Los selectores tipo búsqueda (ServicePicker, AddPartDialog, QuoteDetailPage, PosPage) pasan enabled: term.length > 0 a useServices/useParts, de modo que el catálogo nunca se lista por defecto; useParts se usa solo en esos selectores, mientras useServices se comparte con páginas paginadas y necesita un flag enabled opt-in.
-- El tipo generado RemindersSummary exige generatedAt y usa finishedOrders/daysInWorkshop, ReminderOrder.id y ReminderQuote.id.
-- Las filas de citas y cotizaciones del diálogo de recordatorios muestran el estado crudo en inglés (scheduled/confirmed/draft/sent); conviene mapearlo a etiquetas en español como el resto de la app.
-- El encabezado de documentos se comparte en tres rutas de PDF: drawHeader (comisiones), drawContactHeader rama A4 y rama tirilla; cualquier dato nuevo de empresa debe agregarse a las tres, además de PdfCompany/pdfCompanyFromProfile.
-- ContactDocumentPreview arma su propia línea de contacto en lugar de reutilizar companyContactLine, por lo que cada campo nuevo de empresa debe agregarse también allí.
-- En drawContactHeader el avance del cursor debe ser lineHeight × splitTextToSize(...).length por bloque; un incremento fijo subestima el texto que hace wrap y apila el bloque siguiente encima.
-- En la tirilla 80mm el encabezado de pantalla necesita w-full + min-w-0 en el bloque de identidad y gap explícito; sin w-full el texto largo desborda los 74mm y se encima con el bloque de título.
-- WarrantyDocument.tsx duplica el markup del encabezado de DocumentPreview, así que cualquier corrección de layout del encabezado debe aplicarse en ambos archivos.
-- Existen 170 fallos de prueba preexistentes no relacionados (drift de firma de actor: argumento null inicial extra en llamadas de listado) en 47 archivos de páginas ajenas al encabezado; el subconjunto de encabezado/documentos está verde.
-- Text.toLower() de Motoko NO convierte vocales acentuadas mayúsculas (Á, É, Í, Ó, Ú, Ü, Ñ); la normalización compartida en src/backend/lib/search.mo debe plegar tildes sobre el texto crudo (reconociendo mayúscula y minúscula) y aplicar toLower() al final, o esos caracteres sobreviven y rompen la búsqueda insensible a tildes.
-- En React Query v5, isLoading es false durante el refetch de una query key nueva cuando ya hay datos en caché; para no mostrar resultados obsoletos ni un 'sin resultados' prematuro hay que gatear con isFetching y con la comparación término vivo vs término debounced.
-- invalidateQueries({queryKey:['parts']}) hace prefix-match con ['parts','picker',term], así que el buscador del POS ya se refresca tras una venta o un cambio de inventario sin cambiar la clave.
-- El prompt de término vacío del POS debe usar el valor vivo de search (no el debounced) para que al borrar el campo aparezca de inmediato sin esperar los 250ms.
-- pnpm fix (biome check --write src) reformatea también archivos de prueba; si un dispatch prohíbe editar tests, hay que revertir ese churn con git checkout para no dejar cambios no autorizados.
-- En el POS, el buscador de clientes debe seguir listando todo el directorio cuando el término está vacío (contrato protegido por PosPage.customer.test.tsx); a diferencia de productos/servicios, NO se gatea la consulta por término no vacío. El defecto real es mostrar resultados obsoletos o 'sin resultados' prematuro durante el debounce/refetch, corregido con un guard isCustomerSearchPending análogo a isPartSearchPending.
-- El estado vacío del buscador de clientes del POS debe comparar contra el término debounced (no el vivo) para ser consistente con la consulta que realmente se ejecuta.
-- PosPage.customer.test.tsx tiene mocks con firma desviada: listCustomersMock.mockImplementation((search) => ...) recibe el token como primer argumento, por lo que sus aserciones de búsqueda y de estado vacío no reflejan el contrato real (token, search).
-- En PosPage.tsx el buscador de clientes importa useCustomers desde @/hooks/use-customers (firma correcta (token, search)); la copia duplicada en use-orders.ts no la usa el POS.
-- El defecto del buscador de clientes del POS era el gating de render: el guard de carga y el estado vacío comparaban contra customerSearch (término vivo) mientras la consulta corre sobre debouncedCustomerSearch; ahora el estado vacío compara contra el término debounced y se suprime cuando customersQuery.isError.
-- El backend de búsqueda de clientes ya era correcto: listCustomers normaliza el término una vez y matchesSearch compara nombre/teléfono/documento con Search.contains (normaliza ambos lados) y placas pre-normalizadas en platesByCustomer.
+- El backend calcula el saldo pendiente de una OT como balance = if (charged >= total) { 0 } else { total - charged } (charged = anticipo + abonos), acotado a 0; el frontend debe replicar ese acotamiento o muestra saldos negativos y mensajes de límite confusos.
+- En OrderDetailPage el saldo pendiente se deriva de la orden (total − anticipo − abonos) y no de totals.balance, porque los fixtures de prueba fijan totals.balance al total sin descontar el anticipo.
+- useAddOrderPayment debe invalidar ['order-payments', id] además de ['order', id]; el saldo pendiente del detalle de OT se deriva de esa consulta y no de order.payments.
+- La queryKey de useOrderPayments usa id?.toString() ?? 'none'; la invalidación debe usar view.order.id.toString() para coincidir exactamente.
+- addOrderPayment exime el tope de saldo pendiente solo cuando totals.total > 0, replicando la exención de total 0 de ensureAdvanceWithinTotal; la comparación estricta > conserva la aceptación de un abono igual al saldo.
+- El frontend OrderDetailPage replica la exención de total 0 en handleSavePayment y el acotamiento del saldo a 0 para coincidir con computeTotals del backend.
+- La suite completa pnpm test sigue con ~145 fallos preexistentes en el frontend y ~125 en la lane PocketIC (firmas de actor con token inicial obsoleto); no bloquean el despliegue pero conviene reconciliarlos.
+- Los saldos de turnos abiertos se derivan en vivo desde cashMovements con withLiveBalances en listOpenShifts/getOpenShift/getShift/getDailyShiftReport; closeShift usa shiftTotals con la misma agregación, así que anticipos (#advance) y ventas POS (#pos) se reflejan sin cerrar el turno.
+- invalidateCashData invalida la familia ['cash'] por prefijo, cubriendo useOpenShifts (['cash','open-shifts']) que alimenta CashBalancesPanel; úsalo en cualquier mutación que escriba un movimiento de caja en lugar de invalidar ['cash'] o ['cashMovements'] ad hoc.
+- La clave ['cashMovements'] no coincide con ninguna query (la real es ['cash','movements',...]), por lo que invalidarla es un no-op silencioso.
+- Una venta POS de contado nace con factura #paid y registra su movimiento #pos en createPosSale; markInvoicePaid la rechaza, evitando doble movimiento.
+- La suite completa pnpm test sigue con ~144 fallos preexistentes en el frontend y ~125 en la lane PocketIC (firmas de actor con token inicial obsoleto); no bloquean el despliegue pero conviene reconciliarlos.
+- La preflight local de este build verificó en navegador el panel de Caja y Bancos: el saldo de Caja subió de $100.000 a $150.000 tras registrar un ingreso sin cerrar el turno, y el cierre calculó el esperado correctamente (Diferencia $0).
+- DocumentLine.unitPrice/amount se expresan en PESOS; DocumentPreview los reescala a centavos con formatMoney(BigInt(Math.round(line.unitPrice * 100))). Cualquier productor de DocumentLine (p. ej. ShiftReportDialog.reportDocument) debe convertir centavos del backend a pesos (÷100) antes de construir la línea, o el monto se muestra inflado ×100.
+- El bloque de totales del informe de cierre usa formatMoney directamente sobre centavos del backend (una sola división /100), por eso la sumatoria era correcta aunque las líneas estuvieran infladas.
+- Al buscar un ítem en OT, cotizaciones, POS y facturas se elige la cantidad antes de anexarlo y la línea nueva queda de primera: el backend de OT antepone con [line].concat(order.parts/labor), y cotizaciones/POS anteponen en su estado local.
+- Las facturas son inmutables (el backend no expone operación para anexar/editar líneas); su buscador de ítems transporta addPartId/addServiceId/addQuantity por query params al documento de origen (OT /ordenes/$id, POS /pos, cotización vía /cotizaciones) donde la línea se anexa de primera.
+- Las rutas /ordenes/$id, /cotizaciones/$id, /pos y /cotizaciones usan validateSearch con claves opcionales (addPartId?, addServiceId?, addQuantity?); declararlas opcionales evita exigir search={{}} en cada Link/navigate.
+- LaborItem no tiene campo quantity: AddLaborDialog pliega la cantidad en price (precio unitario × cantidad) y la OT muestra la línea como quantity 1 con el total; los totales son correctos pero la cantidad no se muestra como factor.
+- La preflight local de este build quedó inconclusa (tester_error, child_transport): no se pudo verificar en navegador el flujo de cantidad previa y línea de primera; el typecheck y el build sí pasan.
+- persistInvoice es el punto único de creación de facturas (OT, cotización y POS): registrar el movimiento de una factura de contado ahí cubre los tres flujos sin duplicar lógica.
+- convertQuoteToInvoice debe enrutar por BillingLib.persistInvoice (no construir la factura inline): persistInvoice registra el cobro de contado en Caja y Bancos como #income/#invoice y marca la factura #paid, evitando el doble cobro por markInvoicePaid.
+- Para que un lib de dominio (quotes.mo) registre movimientos de caja, su State debe incluir cashRegisters/shifts/cashMovements y sus Counters nextCashMovementId/nextShiftId/nextCashRegisterId; el mixin y main.mo deben reenviar esos mapas y el mismo registro de counters.
+- Cualquier mutación que escriba un movimiento de caja debe llamar invalidateCashData; useConvertQuoteToInvoice y la mutación createInvoiceFromOrder de InvoicesPage.tsx ahora lo hacen en onSuccess.
+- La preflight local de este build quedó inconclusa (infra): la ruta de detalle de OT /ordenes/$id crasheó el navegador del tester, por lo que no se pudo verificar en navegador el registro de la venta de OT en Caja y Bancos; el typecheck, el build y la revisión de código sí pasan.

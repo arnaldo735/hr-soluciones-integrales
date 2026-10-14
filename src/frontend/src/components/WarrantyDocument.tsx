@@ -233,7 +233,7 @@ export function WarrantyDocument({
             </div>
             <div
               className={cn(
-                "doc-header-title",
+                "doc-header-title min-w-0",
                 isNarrow ? "w-full text-center" : "text-right",
               )}
             >

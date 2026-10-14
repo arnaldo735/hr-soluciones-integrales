@@ -182,7 +182,7 @@ function PaymentDialog({ open, onOpenChange, receivable }: PaymentDialogProps) {
           <DialogTitle className="font-display">Registrar abono</DialogTitle>
           <DialogDescription>
             {receivable
-              ? `Factura ${receivable.invoiceNumber} · ${receivable.customerName}. Saldo pendiente ${formatMoney(balance)}.`
+              ? `Factura ${receivable.invoiceNumber} · ${receivable.customerName}. Saldo pendiente ${formatMoney(balance)} (ya descuenta el anticipo aplicado y los abonos).`
               : "Registra un abono sobre la cuenta por cobrar."}
           </DialogDescription>
         </DialogHeader>
@@ -201,7 +201,8 @@ function PaymentDialog({ open, onOpenChange, receivable }: PaymentDialogProps) {
               required
             />
             <p className="text-xs text-muted-foreground">
-              Máximo {formatMoney(balance)}.
+              Máximo {formatMoney(balance)}. El saldo ya excluye el anticipo
+              aplicado y los abonos previos.
             </p>
           </div>
 
@@ -383,7 +384,10 @@ export function CuentasPorCobrarPage() {
         header: "Saldo pendiente",
         numeric: true,
         render: (row) => (
-          <span className="data-rail font-semibold">
+          <span
+            className="data-rail font-semibold"
+            title="Saldo pendiente = total − anticipo aplicado − abonos registrados"
+          >
             {formatMoney(row.balance)}
           </span>
         ),
@@ -433,7 +437,7 @@ export function CuentasPorCobrarPage() {
       <PageHeader
         eyebrow="Administración"
         title="Cuentas por cobrar"
-        description="Saldos pendientes de facturas a crédito por cliente, con vencimiento y estado de cada cuenta."
+        description="Saldos pendientes de facturas a crédito por cliente, con vencimiento y estado de cada cuenta. El saldo mostrado ya descuenta el anticipo aplicado y los abonos registrados."
       />
 
       <section

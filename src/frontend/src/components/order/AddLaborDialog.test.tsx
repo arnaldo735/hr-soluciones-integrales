@@ -226,6 +226,57 @@ describe("AddLaborDialog", () => {
     });
   });
 
+  it("links a warranty catalog service and keeps its reference on the line", async () => {
+    const mutate = vi.fn();
+    addLaborMock.mockReturnValue({ mutate, isPending: false });
+    listServicesMock.mockResolvedValue(
+      servicePage([
+        service({
+          id: 9n,
+          code: "SRV-006",
+          name: "Reparación de motor",
+          description: "Reparación completa del motor",
+          category: "Motor",
+          laborRate: 250000n,
+          estimatedMinutes: 480n,
+        }),
+      ]),
+    );
+
+    renderWithProviders(
+      <AddLaborDialog orderId={42n} open onOpenChange={vi.fn()} />,
+    );
+
+    await userEvent.type(
+      screen.getByTestId("order_detail.add_labor.service.search_input"),
+      "motor",
+    );
+
+    await userEvent.click(
+      await screen.findByTestId("order_detail.add_labor.service.item.1"),
+    );
+
+    // The picker autocompletes the description and the tariff, and the line
+    // keeps the catalog reference the warranty trigger inspects.
+    expect(
+      screen.getByTestId("order_detail.add_labor.description_input"),
+    ).toHaveValue("SRV-006 · Reparación de motor");
+
+    await userEvent.click(
+      screen.getByTestId("order_detail.add_labor.submit_button"),
+    );
+
+    await waitFor(() => expect(mutate).toHaveBeenCalledTimes(1));
+    expect(mutate.mock.calls[0][0]).toMatchObject({
+      id: 42n,
+      labor: {
+        description: "SRV-006 · Reparación de motor",
+        price: 250000n,
+        serviceId: 9n,
+      },
+    });
+  });
+
   it("closes the dialog after a successful save", async () => {
     const onOpenChange = vi.fn();
     const mutate = vi.fn(

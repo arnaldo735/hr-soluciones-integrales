@@ -209,6 +209,7 @@ async function collectLocalBackup(
   const pageSize =
     manifest.maxPageSize > 0n ? manifest.maxPageSize : DEFAULT_BACKUP_PAGE_SIZE;
   const root: Record<string, unknown> = {
+    formatVersion: 1,
     generatedAt: Number(manifest.generatedAt),
   };
 

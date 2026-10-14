@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
   DialogContent,
@@ -22,6 +23,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
   Select,
@@ -33,14 +35,13 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { invalidateCashData } from "@/hooks/use-cash";
 import { useCompanyProfile, useIvaSettings } from "@/hooks/use-company";
 import { useCustomerDetail } from "@/hooks/use-customers";
 import { useDailyHopeMessage } from "@/hooks/use-hope";
 import { useDeleteInvoice } from "@/hooks/use-invoices";
-import {
-  SERVICE_TERMS_DEFAULT_TEXT,
-  useServiceTermsSettings,
-} from "@/hooks/use-service-terms";
+import { useParts } from "@/hooks/use-orders";
+import { useServices } from "@/hooks/use-services";
 import {
   companyContactLine,
   companyFiscalLines,
@@ -64,17 +65,20 @@ import type {
   DocumentLine,
   DocumentMeta,
   DocumentTotals,
+  Id,
   InstallmentPlanView,
   InstallmentRow,
   Invoice,
   PartView,
   PaymentCondition,
+  Service,
 } from "@/lib/types";
 import {
   NotificationSource,
   PaymentCondition as PaymentConditionEnum,
   PaymentMethod,
   PaymentStatus,
+  ServiceSort,
   WhatsAppContactKind,
   WhatsAppContext,
 } from "@/lib/types";
@@ -88,12 +92,18 @@ import {
   BadgeCheck,
   CalendarClock,
   CheckCircle2,
+  ExternalLink,
+  HandCoins,
+  Info,
   Mail,
+  Package,
   Receipt,
   ScanLine,
+  Search,
   Trash2,
+  Wrench,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 
 /**
@@ -206,6 +216,11 @@ function MarkPaidDialog({
   const [method, setMethod] = useState<PaymentMethod>(invoice.paymentMethod);
   const [error, setError] = useState<string | null>(null);
 
+  // The advance already settled part of the factura, so the amount the customer
+  // still owes is the saldo a cobrar, not the gross total.
+  const advanceApplied = invoice.advanceApplied ?? 0n;
+  const saldoACobrar = invoice.total - advanceApplied;
+
   const mutation = useMutation({
     mutationFn: async (paymentMethod: PaymentMethod) => {
       if (!actor) throw new Error("Backend no disponible");
@@ -216,6 +231,8 @@ function MarkPaidDialog({
         queryKey: ["invoice", invoice.id.toString()],
       });
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      // Collecting the factura writes a movement into the Caja y Bancos ledger.
+      invalidateCashData(queryClient);
       toast.success(`Factura ${invoice.number} marcada como pagada`);
       onOpenChange(false);
     },
@@ -243,7 +260,13 @@ function MarkPaidDialog({
           <DialogDescription>
             Confirma el método con el que el cliente liquidó la factura{" "}
             <span className="data-rail text-foreground">{invoice.number}</span>{" "}
-            por {formatMoney(invoice.total)}.
+            por {formatMoney(saldoACobrar)}.
+            {advanceApplied > 0n ? (
+              <span className="mt-1 block text-xs">
+                Total {formatMoney(invoice.total)} · anticipo aplicado{" "}
+                {formatMoney(advanceApplied)}.
+              </span>
+            ) : null}
           </DialogDescription>
         </DialogHeader>
 
@@ -331,6 +354,8 @@ function InstallmentPlanPanel({
         queryKey: ["invoice", invoice.id.toString()],
       });
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      // Each installment payment writes a movement into the Caja y Bancos ledger.
+      invalidateCashData(queryClient);
       setError(null);
       if (updated.paymentStatus === PaymentStatus.paid) {
         toast.success(
@@ -479,6 +504,14 @@ function InstallmentPlanPanel({
         </span>
       </div>
 
+      {(invoice.advanceApplied ?? 0n) > 0n ? (
+        <p className="mt-2 text-xs text-muted-foreground">
+          El plan de cuotas se calculó sobre el saldo a cobrar (
+          {formatMoney(invoice.total - (invoice.advanceApplied ?? 0n))}), no
+          sobre el total de la factura.
+        </p>
+      ) : null}
+
       {error ? (
         <p
           data-ocid="invoice_detail.installment_error"
@@ -488,6 +521,268 @@ function InstallmentPlanPanel({
         </p>
       ) : null}
     </section>
+  );
+}
+
+/** Parses a quantity input into a positive integer, defaulting to 0. */
+function parseQuantity(value: string): number {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) return 0;
+  return Math.floor(parsed);
+}
+
+/** Delays a fast-changing value so catalog searches hit the backend calmly. */
+function useDebouncedValue<T>(value: T, delayMs: number): T {
+  const [debounced, setDebounced] = useState(value);
+
+  useEffect(() => {
+    const handle = window.setTimeout(() => setDebounced(value), delayMs);
+    return () => window.clearTimeout(handle);
+  }, [value, delayMs]);
+
+  return debounced;
+}
+
+/** A combined search result: a catalog part or a catalog service. */
+type InvoiceItemResult =
+  | { kind: "part"; part: PartView }
+  | { kind: "service"; service: Service };
+
+/**
+ * Item search for a factura. A factura is an immutable fiscal document, so this
+ * picker never edits its lines: it lets the user search the parts and services
+ * catalogs, choose the quantity before appending, and then sends them to the
+ * origin document (workshop order, quote or POS) where the line is appended as
+ * the first line. The chosen quantity is carried in the confirmation so the
+ * user knows exactly what will be appended.
+ */
+function InvoiceItemSearch({
+  invoice,
+  onGoToOrigin,
+}: {
+  invoice: Invoice;
+  onGoToOrigin: (result: InvoiceItemResult, quantity: number) => void;
+}) {
+  const [search, setSearch] = useState("");
+  const [quantity, setQuantity] = useState("1");
+  const inputRef = useRef<HTMLInputElement>(null);
+  const debouncedSearch = useDebouncedValue(search, 250);
+  const liveTerm = search.trim();
+  const term = debouncedSearch.trim();
+
+  const partsQuery = useParts(debouncedSearch);
+  const servicesQuery = useServices({
+    search: debouncedSearch,
+    category: null,
+    activeOnly: true,
+    sort: ServiceSort.name,
+    page: 1,
+    pageSize: 1000,
+    enabled: term.length > 0,
+  });
+
+  const parts =
+    liveTerm.length > 0 && term.length > 0
+      ? (partsQuery.data?.items ?? [])
+      : [];
+  const services =
+    liveTerm.length > 0 && term.length > 0
+      ? (servicesQuery.data?.items ?? [])
+      : [];
+  const results: InvoiceItemResult[] = [
+    ...parts.map((part): InvoiceItemResult => ({ kind: "part", part })),
+    ...services.map(
+      (service): InvoiceItemResult => ({ kind: "service", service }),
+    ),
+  ];
+
+  const isLoading = partsQuery.isLoading || servicesQuery.isLoading;
+  const isError = partsQuery.isError || servicesQuery.isError;
+
+  // The quantity chosen before appending. A blank or invalid entry falls back
+  // to 1 so a tap always carries a valid quantity.
+  const chosenQuantity =
+    parseQuantity(quantity) > 0 ? parseQuantity(quantity) : 1;
+
+  const handleSelect = (result: InvoiceItemResult) => {
+    onGoToOrigin(result, chosenQuantity);
+    setSearch("");
+    setQuantity("1");
+    inputRef.current?.focus();
+  };
+
+  return (
+    <Card
+      data-ocid="invoice_detail.item_search"
+      className="gap-0 rounded-lg py-0 shadow-none print:hidden"
+    >
+      <CardHeader className="border-b border-border px-5 py-4">
+        <CardTitle className="flex items-center gap-2 font-display text-sm font-semibold tracking-tight">
+          <Search className="size-4 text-primary" aria-hidden="true" />
+          Buscar ítem para anexar
+        </CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 px-5 py-5">
+        <p className="text-xs text-muted-foreground">
+          Busca un repuesto o servicio, escoge la cantidad y confirma. La línea
+          se anexa como primera del documento de origen; esta factura emitida no
+          se modifica.
+        </p>
+
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end">
+          <div className="relative flex-1">
+            <Search
+              className="pointer-events-none absolute left-2.5 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <Input
+              ref={inputRef}
+              type="search"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Buscar repuesto o servicio por código o nombre…"
+              aria-label="Buscar repuesto o servicio por código o nombre"
+              data-ocid="invoice_detail.item_search_input"
+              className="h-9 pl-8 text-sm"
+            />
+          </div>
+          <div className="w-full space-y-1.5 sm:w-24">
+            <Label
+              htmlFor="invoice-item-quantity"
+              className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Cantidad
+            </Label>
+            <Input
+              id="invoice-item-quantity"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={quantity}
+              onChange={(event) => setQuantity(event.target.value)}
+              aria-label="Cantidad a anexar"
+              data-ocid="invoice_detail.item_quantity_input"
+              className="data-rail h-9"
+            />
+          </div>
+        </div>
+
+        {liveTerm.length === 0 ? (
+          <p
+            data-ocid="invoice_detail.item_search.prompt_state"
+            className="rounded-md border border-dashed border-border bg-muted/20 px-3 py-2.5 text-xs text-muted-foreground"
+          >
+            Escribe el código o el nombre del repuesto o servicio para ver
+            coincidencias.
+          </p>
+        ) : isLoading ? (
+          <div
+            data-ocid="invoice_detail.item_search.loading_state"
+            className="space-y-1.5"
+          >
+            {Array.from(
+              { length: 3 },
+              (_, index) => `invoice-item-skeleton-${index}`,
+            ).map((key) => (
+              <Skeleton key={key} className="h-12 w-full" />
+            ))}
+          </div>
+        ) : isError ? (
+          <p
+            data-ocid="invoice_detail.item_search.error_state"
+            className="text-xs text-destructive"
+          >
+            No se pudo cargar el catálogo. Inténtalo de nuevo.
+          </p>
+        ) : results.length === 0 ? (
+          <p
+            data-ocid="invoice_detail.item_search.empty_state"
+            className="rounded-md border border-dashed border-border px-3 py-2.5 text-xs text-muted-foreground"
+          >
+            {`Sin repuestos ni servicios que coincidan con “${term}”.`}
+          </p>
+        ) : (
+          <ul
+            data-ocid="invoice_detail.item_search.list"
+            className="max-h-64 space-y-1 overflow-y-auto rounded-md border border-border p-1"
+          >
+            {results.map((result, index) => {
+              const isPart = result.kind === "part";
+              const code = isPart ? result.part.sku : result.service.code;
+              const name = isPart ? result.part.name : result.service.name;
+              const price = isPart
+                ? result.part.salePrice
+                : result.service.laborRate;
+              const meta = isPart
+                ? `${formatNumber(result.part.totalStock)} ${result.part.unit}`
+                : result.service.category;
+              return (
+                <li
+                  key={
+                    isPart
+                      ? `part-${result.part.id.toString()}`
+                      : `service-${result.service.id.toString()}`
+                  }
+                >
+                  <button
+                    type="button"
+                    onClick={() => handleSelect(result)}
+                    data-ocid={`invoice_detail.item_search.item.${index + 1}`}
+                    className="flex w-full items-center justify-between gap-3 rounded-sm px-2.5 py-2 text-left transition-colors hover:bg-accent focus-visible:bg-accent focus-visible:outline-none"
+                  >
+                    <span className="min-w-0">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span
+                          className={
+                            isPart
+                              ? "shrink-0 rounded border border-primary/40 bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-primary"
+                              : "shrink-0 rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-[0.08em] text-muted-foreground"
+                          }
+                        >
+                          {isPart ? "Repuesto" : "Servicio"}
+                        </span>
+                        <span className="data-rail shrink-0 rounded border border-border bg-muted/50 px-1.5 py-0.5 text-[10px] uppercase tracking-[0.08em] text-muted-foreground">
+                          {code}
+                        </span>
+                        <span className="truncate text-sm font-medium">
+                          {name}
+                        </span>
+                      </span>
+                      <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+                        {meta}
+                      </span>
+                    </span>
+                    <span className="data-rail shrink-0 text-xs font-medium">
+                      {formatMoney(price)}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+
+        <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {invoice.orderId !== undefined ? (
+            <>
+              <Package className="size-3.5" aria-hidden="true" />
+              Al confirmar, se anexa en la orden de origen.
+            </>
+          ) : invoice.origin === "quote" ? (
+            <>
+              <Wrench className="size-3.5" aria-hidden="true" />
+              Al confirmar, se anexa en la cotización de origen.
+            </>
+          ) : (
+            <>
+              <Package className="size-3.5" aria-hidden="true" />
+              Al confirmar, se anexa en la venta POS de origen.
+            </>
+          )}
+        </p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -504,7 +799,6 @@ async function buildInvoicePdf(
   meta: DocumentMeta[],
   lines: DocumentLine[],
   totals: DocumentTotals[],
-  footer: string,
   hope: HopeMessageContent | null,
 ): Promise<jsPDF> {
   const { jsPDF, autoTable } = await loadPdfLibs();
@@ -626,16 +920,10 @@ async function buildInvoicePdf(
     (doc as jsPDF & { lastAutoTable?: { finalY: number } }).lastAutoTable
       ?.finalY ?? afterLines + 4;
 
-  doc.setFont("helvetica", "normal");
-  doc.setFontSize(narrow ? 6 : 7.5);
-  doc.setTextColor(100, 116, 139);
-  const footerY = afterTotals + (narrow ? 6 : 10);
-  const footerLines = doc.splitTextToSize(footer, right - margin);
-  doc.text(footerLines, margin, footerY);
   drawHopeMessage(doc, hope, {
     x: margin,
     right,
-    y: footerY + footerLines.length * (narrow ? 2.6 : 3.4) + 1.5,
+    y: afterTotals + (narrow ? 6 : 10),
     narrow,
   });
 
@@ -663,7 +951,6 @@ export function InvoiceDetailPage() {
   const companyQuery = useCompanyProfile();
   const dailyHopeQuery = useDailyHopeMessage();
   const hopeMessage = hopeMessageContent(dailyHopeQuery.data);
-  const serviceTermsQuery = useServiceTermsSettings();
   const deleteInvoice = useDeleteInvoice();
 
   const invoiceId = BigInt(id);
@@ -762,6 +1049,10 @@ export function InvoiceDetailPage() {
     { label: "Estado", value: PAYMENT_STATUS_LABELS[invoice.paymentStatus] },
   ];
 
+  const advanceApplied = invoice.advanceApplied ?? 0n;
+  const hasAdvance = advanceApplied > 0n;
+  const saldoACobrar = invoice.total - advanceApplied;
+
   const documentTotals: DocumentTotals[] = [
     { label: "Subtotal", value: formatMoney(invoice.subtotal) },
     ...(isIvaResponsible
@@ -772,14 +1063,25 @@ export function InvoiceDetailPage() {
           },
         ]
       : []),
-    { label: "Total", value: formatMoney(invoice.total), emphasis: true },
+    {
+      label: "Total",
+      value: formatMoney(invoice.total),
+      emphasis: !hasAdvance,
+    },
+    ...(hasAdvance
+      ? [
+          {
+            label: "Anticipo aplicado",
+            value: `− ${formatMoney(advanceApplied)}`,
+          },
+          {
+            label: "Saldo a cobrar",
+            value: formatMoney(saldoACobrar),
+            emphasis: true,
+          },
+        ]
+      : []),
   ];
-
-  // Pie de página editable "Términos y condiciones del Servicio". Mientras la
-  // consulta carga o el guardado está vacío se usa el texto de recepción por
-  // defecto, de modo que la factura siempre muestra un pie completo.
-  const serviceTermsText =
-    serviceTermsQuery.data?.text?.trim() || SERVICE_TERMS_DEFAULT_TEXT;
 
   // Complete company identity for the printed factura. Unconfigured fields are
   // dropped by the shared helpers, so the header never shows an orphan label.
@@ -796,7 +1098,6 @@ export function InvoiceDetailPage() {
         documentMeta,
         documentLines,
         documentTotals,
-        serviceTermsText,
         hopeMessage,
       );
       await downloadFile({
@@ -819,6 +1120,47 @@ export function InvoiceDetailPage() {
   };
 
   const clearScannedPart = () => setScannedPart(null);
+
+  /**
+   * Sends the user to the document that owns the factura's lines so the chosen
+   * item can be appended there as the first line. A factura is immutable, so
+   * this page never edits its own lines: the selection travels as query params
+   * (`addPartId`/`addServiceId` + `addQuantity`) and the origin document appends
+   * it on mount.
+   */
+  const handleGoToOrigin = (result: InvoiceItemResult, quantity: number) => {
+    const itemName =
+      result.kind === "part" ? result.part.name : result.service.name;
+    const search =
+      result.kind === "part"
+        ? {
+            addPartId: result.part.id.toString(),
+            addQuantity: String(quantity),
+          }
+        : {
+            addServiceId: result.service.id.toString(),
+            addQuantity: String(quantity),
+          };
+    toast.success(
+      `${quantity} × ${itemName} listo para anexar en el documento de origen`,
+    );
+    if (invoice.orderId !== undefined) {
+      void navigate({
+        to: "/ordenes/$id",
+        params: { id: invoice.orderId.toString() },
+        search,
+      });
+      return;
+    }
+    if (invoice.origin === "quote") {
+      // La factura no conserva el id de la cotización de origen, así que se
+      // abre el listado transportando el ítem y la cantidad elegidos; la lista
+      // retoma la cotización en borrador y anexa la línea como primera.
+      void navigate({ to: "/cotizaciones", search });
+      return;
+    }
+    void navigate({ to: "/pos", search });
+  };
 
   const confirmDelete = () => {
     setDeleteError(null);
@@ -977,6 +1319,111 @@ export function InvoiceDetailPage() {
         <InstallmentPlanPanel invoice={invoice} plan={plan} />
       ) : null}
 
+      {hasAdvance ? (
+        <section
+          data-ocid="invoice_detail.advance_panel"
+          aria-label="Anticipo aplicado"
+          className="rounded-lg border border-border bg-card p-4 shadow-subtle print:hidden"
+        >
+          <div className="flex items-center gap-2">
+            <HandCoins
+              className="size-4 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <h2 className="font-display text-sm font-semibold">
+              Anticipo aplicado
+            </h2>
+          </div>
+          <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+            <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+              <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Total
+              </dt>
+              <dd className="data-rail mt-0.5 text-sm font-medium">
+                {formatMoney(invoice.total)}
+              </dd>
+            </div>
+            <div className="rounded-md border border-border bg-muted/20 px-3 py-2">
+              <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                Anticipo aplicado
+              </dt>
+              <dd
+                data-ocid="invoice_detail.advance_applied"
+                className="data-rail mt-0.5 text-sm font-medium text-success"
+              >
+                − {formatMoney(advanceApplied)}
+              </dd>
+            </div>
+            <div className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2">
+              <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">
+                Saldo a cobrar
+              </dt>
+              <dd
+                data-ocid="invoice_detail.saldo_a_cobrar"
+                className="data-rail mt-0.5 text-sm font-semibold"
+              >
+                {formatMoney(saldoACobrar)}
+              </dd>
+            </div>
+          </dl>
+          <p className="mt-2 text-xs text-muted-foreground">
+            El anticipo registrado en la orden de taller se descontó del total.
+            {isCredit
+              ? " El plan de cuotas se calcula sobre el saldo a cobrar."
+              : " El saldo a cobrar es el monto pendiente de pago."}
+          </p>
+        </section>
+      ) : null}
+
+      {canScan ? (
+        <section
+          data-ocid="invoice_detail.readonly_notice"
+          aria-label="Factura de solo lectura"
+          className="flex flex-wrap items-start justify-between gap-3 rounded-lg border border-border bg-muted/30 p-4 print:hidden"
+        >
+          <div className="flex min-w-0 items-start gap-2">
+            <Info
+              className="mt-0.5 size-4 shrink-0 text-muted-foreground"
+              aria-hidden="true"
+            />
+            <div className="min-w-0">
+              <h2 className="font-display text-sm font-semibold">
+                Factura de solo lectura
+              </h2>
+              <p className="text-xs text-muted-foreground">
+                Una factura emitida es un documento cerrado: sus líneas no se
+                editan aquí. Para buscar un ítem, escoger la cantidad y anexarlo
+                como primera línea del documento, hazlo en el documento de
+                origen y vuelve a generarla.
+              </p>
+            </div>
+          </div>
+          {invoice.orderId !== undefined ? (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              asChild
+              className="shrink-0 gap-1.5"
+            >
+              <Link
+                to="/ordenes/$id"
+                params={{ id: invoice.orderId.toString() }}
+                search={{}}
+                data-ocid="invoice_detail.origin_link"
+              >
+                <ExternalLink className="size-3.5" aria-hidden="true" />
+                Ir a la orden de origen
+              </Link>
+            </Button>
+          ) : null}
+        </section>
+      ) : null}
+
+      {canScan ? (
+        <InvoiceItemSearch invoice={invoice} onGoToOrigin={handleGoToOrigin} />
+      ) : null}
+
       {canScan && scanOpen ? (
         <section
           data-ocid="invoice_detail.scan_panel"
@@ -993,7 +1440,8 @@ export function InvoiceDetailPage() {
               </h2>
               <p className="text-xs text-muted-foreground">
                 Escanea el código de barras o el SKU para consultar el repuesto
-                en el catálogo. La factura ya emitida no se modifica.
+                en el catálogo. La factura ya emitida no se modifica; para
+                anexar líneas usa el documento de origen.
               </p>
             </div>
           </div>
@@ -1052,7 +1500,6 @@ export function InvoiceDetailPage() {
         meta={documentMeta}
         lines={documentLines}
         totals={documentTotals}
-        footer={serviceTermsText}
         hopeMessage={hopeMessage}
         format={printFormat}
         ocid="invoice_detail.document"

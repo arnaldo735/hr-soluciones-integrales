@@ -117,13 +117,26 @@ function toSectionState(status: RestoreSectionResult["status"]): {
  * texto. Rechaza con un mensaje en español cuando el archivo no se puede leer.
  */
 export async function readRestoreFile(file: File): Promise<string> {
+  let content: string;
   try {
-    return await file.text();
+    content = await file.text();
   } catch {
     throw new Error(
       "No se pudo leer el archivo seleccionado. Verifica que sea un JSON válido.",
     );
   }
+
+  if (content.trim() === "") {
+    throw new Error("El archivo está vacío o no es un JSON válido.");
+  }
+
+  try {
+    JSON.parse(content);
+  } catch {
+    throw new Error("El archivo está vacío o no es un JSON válido.");
+  }
+
+  return content;
 }
 
 /**

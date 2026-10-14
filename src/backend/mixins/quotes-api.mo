@@ -11,6 +11,7 @@ import BillingTypes "../types/billing";
 import CompanyTypes "../types/company";
 import ServiceTypes "../types/services";
 import InventoryTypes "../types/inventory";
+import CashTypes "../types/cash";
 import UserTypes "../types/users";
 import QuotesLib "../lib/quotes";
 import UsersLib "../lib/users";
@@ -27,11 +28,14 @@ mixin (
   businessSettings : { var settings : BillingTypes.BusinessSettings },
   company : { var profile : CompanyTypes.CompanyProfile },
   counters : QuotesLib.Counters,
+  cashRegisters : Map.Map<Common.Id, CashTypes.CashRegister>,
+  shifts : Map.Map<Common.Id, CashTypes.Shift>,
+  cashMovements : Map.Map<Common.Id, CashTypes.CashMovement>,
   credentials : Map.Map<Common.Id, UserTypes.Credential>,
   sessions : Map.Map<Text, UserTypes.Session>,
   roles : Map.Map<Common.Id, UserTypes.Role>,
 ) {
-  func quotesState() : QuotesLib.State = { quotes; customers; motorcycles; parts; services; orders; invoices; businessSettings; company; counters };
+  func quotesState() : QuotesLib.State = { quotes; customers; motorcycles; parts; services; orders; invoices; businessSettings; company; cashRegisters; shifts; cashMovements; counters };
 
   func requireQuotesModule(caller : Principal, token : ?Text) {
     if (not UsersLib.canAccessModule({ credentials; sessions; roles }, accessControlState, caller, token, "quotes")) {

@@ -1,3 +1,4 @@
+import type { DashboardAlertsSummary } from "@/backend";
 import type { CompanyProfile } from "@/lib/types";
 import {
   DocumentType,
@@ -15,34 +16,17 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
  * Characterization coverage for the operation panel's loading, refresh and
  * error behavior.
  *
- * The accepted change stops already-consulted data from re-showing its loading
- * skeleton when the user switches modules. These tests protect the adjacent
- * behavior that must survive it: the panel still shows its skeleton while the
- * *first* read is in flight and replaces it with real content once the data
- * arrives, the explicit "Actualizar" action still refetches the panel's reads,
- * and a failed read still surfaces the error state with a working retry.
- *
- * They never assert that the skeleton is absent on a later visit — that is the
- * behavior the accepted change intentionally alters.
+ * The accepted change replaces the flow shortcuts with an alert grid. These
+ * tests protect the adjacent behavior that must survive it: the panel still
+ * shows its skeleton while the *first* read is in flight and replaces it with
+ * real content once the data arrives, the explicit "Actualizar" action still
+ * refetches the panel's reads, and a failed read still surfaces the error state
+ * with a working retry.
  */
 
 const useRoleMock = vi.fn();
 const getCompanyProfileMock = vi.fn();
-const listOrdersMock = vi.fn();
-const listAppointmentsMock = vi.fn();
-const listTechniciansMock = vi.fn();
-const listPartsMock = vi.fn();
-const listServicesMock = vi.fn();
-const listCustomersMock = vi.fn();
-const listQuotesMock = vi.fn();
-const listInvoicesMock = vi.fn();
-const listPosSalesMock = vi.fn();
-const listPurchaseInvoicesMock = vi.fn();
-const listReceivablesMock = vi.fn();
-const listPayablesMock = vi.fn();
-const listExpensesMock = vi.fn();
-const listCommissionPaymentsMock = vi.fn();
-const getAccountingSummaryMock = vi.fn();
+const getDashboardAlertsMock = vi.fn();
 
 vi.mock("@/hooks/use-role", () => ({
   useRole: () => useRoleMock(),
@@ -52,25 +36,22 @@ vi.mock("@/hooks/use-backend", () => ({
   useBackend: () => ({
     actor: {
       getCompanyProfile: getCompanyProfileMock,
-      listOrders: listOrdersMock,
-      listAppointments: listAppointmentsMock,
-      listTechnicians: listTechniciansMock,
-      listParts: listPartsMock,
-      listServices: listServicesMock,
-      listCustomers: listCustomersMock,
-      listQuotes: listQuotesMock,
-      listInvoices: listInvoicesMock,
-      listPosSales: listPosSalesMock,
-      listPurchaseInvoices: listPurchaseInvoicesMock,
-      listReceivables: listReceivablesMock,
-      listPayables: listPayablesMock,
-      listExpenses: listExpensesMock,
-      listCommissionPayments: listCommissionPaymentsMock,
-      getAccountingSummary: getAccountingSummaryMock,
+      getDashboardAlerts: getDashboardAlertsMock,
     },
     isFetching: false,
   }),
 }));
+
+// The alert query only runs with an authenticated session; the default setup
+// mock reports no session, so this file overrides `useAuth` while keeping the
+// real `AuthProvider` that `renderWithProviders` mounts.
+vi.mock("@/hooks/use-auth", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/hooks/use-auth")>();
+  return {
+    ...actual,
+    useAuth: () => ({ token: "session-token", isAuthenticated: true }),
+  };
+});
 
 vi.mock("@tanstack/react-router", () => ({
   Link: ({
@@ -116,69 +97,47 @@ function roleState(isAdmin: boolean) {
     isAdmin,
     isLoading: false,
     isError: false,
+    // `null` = sin restricción por módulo (administrador por Internet
+    // Identity). El fixture debe declararlo: `canAccess` llama a
+    // `modules.includes` y un `undefined` rompe el render.
+    modules: null,
     refetch: vi.fn(),
   };
 }
 
-function page<T>(items: T[], total = BigInt(items.length)) {
-  return { items, total, offset: 0n, limit: 50n };
+function summary(): DashboardAlertsSummary {
+  return {
+    generatedAt: 1_700_000_000_000_000_000n,
+    unapprovedOrders: { count: 4n, items: [] },
+    appointments: { count: 3n, items: [] },
+    pendingQuotes: { count: 2n, items: [] },
+    lowStockParts: { count: 12n, items: [] },
+    receivables: { count: 5n, items: [] },
+    payables: { count: 6n, items: [] },
+    supplierOrders: { count: 7n, items: [] },
+    overdueInstallments: { count: 8n, items: [] },
+  };
 }
 
 describe("DashboardPage loading and refresh (characterization)", () => {
   beforeEach(() => {
     useRoleMock.mockReset();
     getCompanyProfileMock.mockReset();
-    listOrdersMock.mockReset();
-    listAppointmentsMock.mockReset();
-    listTechniciansMock.mockReset();
-    listPartsMock.mockReset();
-    listServicesMock.mockReset();
-    listCustomersMock.mockReset();
-    listQuotesMock.mockReset();
-    listInvoicesMock.mockReset();
-    listPosSalesMock.mockReset();
-    listPurchaseInvoicesMock.mockReset();
-    listReceivablesMock.mockReset();
-    listPayablesMock.mockReset();
-    listExpensesMock.mockReset();
-    listCommissionPaymentsMock.mockReset();
-    getAccountingSummaryMock.mockReset();
+    getDashboardAlertsMock.mockReset();
 
     useRoleMock.mockReturnValue(roleState(true));
     getCompanyProfileMock.mockResolvedValue(companyProfile());
-    listOrdersMock.mockResolvedValue(page([], 4n));
-    listAppointmentsMock.mockResolvedValue([]);
-    listTechniciansMock.mockResolvedValue([]);
-    listPartsMock.mockResolvedValue(page([], 12n));
-    listServicesMock.mockResolvedValue(page([], 7n));
-    listCustomersMock.mockResolvedValue([]);
-    listQuotesMock.mockResolvedValue(page([], 3n));
-    listInvoicesMock.mockResolvedValue(page([], 5n));
-    listPosSalesMock.mockResolvedValue(page([], 9n));
-    listPurchaseInvoicesMock.mockResolvedValue(page([], 2n));
-    listReceivablesMock.mockResolvedValue([]);
-    listPayablesMock.mockResolvedValue([]);
-    listExpensesMock.mockResolvedValue(page([], 1n));
-    listCommissionPaymentsMock.mockResolvedValue([]);
-    getAccountingSummaryMock.mockResolvedValue({
-      to: [],
-      from: [],
-      expenseCount: 0n,
-      invoiceCount: 6n,
-      totalIncome: 0n,
-      totalExpenses: 0n,
-      profit: 0n,
-    });
+    getDashboardAlertsMock.mockResolvedValue(summary());
   });
 
   it("shows the loading skeleton while the first read is in flight, then the content", async () => {
-    // The first profile read never settles until the test releases it, so the
+    // The first alerts read never settles until the test releases it, so the
     // panel is observed in its genuine loading state.
-    let resolveProfile: ((value: CompanyProfile) => void) | undefined;
-    getCompanyProfileMock.mockImplementation(
+    let resolveAlerts: ((value: DashboardAlertsSummary) => void) | undefined;
+    getDashboardAlertsMock.mockImplementation(
       () =>
-        new Promise<CompanyProfile>((resolve) => {
-          resolveProfile = resolve;
+        new Promise<DashboardAlertsSummary>((resolve) => {
+          resolveAlerts = resolve;
         }),
     );
 
@@ -187,12 +146,12 @@ describe("DashboardPage loading and refresh (characterization)", () => {
     expect(
       await screen.findByTestId("dashboard.company_header.loading"),
     ).toBeInTheDocument();
-    expect(screen.getByTestId("dashboard.flows.loading")).toBeInTheDocument();
+    expect(screen.getByTestId("dashboard.alerts.loading")).toBeInTheDocument();
     expect(
       screen.queryByTestId("dashboard.company_header"),
     ).not.toBeInTheDocument();
 
-    resolveProfile?.(companyProfile());
+    resolveAlerts?.(summary());
 
     // Once the read resolves the skeleton is replaced by the real nameplate.
     expect(
@@ -202,7 +161,7 @@ describe("DashboardPage loading and refresh (characterization)", () => {
       screen.queryByTestId("dashboard.company_header.loading"),
     ).not.toBeInTheDocument();
     expect(
-      screen.queryByTestId("dashboard.flows.loading"),
+      screen.queryByTestId("dashboard.alerts.loading"),
     ).not.toBeInTheDocument();
   });
 
@@ -211,24 +170,29 @@ describe("DashboardPage loading and refresh (characterization)", () => {
 
     await screen.findByTestId("dashboard.company_header");
     const profileCalls = getCompanyProfileMock.mock.calls.length;
-    const ordersCalls = listOrdersMock.mock.calls.length;
+    const alertsCalls = getDashboardAlertsMock.mock.calls.length;
 
     await userEvent.click(screen.getByTestId("dashboard.refresh_button"));
 
     // The explicit refresh must still reach the backend for both the profile
-    // and the aggregated metrics, even though the panel now caches them.
+    // and the aggregated alerts, even though the panel now caches them.
     await waitFor(() =>
       expect(getCompanyProfileMock.mock.calls.length).toBeGreaterThan(
         profileCalls,
       ),
     );
     await waitFor(() =>
-      expect(listOrdersMock.mock.calls.length).toBeGreaterThan(ordersCalls),
+      expect(getDashboardAlertsMock.mock.calls.length).toBeGreaterThan(
+        alertsCalls,
+      ),
     );
   });
 
   it("shows the error state with a retry when a panel read fails", async () => {
-    getCompanyProfileMock.mockRejectedValue(new Error("backend caído"));
+    // The panel's error state is driven by the aggregated alerts read, so the
+    // failing read must be that one (the profile query has its own empty state
+    // and does not flip the panel into its error view).
+    getDashboardAlertsMock.mockRejectedValue(new Error("backend caído"));
     renderWithProviders(<DashboardPage />);
 
     expect(

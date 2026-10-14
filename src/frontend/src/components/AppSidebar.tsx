@@ -244,6 +244,13 @@ const NAV_FLOWS: FlowGroup[] = [
         moduleKey: "cash",
       },
       {
+        label: "Registros de caja",
+        to: "/caja/registros",
+        icon: Wallet,
+        adminOnly: true,
+        moduleKey: "cash",
+      },
+      {
         label: "Cuentas por cobrar",
         to: "/cuentas-por-cobrar",
         icon: HandCoins,

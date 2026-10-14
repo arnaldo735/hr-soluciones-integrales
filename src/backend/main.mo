@@ -1,3 +1,5 @@
+import Iter "mo:core/Iter";
+import List "mo:core/List";
 import Map "mo:core/Map";
 import Principal "mo:core/Principal";
 import Set "mo:core/Set";
@@ -25,6 +27,7 @@ import PrincipalValue "mo:caffeineai-oql/PrincipalValue";
 import OptTextValue "OptTextValue";
 import OptIdValue "OptIdValue";
 import OptMoneyValue "OptMoneyValue";
+import OptOrderAdvanceValue "OptOrderAdvanceValue";
 import OptTimestampValue "OptTimestampValue";
 import MovementKindValue "MovementKindValue";
 import OrderStatusValue "OrderStatusValue";
@@ -33,6 +36,7 @@ import PaymentStatusValue "PaymentStatusValue";
 import UserRoleValue "UserRoleValue";
 import RoleKindValue "RoleKindValue";
 import OrderPartListValue "OrderPartListValue";
+import OrderPaymentListValue "OrderPaymentListValue";
 import LaborItemListValue "LaborItemListValue";
 import OrderPhotoListValue "OrderPhotoListValue";
 import StatusChangeListValue "StatusChangeListValue";
@@ -172,7 +176,9 @@ actor {
   // Facturas de compra cargadas en PDF o foto para actualizar el inventario.
   let purchaseInvoices : Map.Map<Common.Id, PurchaseInvoiceIntakeTypes.PurchaseInvoice>;
 
-  // Caja y Bancos: turnos y movimientos de tesorería.
+  // Caja y Bancos: catálogo de cajas y bancos, turnos y movimientos de
+  // tesorería.
+  let cashRegisters : Map.Map<Common.Id, CashTypes.CashRegister>;
   let shifts : Map.Map<Common.Id, CashTypes.Shift>;
   let cashMovements : Map.Map<Common.Id, CashTypes.CashMovement>;
 
@@ -224,16 +230,18 @@ actor {
     var nextPurchaseInvoiceLineId : Nat;
     var nextShiftId : Nat;
     var nextCashMovementId : Nat;
+    var nextCashRegisterId : Nat;
+    var nextOrderPaymentId : Nat;
   };
 
   include InventoryApi(accessControlState, parts, lots, movements, counters, credentials, sessions, roles);
   include CustomersApi(accessControlState, customers, motorcycles, orders, counters, credentials, sessions, roles);
-  include WorkshopApi(accessControlState, orders, parts, lots, movements, customers, motorcycles, services, counters, businessSettings, company, credentials, sessions, roles);
+  include WorkshopApi(accessControlState, orders, parts, lots, movements, customers, motorcycles, services, counters, businessSettings, company, cashRegisters, shifts, cashMovements, invoices, credentials, sessions, roles);
   include PurchasingApi(accessControlState, suppliers, purchases, payments, lots, movements, counters, credentials, sessions, roles);
-  include BillingApi(accessControlState, invoices, businessSettings, counters, orders, customers, company, credentials, sessions, roles, posSales, receivablePayments);
+  include BillingApi(accessControlState, invoices, businessSettings, counters, orders, customers, company, credentials, sessions, roles, posSales, receivablePayments, cashRegisters, shifts, cashMovements);
   include DashboardApi(accessControlState, parts, lots, orders, purchases, payments, credentials, sessions, roles);
   include UsersApi(accessControlState, userProfiles, credentials, sessions, roles, userCounters);
-  include QuotesApi(accessControlState, quotes, customers, motorcycles, parts, services, orders, invoices, businessSettings, company, counters, credentials, sessions, roles);
+  include QuotesApi(accessControlState, quotes, customers, motorcycles, parts, services, orders, invoices, businessSettings, company, counters, cashRegisters, shifts, cashMovements, credentials, sessions, roles);
   include ServicesApi(accessControlState, services, counters, credentials, sessions, roles);
   include ServiceCategoriesApi(accessControlState, serviceCategories, services, counters, credentials, sessions, roles);
   include TechniciansApi(accessControlState, technicians, orders, counters, credentials, sessions, roles);
@@ -243,12 +251,12 @@ actor {
   include ExpensesApi(accessControlState, expenses, suppliers, expenseCategories, counters, credentials, sessions, roles);
   include ExpenseCategoriesApi(accessControlState, expenseCategories, expenses, counters, credentials, sessions, roles);
   include AccountingApi(accessControlState, invoices, expenses, parts, lots, orders, technicians, services, credentials, sessions, roles);
-  include PosApi(accessControlState, posSales, parts, lots, movements, customers, invoices, businessSettings, company, counters, credentials, sessions, roles);
-  include ReceivablesApi(accessControlState, invoices, receivablePayments, counters, credentials, sessions, roles);
-  include RemindersApi(accessControlState, appointments, invoices, receivablePayments, suppliers, purchases, payments, quotes, orders, customers, motorcycles, credentials, sessions, roles);
+  include PosApi(accessControlState, posSales, parts, lots, movements, customers, invoices, businessSettings, company, cashRegisters, shifts, cashMovements, counters, credentials, sessions, roles);
+  include ReceivablesApi(accessControlState, invoices, receivablePayments, cashRegisters, shifts, cashMovements, counters, credentials, sessions, roles);
+  include RemindersApi(accessControlState, appointments, invoices, receivablePayments, suppliers, purchases, payments, quotes, orders, customers, motorcycles, parts, lots, supplierOrders, cashRegisters, shifts, cashMovements, counters, credentials, sessions, roles);
   include SupplierOrdersApi(accessControlState, suppliers, supplierOrders, counters, credentials, sessions, roles);
   include PurchaseInvoiceIntakeApi(accessControlState, purchaseInvoices, parts, lots, movements, suppliers, counters, credentials, sessions, roles);
-  include CashApi(accessControlState, shifts, cashMovements, counters, credentials, sessions, roles);
+  include CashApi(accessControlState, cashRegisters, shifts, cashMovements, counters, credentials, sessions, roles);
   include NotificationsApi(customers, suppliers, orders, quotes, invoices, appointments, services, company, hope);
   include HopeApi(accessControlState, hope, credentials, sessions, roles);
   include ServiceTermsApi(accessControlState, serviceTerms, credentials, sessions, roles);
@@ -279,6 +287,20 @@ actor {
     company;
   } : BackupLib.State, credentials, sessions, roles);
   include ApiDocMixin();
+
+  // Proyección OQL: aplana los abonos de todas las órdenes de taller a pares
+  // `(orderId, OrderPayment)` para exponerlos como la entidad `orderPayment`.
+  // Es una función pura de lectura sobre el estado; no contiene lógica de
+  // negocio.
+  func flattenOrderPayments() : Iter.Iter<(Common.Id, WorkshopTypes.OrderPayment)> {
+    let rows = List.empty<(Common.Id, WorkshopTypes.OrderPayment)>();
+    for (order in orders.values()) {
+      for (payment in order.payments.values()) {
+        rows.add((order.id, payment));
+      };
+    };
+    rows.values();
+  };
 
   // Sample owner for the per-user `userProfile` entity; the value is ignored.
   transient let anyPrincipal = Principal.fromText("aaaaa-aa");
@@ -372,6 +394,8 @@ actor {
           customerId = 0;
           motorcycleId = 0;
           intakeMileage = 0;
+          previousMileage = null;
+          oilChangeInterval = null;
           problem = "";
           status = #received;
           parts = [];
@@ -381,11 +405,43 @@ actor {
           statusHistory = [];
           cancelReason = null;
           cancelledAt = null;
+          advance = null;
+          payments = [];
           createdAt = 0;
           updatedAt = 0;
         })
         .edge("customerId", "customer")
         .edge("motorcycleId", "motorcycle")
+        .controllerOnly()
+        .build(),
+
+      // ── Abonos de órdenes de taller ─────────────────────────────────────
+      // Los abonos viven dentro de `WorkshopOrder.payments`, una colección que
+      // no se expone como columna. Esta entidad los aplana a una fila por
+      // abono, con el id de la OT como clave foránea hacia `workshopOrder`,
+      // para que sean consultables por OQL.
+      OQL.Entity.manual<(Common.Id, WorkshopTypes.OrderPayment)>(
+        "orderPayment",
+        func () = flattenOrderPayments(),
+        "OrderPayment",
+        "id",
+      )
+        .sample((0, {
+          id = 0;
+          amount = 0;
+          method = #cash;
+          note = null;
+          registeredAt = 0;
+          registeredBy = anyPrincipal;
+        }))
+        .payload("id", func ((_, payment) : (Common.Id, WorkshopTypes.OrderPayment)) : Common.Id = payment.id)
+        .payload("orderId", func ((orderId, _) : (Common.Id, WorkshopTypes.OrderPayment)) : Common.Id = orderId)
+        .payload("amount", func ((_, payment) : (Common.Id, WorkshopTypes.OrderPayment)) : Common.Money = payment.amount)
+        .payload("method", func ((_, payment) : (Common.Id, WorkshopTypes.OrderPayment)) : BillingTypes.PaymentMethod = payment.method)
+        .payload("note", func ((_, payment) : (Common.Id, WorkshopTypes.OrderPayment)) : ?Text = payment.note)
+        .payload("registeredAt", func ((_, payment) : (Common.Id, WorkshopTypes.OrderPayment)) : Common.Timestamp = payment.registeredAt)
+        .payload("registeredBy", func ((_, payment) : (Common.Id, WorkshopTypes.OrderPayment)) : Principal = payment.registeredBy)
+        .edge("orderId", "workshopOrder")
         .controllerOnly()
         .build(),
 
@@ -450,6 +506,7 @@ actor {
           taxRate = 0;
           tax = 0;
           total = 0;
+          advanceApplied = null;
           paymentMethod = #cash;
           paymentCondition = #cash;
           paymentStatus = #pending;
@@ -536,7 +593,7 @@ actor {
           id = 0;
           quoteNumber = "";
           customerId = 0;
-          motorcycleId = 0;
+          motorcycleId = null;
           status = #draft;
           partLines = [];
           serviceLines = [];
@@ -802,10 +859,44 @@ actor {
         .controllerOnly()
         .build(),
 
+      // ── Caja y Bancos: catálogo de cajas y bancos ───────────────────────
+      // `kind` es una variante estructuralmente idéntica a `CashAccount`, por
+      // lo que la derivación implícita de `_toRow` resulta ambigua; se expone
+      // en modo manual con un `payload` explícito para cada columna.
+      cashRegisters.toEntityManual(
+        "cashRegister",
+        "CashRegister",
+        "id",
+      )
+        .sample({
+          id = 0;
+          name = "";
+          kind = #cash;
+          openingBalance = 0;
+          active = true;
+          createdAt = 0;
+          updatedAt = 0;
+        })
+        .payload("id", func (r : CashTypes.CashRegister) : Common.Id = r.id)
+        .payload("name", func (r : CashTypes.CashRegister) : Text = r.name)
+        .payload("kind", func (r : CashTypes.CashRegister) : Text = switch (r.kind) {
+          case (#cash) { "cash" };
+          case (#bank) { "bank" };
+        })
+        .payload("openingBalance", func (r : CashTypes.CashRegister) : Common.Money = r.openingBalance)
+        .payload("active", func (r : CashTypes.CashRegister) : Bool = r.active)
+        .payload("createdAt", func (r : CashTypes.CashRegister) : Common.Timestamp = r.createdAt)
+        .payload("updatedAt", func (r : CashTypes.CashRegister) : Common.Timestamp = r.updatedAt)
+        .controllerOnly()
+        .build(),
+
       // ── Caja y Bancos: turnos ───────────────────────────────────────────
       shifts.toEntity("shift", "Shift", "id")
         .sample({
           id = 0;
+          registerId = 0;
+          responsibleName = "";
+          responsibleUserId = null;
           openedAt = 0;
           closedAt = null;
           openingCash = 0;

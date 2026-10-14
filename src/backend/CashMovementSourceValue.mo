@@ -14,6 +14,7 @@ module {
       case (#expense) { "expense" };
       case (#commission) { "commission" };
       case (#pos) { "pos" };
+      case (#advance) { "advance" };
       case (#other) { "other" };
     });
 };

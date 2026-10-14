@@ -60,6 +60,8 @@ vi.mock("@tanstack/react-router", () => ({
     </a>
   ),
   useParams: () => ({ id: "1" }),
+  useNavigate: () => vi.fn(),
+  useSearch: () => ({}),
 }));
 
 vi.mock("sonner", () => ({

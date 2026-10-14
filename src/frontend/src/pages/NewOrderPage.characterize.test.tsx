@@ -85,6 +85,7 @@ function orderView(): OrderView {
       createdAt: TS,
       updatedAt: TS,
       photos: [],
+      payments: [],
     },
     totals: {
       partsSubtotal: 0n,
@@ -93,6 +94,8 @@ function orderView(): OrderView {
       taxRate: 0n,
       tax: 0n,
       total: 0n,
+      paidAmount: 0n,
+      balance: 0n,
     },
   };
 }

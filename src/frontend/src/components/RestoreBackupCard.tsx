@@ -102,9 +102,15 @@ export function RestoreBackupCard() {
     try {
       content = await readRestoreFile(file);
     } catch (readError) {
+      setPreview(null);
+      setSelectedKeys([]);
       setError(restoreErrorMessage(readError));
       setStep("idle");
       return;
+    } finally {
+      // Reiniciar el input permite volver a elegir el MISMO archivo y que
+      // onChange se dispare de nuevo. El contenido ya quedó capturado arriba.
+      if (fileInputRef.current) fileInputRef.current.value = "";
     }
 
     setFileContent(content);
@@ -117,6 +123,7 @@ export function RestoreBackupCard() {
       onError: (validationError) => {
         setPreview(null);
         setSelectedKeys([]);
+        setConfirmed(false);
         setError(restoreErrorMessage(validationError));
         setStep("idle");
       },

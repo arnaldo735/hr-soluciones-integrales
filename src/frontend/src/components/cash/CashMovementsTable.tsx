@@ -11,7 +11,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useCashMovements } from "@/hooks/use-cash";
+import { useCashMovements, useCashRegisters } from "@/hooks/use-cash";
 import {
   colombiaEndOfDay,
   colombiaStartOfDay,
@@ -70,15 +70,26 @@ export function CashMovementsTable({
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod | "all">(
     "all",
   );
+  const [registerId, setRegisterId] = useState<string>("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [page, setPage] = useState(1);
+
+  const registersQuery = useCashRegisters({
+    kind: null,
+    active: null,
+    search: "",
+    offset: 0,
+    limit: 100,
+  });
+  const registers = registersQuery.data?.items ?? [];
 
   const fromTimestamp = useMemo(() => colombiaStartOfDay(from), [from]);
   const toTimestamp = useMemo(() => colombiaEndOfDay(to), [to]);
 
   const movementsQuery = useCashMovements({
     shiftId,
+    registerId: registerId === "all" ? null : BigInt(registerId),
     kind: kind === "all" ? null : kind,
     account: account === "all" ? null : account,
     paymentMethod: paymentMethod === "all" ? null : paymentMethod,
@@ -96,6 +107,7 @@ export function CashMovementsTable({
     kind !== "all" ||
     account !== "all" ||
     paymentMethod !== "all" ||
+    registerId !== "all" ||
     from !== "" ||
     to !== "";
 
@@ -103,6 +115,7 @@ export function CashMovementsTable({
     setKind("all");
     setAccount("all");
     setPaymentMethod("all");
+    setRegisterId("all");
     setFrom("");
     setTo("");
     setPage(1);
@@ -203,6 +216,42 @@ export function CashMovementsTable({
         className="rounded-lg border border-border bg-card p-3 shadow-subtle"
       >
         <div className="flex flex-wrap items-end gap-2">
+          <div className="space-y-1">
+            <Label
+              htmlFor={`${ocid}-register`}
+              className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground"
+            >
+              Caja o banco
+            </Label>
+            <Select
+              value={registerId}
+              onValueChange={(value) => {
+                setRegisterId(value);
+                setPage(1);
+              }}
+            >
+              <SelectTrigger
+                id={`${ocid}-register`}
+                aria-label="Filtrar por caja o banco"
+                data-ocid={`${ocid}.register_filter`}
+                className="w-[180px]"
+              >
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todas</SelectItem>
+                {registers.map((register) => (
+                  <SelectItem
+                    key={register.id.toString()}
+                    value={register.id.toString()}
+                  >
+                    {register.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-1">
             <Label
               htmlFor={`${ocid}-kind`}

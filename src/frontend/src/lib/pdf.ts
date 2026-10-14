@@ -15,6 +15,7 @@ import type {
   ContactDocument,
   DocumentFormat,
   HopeMessage,
+  OrderAdvanceReceipt,
   WarrantyDocumentData,
 } from "@/lib/types";
 import {
@@ -1093,13 +1094,21 @@ const WARRANTY_NOTICE_BODY: [number, number, number] = [69, 26, 3];
 
 /**
  * Draws the identification block of the warranty document (cliente,
- * motocicleta, fecha y técnico) and returns the Y cursor below it. A4 uses a
- * two-column label/value grid; the 80mm roll stacks each row.
+ * motocicleta, fecha y técnico) starting at `startY` and returns the Y cursor
+ * below it. A4 uses a two-column label/value grid; the 80mm roll stacks each
+ * row.
+ *
+ * `startY` is the Y the caller already advanced to (below the company header
+ * and the "Orden de servicio" line). The block must begin there, never at the
+ * top of the page, or it would be drawn over the header. Each row advances by
+ * the real height of its wrapped value, so a long cliente/moto/técnico value
+ * can never be overlapped by the row below it.
  */
 function drawWarrantyIdentity(
   doc: jsPDF,
   data: WarrantyDocumentData,
   layout: ContactLayout,
+  startY: number,
 ): number {
   const { margin, right, narrow } = layout;
   const rows: Array<[string, string]> = [
@@ -1123,7 +1132,7 @@ function drawWarrantyIdentity(
     ],
   ];
 
-  let cursor = 0;
+  let cursor = startY;
   if (narrow) {
     for (const [label, value] of rows) {
       doc.setFont("helvetica", "normal");
@@ -1191,7 +1200,8 @@ export async function downloadWarrantyPdf(
   doc.text(`Orden de servicio ${data.orderNumber}`, layout.margin, cursor);
   cursor += layout.narrow ? 4 : 6;
 
-  cursor = drawWarrantyIdentity(doc, data, layout) + (layout.narrow ? 2 : 3);
+  cursor =
+    drawWarrantyIdentity(doc, data, layout, cursor) + (layout.narrow ? 2 : 3);
 
   doc.setDrawColor(...ACCENT);
   doc.setLineWidth(0.3);
@@ -1311,4 +1321,216 @@ export async function downloadWarrantyPdf(
   );
 
   await savePdf(doc, `garantia-${data.orderNumber}.pdf`);
+}
+
+/* ---------------------------------------------------------------------------
+ * Recibo de anticipo (anticipo + abonos de una orden de trabajo).
+ * El mismo contenido que la vista previa en pantalla, en A4 o tirilla 80 mm.
+ * ------------------------------------------------------------------------- */
+
+/** Etiqueta en español del método de pago de un anticipo o abono. */
+function paymentMethodLabel(method: string): string {
+  switch (method) {
+    case "transfer":
+      return "Transferencia";
+    case "card":
+      return "Tarjeta";
+    case "mixed":
+      return "Mixto";
+    default:
+      return "Efectivo";
+  }
+}
+
+/**
+ * Real downloadable PDF of the advance receipt of a workshop order: company
+ * header, receipt and order numbers, customer/motorcycle identification, the
+ * advance and every registered partial payment, and the updated totals
+ * (total, abonado y saldo pendiente). Renders in A4 or 80mm tirilla, reusing
+ * the shared company header/footer and the daily hope block.
+ */
+export async function downloadOrderAdvanceReceiptPdf(
+  receipt: OrderAdvanceReceipt,
+  company: PdfCompany,
+  format: DocumentFormat,
+  hope?: HopeMessageContent | null,
+): Promise<void> {
+  const { jsPDF, autoTable } = await loadPdfLibs();
+  const logoDataUrl = company.logoUrl
+    ? await loadLogoDataUrl(company.logoUrl)
+    : null;
+  const layout = layoutFor(format);
+  const doc = new jsPDF({ unit: "mm", format: layout.pageFormat });
+  let cursor = drawContactHeader(
+    doc,
+    company,
+    "Recibo de anticipo",
+    layout,
+    logoDataUrl,
+  );
+
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(layout.narrow ? 8 : 10);
+  doc.setTextColor(...ACCENT);
+  doc.text(`Recibo de anticipo ${receipt.orderNumber}`, layout.margin, cursor);
+  cursor += layout.narrow ? 4 : 6;
+
+  doc.setFont("helvetica", "normal");
+  doc.setFontSize(layout.narrow ? 6.5 : 8.5);
+  doc.setTextColor(...MUTED);
+  doc.text(`Orden de taller ${receipt.orderNumber}`, layout.margin, cursor);
+  cursor += layout.narrow ? 4 : 6;
+
+  const identity: Array<[string, string]> = [
+    ["Cliente", receipt.customerName],
+    [
+      "Documento",
+      receipt.customerDocument && receipt.customerDocument.trim() !== ""
+        ? receipt.customerDocument
+        : "—",
+    ],
+    [
+      "Motocicleta",
+      `${receipt.motorcycleBrand} ${receipt.motorcycleModel}`.trim() || "—",
+    ],
+    ["Placa", receipt.motorcyclePlate.trim() || "—"],
+    ["Fecha de emisión", formatDate(receipt.issuedAt)],
+  ];
+
+  if (layout.narrow) {
+    for (const [label, value] of identity) {
+      doc.setFont("helvetica", "normal");
+      doc.setFontSize(6.5);
+      doc.setTextColor(...MUTED);
+      doc.text(label, layout.margin, cursor);
+      doc.setFont("helvetica", "bold");
+      doc.setTextColor(...ACCENT);
+      const valueLines = doc.splitTextToSize(
+        value,
+        layout.right - layout.margin,
+      );
+      doc.text(valueLines, layout.margin, cursor + 3);
+      cursor += 3 + valueLines.length * 3 + 1.5;
+    }
+  } else {
+    autoTable(doc, {
+      startY: cursor,
+      body: identity.map(([label, value]) => [label, value]),
+      theme: "plain",
+      styles: { font: "helvetica", fontSize: 8.5, cellPadding: 1.5 },
+      columnStyles: {
+        0: { cellWidth: 40, textColor: MUTED },
+        1: { fontStyle: "bold", textColor: ACCENT },
+      },
+      margin: { left: layout.margin, right: layout.margin },
+    });
+    cursor = tableEndY(doc, cursor) + 4;
+  }
+
+  // Anticipo registrado (monto, método y fecha).
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(layout.narrow ? 7.5 : 9.5);
+  doc.setTextColor(...ACCENT);
+  doc.text("Anticipo", layout.margin, cursor);
+  cursor += layout.narrow ? 3.5 : 4;
+
+  if (receipt.advance) {
+    autoTable(doc, {
+      startY: cursor,
+      head: [["Monto", "Método", "Fecha"]],
+      body: [
+        [
+          formatMoney(receipt.advance.amount),
+          paymentMethodLabel(receipt.advance.method),
+          formatDate(receipt.advance.registeredAt),
+        ],
+      ],
+      theme: "striped",
+      styles: {
+        font: "helvetica",
+        fontSize: layout.narrow ? 6.5 : 8.5,
+        cellPadding: layout.narrow ? 1.2 : 2,
+      },
+      headStyles: { fillColor: [71, 85, 105], textColor: 255 },
+      columnStyles: { 0: { halign: "right" } },
+      margin: { left: layout.margin, right: layout.margin },
+    });
+    cursor = tableEndY(doc, cursor) + (layout.narrow ? 4 : 6);
+  } else {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(layout.narrow ? 6.5 : 8.5);
+    doc.setTextColor(...MUTED);
+    doc.text("Sin anticipo registrado.", layout.margin, cursor);
+    cursor += layout.narrow ? 5 : 7;
+  }
+
+  // Abonos registrados sobre la orden.
+  doc.setFont("helvetica", "bold");
+  doc.setFontSize(layout.narrow ? 7.5 : 9.5);
+  doc.setTextColor(...ACCENT);
+  doc.text("Abonos registrados", layout.margin, cursor);
+  cursor += layout.narrow ? 3.5 : 4;
+
+  if (receipt.payments.length === 0) {
+    doc.setFont("helvetica", "italic");
+    doc.setFontSize(layout.narrow ? 6.5 : 8.5);
+    doc.setTextColor(...MUTED);
+    doc.text("Sin abonos registrados.", layout.margin, cursor);
+    cursor += layout.narrow ? 5 : 7;
+  } else {
+    autoTable(doc, {
+      startY: cursor,
+      head: [["Fecha", "Método", "Nota", "Monto"]],
+      body: receipt.payments.map((payment) => [
+        formatDate(payment.registeredAt),
+        paymentMethodLabel(payment.method),
+        payment.note && payment.note.trim() !== "" ? payment.note : "—",
+        formatMoney(payment.amount),
+      ]),
+      theme: "striped",
+      styles: {
+        font: "helvetica",
+        fontSize: layout.narrow ? 6.5 : 8,
+        cellPadding: layout.narrow ? 1.2 : 2,
+        overflow: "linebreak",
+      },
+      headStyles: { fillColor: [71, 85, 105], textColor: 255 },
+      columnStyles: { 3: { halign: "right" } },
+      margin: { left: layout.margin, right: layout.margin },
+    });
+    cursor = tableEndY(doc, cursor) + (layout.narrow ? 4 : 6);
+  }
+
+  // Totales: total de la orden, total abonado y saldo pendiente.
+  autoTable(doc, {
+    startY: cursor,
+    body: [
+      ["Total de la orden", formatMoney(receipt.total)],
+      ["Total abonado", formatMoney(receipt.paidAmount)],
+      ["Saldo pendiente", formatMoney(receipt.balance)],
+    ],
+    theme: "plain",
+    styles: {
+      font: "helvetica",
+      fontSize: layout.narrow ? 7 : 9,
+      cellPadding: 1.5,
+    },
+    columnStyles: {
+      0: { halign: "right", textColor: MUTED },
+      1: { halign: "right", fontStyle: "bold", textColor: ACCENT },
+    },
+    margin: {
+      left: layout.narrow ? layout.margin : layout.right - 90,
+      right: layout.margin,
+    },
+  });
+
+  drawContactFooter(
+    doc,
+    "Recibo generado por el sistema de taller. Conserve este comprobante como constancia del anticipo y los abonos.",
+    layout,
+    hope ?? null,
+  );
+
+  await savePdf(doc, `recibo-anticipo-${receipt.orderNumber}.pdf`);
 }

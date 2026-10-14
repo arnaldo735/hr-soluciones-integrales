@@ -395,6 +395,7 @@ export function OrdersPage() {
                         <Link
                           to="/ordenes/$id"
                           params={{ id: order.id.toString() }}
+                          search={{}}
                           data-ocid={`orders.link.${index + 1}`}
                           className="data-rail text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >

@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/table";
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { invalidateCashData } from "@/hooks/use-cash";
 import { useIvaSettings } from "@/hooks/use-company";
 import { useDeleteInvoice } from "@/hooks/use-invoices";
 import { useReceivables } from "@/hooks/use-receivables";
@@ -379,16 +380,18 @@ function GenerateInvoiceDialog({
   const creditReady = validCount && firstDueDate !== "";
 
   const previewTotal = selectedOrder?.totals.total ?? 0n;
+  const previewAdvance = selectedOrder?.order.advance?.amount ?? 0n;
+  const previewSaldo = previewTotal - previewAdvance;
   const previewRows = useMemo(() => {
     if (!isCredit || !creditReady) return [];
-    const base = previewTotal / BigInt(parsedCount);
-    const remainder = previewTotal - base * BigInt(parsedCount);
+    const base = previewSaldo / BigInt(parsedCount);
+    const remainder = previewSaldo - base * BigInt(parsedCount);
     return Array.from({ length: parsedCount }, (_, index) => ({
       number: index + 1,
       amount: index === parsedCount - 1 ? base + remainder : base,
       dueDate: addMonths(firstDueDate, index),
     }));
-  }, [isCredit, creditReady, previewTotal, parsedCount, firstDueDate]);
+  }, [isCredit, creditReady, previewSaldo, parsedCount, firstDueDate]);
 
   const mutation = useMutation({
     mutationFn: async (input: {
@@ -408,6 +411,10 @@ function GenerateInvoiceDialog({
     },
     onSuccess: (invoice: Invoice) => {
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      // Emitir la factura de una OT registra el movimiento #invoice en Caja y
+      // Bancos (abriendo turno si hace falta), así que los saldos de turnos
+      // abiertos y el historial de movimientos deben refrescarse sin recargar.
+      invalidateCashData(queryClient);
       toast.success(`Factura ${invoice.number} generada`);
       onOpenChange(false);
       void navigate({
@@ -509,6 +516,61 @@ function GenerateInvoiceDialog({
               </Select>
             )}
           </div>
+
+          {selectedOrder ? (
+            <div
+              data-ocid="invoices.advance_preview"
+              className="space-y-2 rounded-md border border-border bg-muted/20 p-3"
+            >
+              <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+                Resumen de la factura
+              </p>
+              <dl className="grid gap-2 sm:grid-cols-3">
+                <div className="rounded-md border border-border bg-card px-3 py-2">
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Total
+                  </dt>
+                  <dd className="data-rail mt-0.5 text-sm font-medium">
+                    {formatMoney(previewTotal)}
+                  </dd>
+                </div>
+                <div className="rounded-md border border-border bg-card px-3 py-2">
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+                    Anticipo aplicado
+                  </dt>
+                  <dd
+                    data-ocid="invoices.advance_preview_applied"
+                    className={cn(
+                      "data-rail mt-0.5 text-sm font-medium",
+                      previewAdvance > 0n
+                        ? "text-success"
+                        : "text-muted-foreground",
+                    )}
+                  >
+                    {previewAdvance > 0n
+                      ? `− ${formatMoney(previewAdvance)}`
+                      : formatMoney(0n)}
+                  </dd>
+                </div>
+                <div className="rounded-md border border-primary/40 bg-primary/10 px-3 py-2">
+                  <dt className="font-mono text-[10px] uppercase tracking-[0.14em] text-primary">
+                    Saldo a cobrar
+                  </dt>
+                  <dd
+                    data-ocid="invoices.advance_preview_saldo"
+                    className="data-rail mt-0.5 text-sm font-semibold"
+                  >
+                    {formatMoney(previewSaldo)}
+                  </dd>
+                </div>
+              </dl>
+              <p className="text-xs text-muted-foreground">
+                {previewAdvance > 0n
+                  ? "El anticipo registrado en la orden se descontará del total al generar la factura."
+                  : "Esta orden no tiene anticipo registrado; el saldo a cobrar es igual al total."}
+              </p>
+            </div>
+          ) : null}
 
           <div className="space-y-2 rounded-md border border-border bg-muted/20 p-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -722,7 +784,7 @@ function GenerateInvoiceDialog({
                   <div className="installment-summary">
                     <span>
                       Total financiado{" "}
-                      <strong>{formatMoney(previewTotal)}</strong>
+                      <strong>{formatMoney(previewSaldo)}</strong>
                     </span>
                     <span>
                       Cuotas <strong>{formatNumber(parsedCount)}</strong>

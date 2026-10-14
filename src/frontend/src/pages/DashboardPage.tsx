@@ -1,232 +1,338 @@
-import { InvoiceSort } from "@/backend";
+import { AlertListDialog } from "@/components/dashboard/AlertListDialog";
+import {
+  type AlertRecord,
+  statusLabel,
+} from "@/components/dashboard/AlertRecordDetailDialog";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { useAuth } from "@/hooks/use-auth";
-import { useBackend } from "@/hooks/use-backend";
 import { useCompanyProfile } from "@/hooks/use-company";
+import { useDashboardAlerts } from "@/hooks/use-dashboard-alerts";
 import { useRole } from "@/hooks/use-role";
-import { formatMoney, formatNumber } from "@/lib/format";
-import type { CompanyProfile } from "@/lib/types";
-import { PartSort, QuoteSort, ServiceSort } from "@/lib/types";
-import { useQuery } from "@tanstack/react-query";
+import {
+  formatDate,
+  formatDateTime,
+  formatMoney,
+  formatNumber,
+} from "@/lib/format";
+import type { CompanyProfile, DashboardAlertsSummary } from "@/lib/types";
 import { Link } from "@tanstack/react-router";
 import {
   AlertTriangle,
+  ArrowRight,
   Banknote,
   Boxes,
   Building2,
   CalendarClock,
   ClipboardList,
-  FileSpreadsheet,
   FileText,
-  HandCoins,
   Mail,
   MapPin,
   Package,
   Phone,
   Receipt,
-  ScanBarcode,
   Settings,
   ShieldAlert,
-  Tags,
   Truck,
-  Users,
-  Wallet,
   Wrench,
 } from "lucide-react";
 import type { LucideIcon } from "lucide-react";
+import { useRef, useState } from "react";
 
 /* ---------------------------------------------------------------------------
- * Live metrics
+ * Alert definitions
  * ------------------------------------------------------------------------- */
 
-interface DashboardMetrics {
-  activeOrders: bigint;
-  appointments: bigint;
-  technicians: bigint;
-  parts: bigint;
-  services: bigint;
-  customers: bigint;
-  quotes: bigint;
-  invoices: bigint;
-  posSales: bigint;
-  purchaseInvoices: bigint;
-  receivables: bigint;
-  payables: bigint;
-  expenses: bigint;
-  commissions: bigint;
-  accounting: bigint;
-}
+type AlertTone = "info" | "warning" | "danger" | "ok";
 
-const EMPTY_METRICS: DashboardMetrics = {
-  activeOrders: 0n,
-  appointments: 0n,
-  technicians: 0n,
-  parts: 0n,
-  services: 0n,
-  customers: 0n,
-  quotes: 0n,
-  invoices: 0n,
-  posSales: 0n,
-  purchaseInvoices: 0n,
-  receivables: 0n,
-  payables: 0n,
-  expenses: 0n,
-  commissions: 0n,
-  accounting: 0n,
-};
-
-/**
- * Módulos del backend que exige cada lectura del panel. Un endpoint con
- * alcance de módulo falla con `Runtime.trap` cuando el rol de la sesión no
- * incluye la clave, así que cada lectura se condiciona a su módulo para que un
- * rol parcial siga viendo el panel con los datos que sí puede consultar.
- */
-const DASHBOARD_MODULES = {
-  workshop: "workshop",
-  appointments: "appointments",
-  technicians: "technicians",
-  inventory: "inventory",
-  services: "services",
-  customers: "customers",
-  quotes: "quotes",
-  billing: "billing",
-  pos: "pos",
-  purchaseInvoices: "purchaseInvoices",
-  receivables: "receivables",
-  payables: "payables",
-  expenses: "expenses",
-  commissions: "commissions",
-  accounting: "accounting",
-} as const;
-
-/**
- * Resuelve si el rol activo puede consultar un módulo. `modules === null`
- * significa sin restricción (administrador por Internet Identity); un arreglo
- * vacío significa que el rol no habilita ningún módulo.
- */
-function canAccess(modules: string[] | null, moduleKey: string): boolean {
-  if (modules === null) return true;
-  return modules.includes(moduleKey);
+interface AlertDefinition {
+  /** Stable key used for list keys and test markers. */
+  key: string;
+  /** Visible Spanish alert name. */
+  title: string;
+  /** Destination module label. */
+  moduleLabel: string;
+  /** Route the card links to. */
+  to: string;
+  icon: LucideIcon;
+  tone: AlertTone;
+  /** Módulo del backend que habilita esta alerta; `null` = siempre visible. */
+  moduleKey: string | null;
+  /**
+   * `true` cuando la ruta destino está envuelta en la guarda de administrador.
+   * La tarjeta solo se muestra a un administrador para no ofrecer un enlace que
+   * la guarda rechazaría.
+   */
+  adminOnly: boolean;
+  /** Reads the live count from the summary; `undefined` = sección no permitida. */
+  count: (summary: DashboardAlertsSummary) => bigint | undefined;
+  /** Mensaje en español propio de la alerta; usa el genérico si se omite. */
+  message?: (count: bigint) => string;
 }
 
 /**
- * Aggregates the live counters shown on each flow shortcut. Every call is a
- * cheap list/count read; the panel is the only consumer, so the metrics live
- * here instead of in a shared hook. Cada lectura se omite cuando el rol no
- * tiene el módulo correspondiente, de modo que un rol parcial nunca hace
- * fallar el `Promise.all` completo.
+ * Conjunto de alertas del panel. Cada tarjeta respeta los módulos del rol
+ * activo: una sección ausente del resumen (rol sin permiso) no se renderiza.
  */
-function useDashboardMetrics(modules: string[] | null) {
-  const { actor, isFetching } = useBackend();
-  const { token } = useAuth();
-
-  const canWorkshop = canAccess(modules, DASHBOARD_MODULES.workshop);
-  const canAppointments = canAccess(modules, DASHBOARD_MODULES.appointments);
-  const canTechnicians = canAccess(modules, DASHBOARD_MODULES.technicians);
-  const canInventory = canAccess(modules, DASHBOARD_MODULES.inventory);
-  const canServices = canAccess(modules, DASHBOARD_MODULES.services);
-  const canCustomers = canAccess(modules, DASHBOARD_MODULES.customers);
-  const canQuotes = canAccess(modules, DASHBOARD_MODULES.quotes);
-  const canBilling = canAccess(modules, DASHBOARD_MODULES.billing);
-  const canPos = canAccess(modules, DASHBOARD_MODULES.pos);
-  const canPurchaseInvoices = canAccess(
-    modules,
-    DASHBOARD_MODULES.purchaseInvoices,
-  );
-  const canReceivables = canAccess(modules, DASHBOARD_MODULES.receivables);
-  const canPayables = canAccess(modules, DASHBOARD_MODULES.payables);
-  const canExpenses = canAccess(modules, DASHBOARD_MODULES.expenses);
-  const canCommissions = canAccess(modules, DASHBOARD_MODULES.commissions);
-  const canAccounting = canAccess(modules, DASHBOARD_MODULES.accounting);
-
-  return useQuery({
-    queryKey: [
-      "dashboard-metrics",
-      modules === null ? "all" : [...modules].sort().join(","),
-      token,
-    ],
-    queryFn: async (): Promise<DashboardMetrics> => {
-      if (!actor) return EMPTY_METRICS;
-
-      const [
-        orders,
-        appointments,
-        technicians,
-        parts,
-        services,
-        customers,
-        quotes,
-        invoices,
-        posSales,
-        purchaseInvoices,
-        receivables,
-        payables,
-        expenses,
-        commissionLines,
-        accounting,
-      ] = await Promise.all([
-        canWorkshop
-          ? actor.listOrders(token, {}, 0n, 1n)
-          : Promise.resolve(null),
-        canAppointments
-          ? actor.listAppointments(token, {})
-          : Promise.resolve(null),
-        canTechnicians
-          ? actor.listTechnicians(token, {})
-          : Promise.resolve(null),
-        canInventory
-          ? actor.listParts(token, {}, PartSort.name, 0n, 1n)
-          : Promise.resolve(null),
-        canServices
-          ? actor.listServices(token, {}, ServiceSort.name, 0n, 1n)
-          : Promise.resolve(null),
-        canCustomers ? actor.listCustomers(token, null) : Promise.resolve(null),
-        canQuotes
-          ? actor.listQuotes(token, {}, QuoteSort.createdAt, 0n, 1n)
-          : Promise.resolve(null),
-        canBilling
-          ? actor.listInvoices(token, {}, 0n, 1n)
-          : Promise.resolve(null),
-        canPos ? actor.listPosSales(token, {}, 0n, 1n) : Promise.resolve(null),
-        canPurchaseInvoices
-          ? actor.listPurchaseInvoices(token, {}, InvoiceSort.createdAt, 0n, 1n)
-          : Promise.resolve(null),
-        canReceivables
-          ? actor.listReceivables(token, {})
-          : Promise.resolve(null),
-        canPayables ? actor.listPayables(token) : Promise.resolve(null),
-        canExpenses
-          ? actor.listExpenses(token, {}, 0n, 1n)
-          : Promise.resolve(null),
-        canCommissions
-          ? actor.listCommissionPayments(token, {})
-          : Promise.resolve(null),
-        canAccounting
-          ? actor.getAccountingSummary(token, {})
-          : Promise.resolve(null),
-      ]);
-
-      return {
-        activeOrders: orders?.total ?? 0n,
-        appointments: BigInt(appointments?.length ?? 0),
-        technicians: BigInt(technicians?.length ?? 0),
-        parts: parts?.total ?? 0n,
-        services: services?.total ?? 0n,
-        customers: BigInt(customers?.length ?? 0),
-        quotes: quotes?.total ?? 0n,
-        invoices: invoices?.total ?? 0n,
-        posSales: posSales?.total ?? 0n,
-        purchaseInvoices: purchaseInvoices?.total ?? 0n,
-        receivables: BigInt(receivables?.length ?? 0),
-        payables: BigInt(payables?.length ?? 0),
-        expenses: expenses?.total ?? 0n,
-        commissions: BigInt(commissionLines?.length ?? 0),
-        accounting: accounting?.invoiceCount ?? 0n,
-      };
+const ALERT_DEFINITIONS: AlertDefinition[] = [
+  {
+    key: "unapprovedOrders",
+    title: "OT sin aprobar",
+    moduleLabel: "Órdenes de taller",
+    to: "/ordenes",
+    icon: ClipboardList,
+    tone: "warning",
+    moduleKey: "workshop",
+    adminOnly: false,
+    count: (summary) => summary.unapprovedOrders?.count,
+  },
+  {
+    key: "appointments",
+    title: "Citas pendientes",
+    moduleLabel: "Citas",
+    to: "/citas",
+    icon: CalendarClock,
+    tone: "info",
+    moduleKey: "appointments",
+    adminOnly: false,
+    count: (summary) => summary.appointments?.count,
+  },
+  {
+    key: "finishedOrders",
+    title: "Motos terminadas",
+    moduleLabel: "Órdenes de taller",
+    to: "/ordenes",
+    icon: Wrench,
+    tone: "warning",
+    moduleKey: "workshop",
+    adminOnly: false,
+    count: (summary) => summary.finishedOrders?.count,
+  },
+  {
+    key: "pendingQuotes",
+    title: "Cotizaciones pendientes",
+    moduleLabel: "Cotizaciones",
+    to: "/cotizaciones",
+    icon: FileText,
+    tone: "info",
+    moduleKey: "quotes",
+    adminOnly: false,
+    count: (summary) => summary.pendingQuotes?.count,
+  },
+  {
+    key: "lowStockParts",
+    title: "Inventario por agotarse",
+    moduleLabel: "Inventario",
+    to: "/inventario",
+    icon: Package,
+    tone: "warning",
+    moduleKey: "inventory",
+    adminOnly: false,
+    count: (summary) => summary.lowStockParts?.count,
+  },
+  {
+    key: "receivables",
+    title: "Cuentas por cobrar",
+    moduleLabel: "Cuentas por cobrar",
+    to: "/cuentas-por-cobrar",
+    icon: Receipt,
+    tone: "danger",
+    moduleKey: "receivables",
+    adminOnly: true,
+    count: (summary) => summary.receivables?.count,
+  },
+  {
+    key: "payables",
+    title: "Cuentas por pagar",
+    moduleLabel: "Cuentas por pagar",
+    to: "/cuentas-por-pagar",
+    icon: Banknote,
+    tone: "danger",
+    moduleKey: "payables",
+    adminOnly: true,
+    count: (summary) => summary.payables?.count,
+  },
+  {
+    key: "supplierOrders",
+    title: "Pedidos a proveedor",
+    moduleLabel: "Proveedores",
+    to: "/proveedores",
+    icon: Truck,
+    tone: "info",
+    moduleKey: "suppliers",
+    adminOnly: true,
+    count: (summary) => summary.supplierOrders?.count,
+  },
+  {
+    key: "overdueInstallments",
+    title: "Cuotas vencidas",
+    moduleLabel: "Facturas",
+    to: "/facturas",
+    icon: AlertTriangle,
+    tone: "danger",
+    moduleKey: "receivables",
+    adminOnly: true,
+    count: (summary) => summary.overdueInstallments?.count,
+    message: (count) => {
+      if (count === 0n) return "Todo al día, sin cuotas vencidas.";
+      const n = formatNumber(count);
+      return count === 1n
+        ? `Tiene ${n} cuota vencida, haga clic aquí para verla.`
+        : `Tiene ${n} cuotas vencidas, haga clic aquí para verlas.`;
     },
-    enabled: !!actor && !isFetching,
-  });
+  },
+];
+
+/** Mensaje en español del conteo de una alerta. */
+function alertMessage(count: bigint): string {
+  if (count === 0n) return "Todo al día, sin pendientes.";
+  const n = formatNumber(count);
+  return count === 1n
+    ? `Tiene ${n} pendiente, haga clic aquí para verlo.`
+    : `Tiene ${n} pendientes, haga clic aquí para verlos.`;
+}
+
+/* ---------------------------------------------------------------------------
+ * Mapeo de registros por tipo de alerta
+ * ------------------------------------------------------------------------- */
+
+/**
+ * Convierte los ítems ya cargados de una sección en registros normalizados que
+ * el detalle anidado sabe renderizar. No dispara consultas nuevas: reutiliza
+ * los datos de `getDashboardAlerts`.
+ */
+function buildRecords(
+  key: string,
+  summary: DashboardAlertsSummary,
+): AlertRecord[] {
+  switch (key) {
+    case "unapprovedOrders":
+      return (summary.unapprovedOrders?.items ?? []).map((item) => ({
+        kind: "order",
+        key: `order-${item.id}`,
+        title: `${item.orderNumber} · ${item.customerName}`,
+        subtitle: item.plate,
+        fields: [
+          { label: "Orden", value: item.orderNumber },
+          { label: "Cliente", value: item.customerName },
+          { label: "Placa", value: item.plate || "—" },
+          { label: "Estado", value: "Pendiente de aprobación" },
+        ],
+      }));
+    case "finishedOrders":
+      return (summary.finishedOrders?.items ?? []).map((item) => ({
+        kind: "order",
+        key: `finished-${item.id}`,
+        title: `${item.orderNumber} · ${item.customerName}`,
+        subtitle: item.plate,
+        fields: [
+          { label: "Orden", value: item.orderNumber },
+          { label: "Cliente", value: item.customerName },
+          { label: "Placa", value: item.plate || "—" },
+          { label: "Días en taller", value: formatNumber(item.daysInWorkshop) },
+        ],
+      }));
+    case "appointments":
+      return (summary.appointments?.items ?? []).map((item) => ({
+        kind: "appointment",
+        key: `appointment-${item.id}`,
+        title: item.customerName,
+        subtitle: statusLabel(item.status),
+        fields: [
+          { label: "Cliente", value: item.customerName },
+          { label: "Estado", value: statusLabel(item.status) },
+          { label: "Programada", value: formatDateTime(item.scheduledAt) },
+        ],
+      }));
+    case "pendingQuotes":
+      return (summary.pendingQuotes?.items ?? []).map((item) => ({
+        kind: "quote",
+        key: `quote-${item.id}`,
+        title: `${item.quoteNumber} · ${item.customerName}`,
+        subtitle: statusLabel(item.status),
+        fields: [
+          { label: "Cotización", value: item.quoteNumber },
+          { label: "Cliente", value: item.customerName },
+          { label: "Estado", value: statusLabel(item.status) },
+          { label: "Creada", value: formatDate(item.createdAt) },
+        ],
+      }));
+    case "lowStockParts":
+      return (summary.lowStockParts?.items ?? []).map((item) => ({
+        kind: "part",
+        key: `part-${item.id}`,
+        title: item.name,
+        subtitle: item.sku,
+        fields: [
+          { label: "Repuesto", value: item.name },
+          { label: "SKU", value: item.sku || "—" },
+          { label: "Existencia", value: formatNumber(item.totalStock) },
+          {
+            label: "Mínimo",
+            value: formatNumber(item.lowStockThreshold),
+          },
+        ],
+      }));
+    case "receivables":
+      return (summary.receivables?.items ?? []).map((item) => ({
+        kind: "receivable",
+        key: `receivable-${item.invoiceId}`,
+        title: item.customerName,
+        subtitle: item.invoiceNumber,
+        fields: [
+          { label: "Factura", value: item.invoiceNumber },
+          { label: "Cliente", value: item.customerName },
+          { label: "Saldo", value: formatMoney(item.balance) },
+          { label: "Vence", value: formatDate(item.dueDate) },
+          { label: "Estado", value: statusLabel(item.status) },
+        ],
+      }));
+    case "payables":
+      return (summary.payables?.items ?? []).map((item) => ({
+        kind: "payable",
+        key: `payable-${item.supplierId}`,
+        title: item.supplierName,
+        subtitle: formatMoney(item.balance),
+        fields: [
+          { label: "Proveedor", value: item.supplierName },
+          { label: "Saldo", value: formatMoney(item.balance) },
+          { label: "Vence", value: formatDate(item.dueDate) },
+          { label: "Estado", value: statusLabel(item.status) },
+        ],
+      }));
+    case "supplierOrders":
+      return (summary.supplierOrders?.items ?? []).map((item) => ({
+        kind: "supplierOrder",
+        key: `supplier-order-${item.id}`,
+        title: item.description || item.sku,
+        subtitle: item.supplierName,
+        fields: [
+          { label: "Proveedor", value: item.supplierName },
+          { label: "Descripción", value: item.description || "—" },
+          { label: "SKU", value: item.sku || "—" },
+          { label: "Cantidad", value: formatNumber(item.quantity) },
+          { label: "Creado", value: formatDate(item.createdAt) },
+        ],
+      }));
+    case "overdueInstallments":
+      return (summary.overdueInstallments?.items ?? []).map((item) => ({
+        kind: "overdueInstallment",
+        key: `installment-${item.invoiceId}-${item.installmentNumber}`,
+        title: `${item.invoiceNumber} · ${item.customerName}`,
+        subtitle: `Cuota ${formatNumber(item.installmentNumber)}`,
+        fields: [
+          { label: "Factura", value: item.invoiceNumber },
+          { label: "Cliente", value: item.customerName },
+          {
+            label: "Cuota",
+            value: formatNumber(item.installmentNumber),
+          },
+          { label: "Monto", value: formatMoney(item.amount) },
+          { label: "Vence", value: formatDate(item.dueDate) },
+        ],
+      }));
+    default:
+      return [];
+  }
 }
 
 /* ---------------------------------------------------------------------------
@@ -352,368 +458,105 @@ function CompanyHeader({ profile }: { profile: CompanyProfile }) {
   );
 }
 
-/* ---------------------------------------------------------------------------
- * Flow shortcuts
- * ------------------------------------------------------------------------- */
-
-type ShortcutTone = "primary" | "accent" | "info";
-
-interface Shortcut {
-  key: string;
-  label: string;
-  to: string;
-  icon: LucideIcon;
-  metric: (metrics: DashboardMetrics) => string;
-  caption: string;
-  tone: ShortcutTone;
-  /** Módulo del backend que habilita este acceso; `null` = siempre visible. */
-  moduleKey: string | null;
-}
-
-interface FlowGroup {
-  id: string;
-  label: string;
-  icon: LucideIcon;
-  shortcuts: Shortcut[];
-}
-
-const FLOW_GROUPS: FlowGroup[] = [
-  {
-    id: "taller",
-    label: "Taller",
-    icon: Wrench,
-    shortcuts: [
-      {
-        key: "orders",
-        label: "Órdenes de taller",
-        to: "/ordenes",
-        icon: ClipboardList,
-        metric: (m) => formatNumber(m.activeOrders),
-        caption: "órdenes registradas",
-        tone: "primary",
-        moduleKey: "workshop",
-      },
-      {
-        key: "appointments",
-        label: "Citas",
-        to: "/citas",
-        icon: CalendarClock,
-        metric: (m) => formatNumber(m.appointments),
-        caption: "citas agendadas",
-        tone: "primary",
-        moduleKey: "appointments",
-      },
-      {
-        key: "technicians",
-        label: "Técnicos",
-        to: "/tecnicos",
-        icon: Users,
-        metric: (m) => formatNumber(m.technicians),
-        caption: "técnicos en nómina",
-        tone: "primary",
-        moduleKey: "technicians",
-      },
-    ],
-  },
-  {
-    id: "catalogo",
-    label: "Catálogo",
-    icon: Boxes,
-    shortcuts: [
-      {
-        key: "inventory",
-        label: "Inventario",
-        to: "/inventario",
-        icon: Package,
-        metric: (m) => formatNumber(m.parts),
-        caption: "repuestos en catálogo",
-        tone: "accent",
-        moduleKey: "inventory",
-      },
-      {
-        key: "services",
-        label: "Servicios",
-        to: "/servicios",
-        icon: Wrench,
-        metric: (m) => formatNumber(m.services),
-        caption: "servicios ofrecidos",
-        tone: "accent",
-        moduleKey: "services",
-      },
-      {
-        key: "service-categories",
-        label: "Categorías de servicios",
-        to: "/servicios/categorias",
-        icon: Tags,
-        metric: (m) => formatNumber(m.services),
-        caption: "servicios clasificados",
-        tone: "accent",
-        moduleKey: "serviceCategories",
-      },
-      {
-        key: "customers",
-        label: "Clientes y motos",
-        to: "/clientes",
-        icon: Users,
-        metric: (m) => formatNumber(m.customers),
-        caption: "clientes registrados",
-        tone: "accent",
-        moduleKey: "customers",
-      },
-      {
-        key: "suppliers",
-        label: "Proveedores",
-        to: "/proveedores",
-        icon: Truck,
-        metric: (m) => formatNumber(m.purchaseInvoices),
-        caption: "facturas de compra",
-        tone: "accent",
-        moduleKey: "suppliers",
-      },
-    ],
-  },
-  {
-    id: "ventas",
-    label: "Ventas",
-    icon: Receipt,
-    shortcuts: [
-      {
-        key: "quotes",
-        label: "Cotizaciones",
-        to: "/cotizaciones",
-        icon: FileText,
-        metric: (m) => formatNumber(m.quotes),
-        caption: "cotizaciones emitidas",
-        tone: "primary",
-        moduleKey: "quotes",
-      },
-      {
-        key: "invoices",
-        label: "Facturas",
-        to: "/facturas",
-        icon: Receipt,
-        metric: (m) => formatNumber(m.invoices),
-        caption: "facturas de venta",
-        tone: "primary",
-        moduleKey: "billing",
-      },
-      {
-        key: "pos",
-        label: "POS mostrador",
-        to: "/pos",
-        icon: ScanBarcode,
-        metric: (m) => formatNumber(m.posSales),
-        caption: "ventas de mostrador",
-        tone: "primary",
-        moduleKey: "pos",
-      },
-    ],
-  },
-  {
-    id: "compras",
-    label: "Compras",
-    icon: Truck,
-    shortcuts: [
-      {
-        key: "purchase-invoices",
-        label: "Facturas de compra",
-        to: "/facturas-compra",
-        icon: Receipt,
-        metric: (m) => formatNumber(m.purchaseInvoices),
-        caption: "facturas registradas",
-        tone: "accent",
-        moduleKey: "purchaseInvoices",
-      },
-      {
-        key: "payables",
-        label: "Cuentas por pagar",
-        to: "/cuentas-por-pagar",
-        icon: Wallet,
-        metric: (m) => formatNumber(m.payables),
-        caption: "cuentas pendientes",
-        tone: "accent",
-        moduleKey: "payables",
-      },
-    ],
-  },
-  {
-    id: "administracion",
-    label: "Administración",
-    icon: Settings,
-    shortcuts: [
-      {
-        key: "company",
-        label: "Empresa",
-        to: "/empresa",
-        icon: Building2,
-        metric: (m) => formatNumber(m.customers),
-        caption: "clientes en cartera",
-        tone: "info",
-        moduleKey: "company",
-      },
-      {
-        key: "receivables",
-        label: "Cuentas por cobrar",
-        to: "/cuentas-por-cobrar",
-        icon: HandCoins,
-        metric: (m) => formatNumber(m.receivables),
-        caption: "cuentas por cobrar",
-        tone: "info",
-        moduleKey: "receivables",
-      },
-      {
-        key: "expenses",
-        label: "Gastos",
-        to: "/gastos",
-        icon: Banknote,
-        metric: (m) => formatNumber(m.expenses),
-        caption: "gastos registrados",
-        tone: "info",
-        moduleKey: "expenses",
-      },
-      {
-        key: "commissions",
-        label: "Comisiones y préstamos",
-        to: "/comisiones",
-        icon: HandCoins,
-        metric: (m) => formatNumber(m.commissions),
-        caption: "pagos de comisión",
-        tone: "info",
-        moduleKey: "commissions",
-      },
-      {
-        key: "accounting",
-        label: "Contabilidad",
-        to: "/contabilidad",
-        icon: FileSpreadsheet,
-        metric: (m) => formatNumber(m.accounting),
-        caption: "facturas del periodo",
-        tone: "info",
-        moduleKey: "accounting",
-      },
-      {
-        key: "settings",
-        label: "Configuración",
-        to: "/configuracion",
-        icon: Settings,
-        metric: (m) => formatNumber(m.payables),
-        caption: "cuentas por pagar",
-        tone: "info",
-        moduleKey: "settings",
-      },
-    ],
-  },
-];
-
-function ShortcutCard({
-  shortcut,
-  metrics,
-  index,
-  accessible,
-}: {
-  shortcut: Shortcut;
-  metrics: DashboardMetrics;
-  index: number;
-  accessible: boolean;
-}) {
-  return (
-    <Link
-      to={shortcut.to}
-      data-ocid={`dashboard.shortcut.${index + 1}`}
-      data-tone={shortcut.tone}
-      className="flow-shortcut"
-    >
-      <span className="flow-shortcut-head">
-        <span className="flow-shortcut-icon" aria-hidden="true">
-          <shortcut.icon className="size-4" />
-        </span>
-        <span className="flow-shortcut-name">{shortcut.label}</span>
-      </span>
-      {accessible ? (
-        <span
-          className="flow-shortcut-metric"
-          data-tone={shortcut.tone}
-          aria-label={`${shortcut.metric(metrics)} ${shortcut.caption}`}
-        >
-          {shortcut.metric(metrics)}
-        </span>
-      ) : (
-        <span
-          className="flow-shortcut-metric text-muted-foreground"
-          data-tone={shortcut.tone}
-          aria-label="Sin acceso a este módulo"
-        >
-          —
-        </span>
-      )}
-      <span className="flow-shortcut-caption">{shortcut.caption}</span>
-    </Link>
-  );
-}
-
-function FlowGroupSection({
-  group,
-  metrics,
-  modules,
-}: {
-  group: FlowGroup;
-  metrics: DashboardMetrics;
-  modules: string[] | null;
-}) {
-  const shortcuts = group.shortcuts.filter((shortcut) =>
-    canAccess(modules, shortcut.moduleKey ?? ""),
-  );
-
-  if (shortcuts.length === 0) return null;
-
-  return (
-    <section
-      data-ocid={`dashboard.flow.${group.id}`}
-      aria-label={group.label}
-      className="flow-group"
-    >
-      <div className="flow-group-head">
-        <span className="flow-group-icon" aria-hidden="true">
-          <group.icon className="size-4" />
-        </span>
-        <h3 className="flow-group-label">{group.label}</h3>
-        <span className="flow-group-count">
-          {formatNumber(BigInt(shortcuts.length))} módulos
-        </span>
-      </div>
-      <div className="flow-shortcuts">
-        {shortcuts.map((shortcut, index) => (
-          <ShortcutCard
-            key={shortcut.key}
-            shortcut={shortcut}
-            metrics={metrics}
-            index={index}
-            accessible={canAccess(modules, shortcut.moduleKey ?? "")}
-          />
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function FlowSkeleton() {
-  const groups = Array.from({ length: 3 }, (_, i) => `flow-skeleton-${i}`);
-  const cards = Array.from({ length: 3 }, (_, i) => `flow-card-${i}`);
+/**
+ * Aviso neutral para un rol que no tiene el módulo `company`: el panel sigue
+ * funcionando y solo se omite la identidad del taller.
+ */
+function CompanyRestrictedNotice() {
   return (
     <div
-      data-ocid="dashboard.flows.loading"
-      className="space-y-4"
+      data-ocid="dashboard.company_header.restricted_state"
+      className="company-header"
+    >
+      <div className="company-header-logo" aria-hidden="true">
+        <Building2 className="size-6" />
+      </div>
+      <p className="company-header-name">Perfil de empresa restringido</p>
+      <p className="company-header-legal">
+        Tu rol no incluye el módulo de empresa
+      </p>
+      <p className="mx-auto mt-3 max-w-md text-xs text-muted-foreground">
+        Las alertas de los módulos que sí puedes usar siguen disponibles más
+        abajo.
+      </p>
+    </div>
+  );
+}
+
+/* ---------------------------------------------------------------------------
+ * Alert grid
+ * ------------------------------------------------------------------------- */
+
+function AlertCard({
+  alert,
+  count,
+  index,
+  onOpen,
+}: {
+  alert: AlertDefinition;
+  count: bigint;
+  index: number;
+  onOpen: (trigger: HTMLButtonElement) => void;
+}) {
+  const isClear = count === 0n;
+  const Icon = alert.icon;
+  const message = alert.message ? alert.message(count) : alertMessage(count);
+
+  return (
+    <button
+      type="button"
+      onClick={(event) => onOpen(event.currentTarget)}
+      data-ocid={`dashboard.alert.${index + 1}`}
+      data-tone={alert.tone}
+      data-clear={isClear ? "true" : "false"}
+      className="alert-card"
+      aria-label={`${alert.title}: ${message}`}
+    >
+      <span className="alert-card-strip" aria-hidden="true" />
+      <span className="alert-card-body">
+        <span className="alert-card-head">
+          <span className="alert-card-icon" aria-hidden="true">
+            <Icon className="size-4" />
+          </span>
+          <span className="min-w-0">
+            <span className="alert-card-title block">{alert.title}</span>
+            <span className="alert-card-module block">{alert.moduleLabel}</span>
+          </span>
+        </span>
+        <span className="alert-card-count">{formatNumber(count)}</span>
+        <span className="alert-card-message">{message}</span>
+        <span className="alert-card-cta">
+          Ver registros
+          <ArrowRight aria-hidden="true" />
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function AlertGridSkeleton() {
+  const cards = Array.from({ length: 6 }, (_, i) => `alert-skeleton-${i}`);
+  return (
+    <div
+      data-ocid="dashboard.alerts.loading"
+      className="alert-grid"
       aria-busy="true"
       aria-hidden="true"
     >
-      {groups.map((groupId) => (
-        <div key={groupId} className="flow-group">
-          <Skeleton className="mb-3 h-4 w-28" />
-          <div className="flow-shortcuts">
-            {cards.map((cardId) => (
-              <Skeleton key={cardId} className="h-24 w-full rounded-md" />
-            ))}
-          </div>
+      {cards.map((cardId) => (
+        <div key={cardId} className="alert-card">
+          <span className="alert-card-strip" />
+          <span className="alert-card-body">
+            <span className="alert-card-head">
+              <Skeleton className="size-9 rounded-md" />
+              <span className="flex-1 space-y-2">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-3 w-24" />
+              </span>
+            </span>
+            <Skeleton className="h-9 w-16" />
+            <Skeleton className="h-4 w-full" />
+          </span>
         </div>
       ))}
     </div>
@@ -733,36 +576,10 @@ function MechanicNotice() {
       <div className="space-y-0.5">
         <p className="text-sm font-medium">Vista de mecánico</p>
         <p className="text-xs text-muted-foreground">
-          Los módulos de administración, compras y los importes de costo
-          requieren un administrador. Solicita acceso para ver el panel
-          completo.
+          Las alertas de administración, compras y cuentas por pagar requieren
+          un administrador. Solicita acceso para ver el panel completo.
         </p>
       </div>
-    </div>
-  );
-}
-
-/**
- * Aviso neutral para un rol que no tiene el módulo `company`: el panel sigue
- * funcionando y solo se omite la identidad del taller.
- */
-function CompanyRestrictedNotice() {
-  return (
-    <div
-      data-ocid="dashboard.company_header.restricted_state"
-      className="company-header"
-    >
-      <div className="company-header-logo" aria-hidden="true">
-        <Building2 className="size-6" />
-      </div>
-      <p className="company-header-name">Perfil de empresa restringido</p>
-      <p className="company-header-legal">
-        Tu rol no incluye el módulo de empresa
-      </p>
-      <p className="mx-auto mt-3 max-w-md text-xs text-muted-foreground">
-        Los accesos directos a los flujos que sí puedes usar siguen disponibles
-        más abajo.
-      </p>
     </div>
   );
 }
@@ -773,18 +590,53 @@ function CompanyRestrictedNotice() {
 
 export function DashboardPage() {
   const { isAdmin, isLoading: isRoleLoading, modules } = useRole();
-  const canCompany = canAccess(modules, "company");
+  const canCompany = modules === null || modules.includes("company");
   const profileQuery = useCompanyProfile({ enabled: canCompany });
-  const metricsQuery = useDashboardMetrics(modules);
+  const alertsQuery = useDashboardAlerts();
+  const [openAlertKey, setOpenAlertKey] = useState<string | null>(null);
+  // Tarjeta que abrió el modal de alerta. El diálogo es controlado por estado
+  // (sin `DialogTrigger`), así que Radix no tiene un disparador al cual
+  // devolver el foco; se restaura manualmente a esta tarjeta al cerrar.
+  const alertTriggerRef = useRef<HTMLButtonElement | null>(null);
 
-  const isError = metricsQuery.isError;
+  const isError = alertsQuery.isError;
   const showSkeleton =
     isRoleLoading ||
     (canCompany && profileQuery.isLoading) ||
-    metricsQuery.isLoading;
+    alertsQuery.isLoading;
 
-  const metrics = metricsQuery.data ?? EMPTY_METRICS;
+  const summary = alertsQuery.data;
   const profile = profileQuery.data ?? null;
+
+  // Solo se renderizan las alertas cuya sección devolvió el backend; una
+  // sección ausente significa que el rol no tiene el módulo correspondiente.
+  // Las tarjetas cuya ruta destino está en la guarda de administrador se
+  // ocultan a un rol no administrador para no ofrecer un enlace rechazado.
+  const alerts = summary
+    ? ALERT_DEFINITIONS.map((alert) => ({
+        alert,
+        count: alert.count(summary),
+      })).filter(
+        (entry): entry is { alert: AlertDefinition; count: bigint } =>
+          entry.count !== undefined && (isAdmin || !entry.alert.adminOnly),
+      )
+    : [];
+
+  // La alerta abierta se resuelve contra las alertas visibles para el rol: si
+  // el rol no tiene la sección, no se abre aunque el estado la conserve.
+  const openAlert = openAlertKey
+    ? (alerts.find((entry) => entry.alert.key === openAlertKey)?.alert ?? null)
+    : null;
+  const openCount = openAlertKey
+    ? (alerts.find((entry) => entry.alert.key === openAlertKey)?.count ?? 0n)
+    : 0n;
+  const openRecords =
+    openAlert && summary ? buildRecords(openAlert.key, summary) : [];
+  const openMessage = openAlert
+    ? openAlert.message
+      ? openAlert.message(openCount)
+      : alertMessage(openCount)
+    : "";
 
   // "Actualizar" and "Reintentar" must always hit the backend, so the cached
   // freshness window is bypassed explicitly instead of relying on staleTime.
@@ -792,7 +644,7 @@ export function DashboardPage() {
     if (canCompany) {
       void profileQuery.refetch({ cancelRefetch: true });
     }
-    void metricsQuery.refetch({ cancelRefetch: true });
+    void alertsQuery.refetch({ cancelRefetch: true });
   };
 
   return (
@@ -806,7 +658,7 @@ export function DashboardPage() {
             Panel de operación
           </h1>
           <p className="max-w-2xl text-sm text-muted-foreground">
-            Identidad del taller y accesos directos a cada flujo de trabajo.
+            Identidad del taller y alertas de trabajo pendiente por módulo.
           </p>
         </div>
         <Button
@@ -860,25 +712,64 @@ export function DashboardPage() {
           {!isRoleLoading && !isAdmin ? <MechanicNotice /> : null}
 
           {showSkeleton ? (
-            <FlowSkeleton />
-          ) : (
+            <AlertGridSkeleton />
+          ) : alerts.length === 0 ? (
             <div
-              data-ocid="dashboard.flows.section"
-              className="space-y-4"
-              aria-label="Accesos directos por flujo"
+              data-ocid="dashboard.alerts.empty_state"
+              className="flex flex-col items-center gap-2 rounded-lg border border-border bg-card px-6 py-12 text-center"
             >
-              {FLOW_GROUPS.map((group) => (
-                <FlowGroupSection
-                  key={group.id}
-                  group={group}
-                  metrics={metrics}
-                  modules={modules}
-                />
-              ))}
+              <Boxes
+                className="size-5 text-muted-foreground"
+                aria-hidden="true"
+              />
+              <p className="text-sm font-medium">Sin alertas disponibles</p>
+              <p className="text-xs text-muted-foreground">
+                Tu rol no tiene módulos con alertas configuradas.
+              </p>
             </div>
+          ) : (
+            <section
+              data-ocid="dashboard.alerts.section"
+              aria-label="Alertas de trabajo pendiente"
+            >
+              <div className="alert-grid">
+                {alerts.map(({ alert, count }, index) => (
+                  <AlertCard
+                    key={alert.key}
+                    alert={alert}
+                    count={count}
+                    index={index}
+                    onOpen={(trigger) => {
+                      alertTriggerRef.current = trigger;
+                      setOpenAlertKey(alert.key);
+                    }}
+                  />
+                ))}
+              </div>
+            </section>
           )}
         </>
       )}
+
+      <AlertListDialog
+        title={openAlert?.title ?? null}
+        message={openMessage}
+        count={openCount}
+        icon={openAlert?.icon ?? Boxes}
+        records={openRecords}
+        moduleTo={openAlert?.to ?? "/"}
+        moduleLabel={openAlert?.moduleLabel ?? ""}
+        isLoading={showSkeleton}
+        onOpenChange={(next) => {
+          if (!next) setOpenAlertKey(null);
+        }}
+        onCloseAutoFocus={(event) => {
+          // Radix enfocaría <body> al no existir `DialogTrigger`; se evita y se
+          // devuelve el foco a la tarjeta que abrió el modal.
+          event.preventDefault();
+          alertTriggerRef.current?.focus();
+        }}
+      />
     </div>
   );
 }

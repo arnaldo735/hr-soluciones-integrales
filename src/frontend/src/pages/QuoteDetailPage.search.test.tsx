@@ -20,15 +20,14 @@ import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 /**
- * Coverage for the new-quote pickers' search seam.
+ * Coverage for the new-quote unified search seam.
  *
- * The accepted change makes the pickers stop truncating: the part and service
- * pickers request a page large enough to cover the whole catalog (1000 rows)
- * instead of the old 50/100 caps, and the actor call carries the session token
- * as its leading argument. These tests pin the consumer contract the pickers
- * rely on: the term typed into each search box is debounced and forwarded to
- * the matching backend method with the resolved call shape, and the picker
- * still lists and selects the options the backend returns for that term.
+ * The accepted change replaces the two separate part/service pickers with one
+ * box that queries both catalogs. These tests pin the consumer contract the
+ * unified search relies on: the term typed into the box is debounced and
+ * forwarded to both `listParts` and `listServices` with the resolved call shape
+ * (session token first, whole-catalog page size), and the combined list still
+ * lets a result be selected in one step.
  */
 
 const listCustomersMock = vi.fn();
@@ -68,6 +67,7 @@ vi.mock("@tanstack/react-router", () => ({
   // No id means the "nueva" (new quote) route.
   useParams: () => ({}),
   useNavigate: () => vi.fn(),
+  useSearch: () => ({}),
 }));
 
 vi.mock("sonner", () => ({
@@ -164,7 +164,7 @@ function companyProfile(): CompanyProfile {
   };
 }
 
-describe("QuoteDetailPage new-quote picker search", () => {
+describe("QuoteDetailPage new-quote unified search", () => {
   beforeEach(() => {
     listCustomersMock.mockReset();
     listMotorcyclesMock.mockReset();
@@ -178,13 +178,13 @@ describe("QuoteDetailPage new-quote picker search", () => {
       items: [part()],
       total: 1n,
       offset: 0n,
-      limit: 50n,
+      limit: 1000n,
     });
     listServicesMock.mockResolvedValue({
       items: [service()],
       total: 1n,
       offset: 0n,
-      limit: 100n,
+      limit: 1000n,
     });
     getBusinessSettingsMock.mockResolvedValue(business());
     getCompanyProfileMock.mockResolvedValue(companyProfile());
@@ -209,12 +209,12 @@ describe("QuoteDetailPage new-quote picker search", () => {
     );
   });
 
-  it("forwards the typed part term to the backend", async () => {
+  it("forwards the typed term to both the part and service catalogs", async () => {
     renderWithProviders(<QuoteDetailPage />);
     await screen.findByText("Nueva cotización");
 
     await userEvent.type(
-      screen.getByTestId("quote_detail.part_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "balata",
     );
 
@@ -224,29 +224,17 @@ describe("QuoteDetailPage new-quote picker search", () => {
         { search: "balata" },
         PartSort.name,
         0n,
-        // The picker no longer truncates: it asks for a page large enough to
+        // The search no longer truncates: it asks for a page large enough to
         // cover the whole catalog.
         1000n,
       ),
     );
-  });
-
-  it("forwards the typed service term to the backend", async () => {
-    renderWithProviders(<QuoteDetailPage />);
-    await screen.findByText("Nueva cotización");
-
-    await userEvent.type(
-      screen.getByTestId("quote_detail.service_search_input"),
-      "aceite",
-    );
-
     await waitFor(() =>
       expect(listServicesMock).toHaveBeenLastCalledWith(
         null,
-        expect.objectContaining({ search: "aceite", activeOnly: true }),
+        expect.objectContaining({ search: "balata", activeOnly: true }),
         ServiceSort.name,
         0n,
-        // The picker no longer truncates: it asks for a whole-catalog page.
         1000n,
       ),
     );
@@ -257,26 +245,11 @@ describe("QuoteDetailPage new-quote picker search", () => {
     await screen.findByText("Nueva cotización");
 
     await userEvent.type(
-      screen.getByTestId("quote_detail.part_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "balata",
     );
-    await waitFor(() =>
-      expect(listPartsMock).toHaveBeenLastCalledWith(
-        null,
-        { search: "balata" },
-        PartSort.name,
-        0n,
-        1000n,
-      ),
-    );
-
-    await userEvent.click(screen.getByTestId("quote_detail.add_part_button"));
-    // The line must be activated before a search result can fill it.
     await userEvent.click(
-      screen.getByTestId("quote_detail.part_pick_button.1"),
-    );
-    await userEvent.click(
-      await screen.findByTestId("quote_detail.part_search.item.1"),
+      await screen.findByTestId("quote_detail.item_search.item.1"),
     );
 
     expect(
@@ -285,31 +258,25 @@ describe("QuoteDetailPage new-quote picker search", () => {
   });
 
   it("still lists and selects a service after searching", async () => {
+    // Only the service catalog matches, so the first result is the service.
+    listPartsMock.mockResolvedValue({
+      items: [],
+      total: 0n,
+      offset: 0n,
+      limit: 1000n,
+    });
     renderWithProviders(<QuoteDetailPage />);
     await screen.findByText("Nueva cotización");
 
     await userEvent.type(
-      screen.getByTestId("quote_detail.service_search_input"),
+      screen.getByTestId("quote_detail.item_search_input"),
       "aceite",
     );
-    await waitFor(() =>
-      expect(listServicesMock).toHaveBeenLastCalledWith(
-        null,
-        expect.objectContaining({ search: "aceite" }),
-        ServiceSort.name,
-        0n,
-        1000n,
-      ),
-    );
-
+    // Wait for the service result to render before selecting it, so the click
+    // cannot land on a stale part result from a previous term.
+    await screen.findByText("Cambio de aceite");
     await userEvent.click(
-      screen.getByTestId("quote_detail.add_service_button"),
-    );
-    await userEvent.click(
-      screen.getByTestId("quote_detail.service_pick_button.1"),
-    );
-    await userEvent.click(
-      await screen.findByTestId("quote_detail.service_search.item.1"),
+      screen.getByTestId("quote_detail.item_search.item.1"),
     );
 
     expect(

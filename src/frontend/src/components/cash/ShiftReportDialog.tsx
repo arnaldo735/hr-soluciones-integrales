@@ -58,17 +58,26 @@ function reportDocument(report: DailyShiftReport): {
   footer: string;
 } {
   const shift = report.shift;
-  const lines: DocumentLine[] = report.movements.map((movement) => ({
-    description: `${movementKindLabel(movement.kind)} · ${movement.description}${
-      movement.reference ? ` (${movement.reference})` : ""
-    }`,
-    quantity: 1,
-    unitPrice: Number(movement.amount),
-    amount: Number(movement.amount),
-  }));
+  // `movement.amount` comes from the backend in whole cents; `DocumentLine`
+  // (shared with invoices/quotes) expects unitPrice/amount in pesos, and
+  // `DocumentPreview` rescales them back to cents. Convert here so the ×100
+  // rescale in the preview lands on the real amount.
+  const lines: DocumentLine[] = report.movements.map((movement) => {
+    const amountInPesos = Number(movement.amount) / 100;
+    return {
+      description: `${movementKindLabel(movement.kind)} · ${movement.description}${
+        movement.reference ? ` (${movement.reference})` : ""
+      }`,
+      quantity: 1,
+      unitPrice: amountInPesos,
+      amount: amountInPesos,
+    };
+  });
 
   const meta: DocumentMeta[] = [
     { label: "Turno", value: `#${shift.id.toString()}`, rail: true },
+    { label: "Caja o banco", value: report.registerName || "—" },
+    { label: "Responsable", value: report.responsibleName || "—" },
     { label: "Apertura", value: formatDateTime(shift.openedAt) },
     {
       label: "Cierre",
@@ -332,6 +341,11 @@ export function ShiftReportDialog({
             Informe diario del turno
           </DialogTitle>
           <DialogDescription>
+            {report
+              ? `${report.registerName || "Caja o banco"} · Responsable ${
+                  report.responsibleName || "—"
+                }. `
+              : ""}
             Todos los movimientos del turno, totales por medio de pago y saldos
             finales. Imprimible en hoja A4 o tirilla de 80 mm.
           </DialogDescription>

@@ -74,6 +74,10 @@ module {
     taxRate : TaxRate;
     tax : Money;
     total : Money;
+    // Anticipo aplicado desde la orden de taller, en centavos enteros. `null`
+    // cuando la factura no proviene de una OT con anticipo. El saldo a cobrar
+    // es `total - advanceApplied`.
+    advanceApplied : ?Money;
     paymentMethod : PaymentMethod;
     paymentCondition : PaymentCondition;
     paymentStatus : PaymentStatus;
@@ -107,5 +111,11 @@ module {
     // La factura no se puede eliminar porque ya tiene pagos o abonos
     // registrados, o porque ya está pagada.
     #invoiceHasPayments;
+    // El anticipo aplicado supera el total de la factura.
+    #advanceExceedsTotal : { advance : Money; total : Money };
+    // La orden ya está facturada y no admite cambios de anticipo.
+    #orderAlreadyInvoiced : Id;
+    // El medio de pago del anticipo no es efectivo ni transferencia.
+    #invalidAdvanceMethod;
   };
 };

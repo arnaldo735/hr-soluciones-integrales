@@ -150,6 +150,7 @@ export interface CashMovementFilter {
     from?: Timestamp;
     kind?: CashMovementKind;
     account?: CashAccount;
+    registerId?: Id;
     shiftId?: Id;
 }
 export interface CashMovementInput {
@@ -160,12 +161,38 @@ export interface CashMovementInput {
     description: string;
     account: CashAccount;
     amount: Money;
+    shiftId?: Id;
 }
 export interface CashMovementPage {
     total: bigint;
     offset: bigint;
     limit: bigint;
     items: Array<CashMovement>;
+}
+export interface CashRegister {
+    id: Id;
+    active: boolean;
+    kind: CashRegisterKind;
+    name: string;
+    createdAt: Timestamp;
+    updatedAt: Timestamp;
+    openingBalance: Money;
+}
+export interface CashRegisterFilter {
+    active?: boolean;
+    kind?: CashRegisterKind;
+    search?: string;
+}
+export interface CashRegisterInput {
+    kind: CashRegisterKind;
+    name: string;
+    openingBalance: Money;
+}
+export interface CashRegisterPage {
+    total: bigint;
+    offset: bigint;
+    limit: bigint;
+    items: Array<CashRegister>;
 }
 export interface CategoryBreakdown {
     total: Money;
@@ -357,12 +384,26 @@ export interface DailyShiftReport {
     movements: Array<CashMovement>;
     bankIncome: Money;
     totalIncome: Money;
+    responsibleName: string;
     byPaymentMethod: Array<PaymentMethodTotal>;
     shift: Shift;
     cashExpense: Money;
     cashIncome: Money;
     bankExpense: Money;
+    registerName: string;
     totalExpense: Money;
+}
+export interface DashboardAlertsSummary {
+    overdueInstallments?: ReminderSection_7;
+    payables?: ReminderSection_2;
+    generatedAt: Timestamp;
+    unapprovedOrders?: ReminderSection_5;
+    appointments?: ReminderSection;
+    finishedOrders?: ReminderSection_1;
+    supplierOrders?: ReminderSection_8;
+    receivables?: ReminderSection_4;
+    lowStockParts?: ReminderSection_6;
+    pendingQuotes?: ReminderSection_3;
 }
 export interface DashboardSummary {
     pendingPayablesTotal: Money;
@@ -614,6 +655,7 @@ export interface Invoice {
     id: Id;
     tax: Money;
     customerName: string;
+    advanceApplied?: Money;
     total: Money;
     paymentStatus: PaymentStatus;
     posSaleId?: Id;
@@ -819,21 +861,55 @@ export interface Movement {
     unitCost?: Money;
     reason?: string;
 }
+export interface OilChangeIntervalInput {
+    oilChangeInterval?: bigint;
+}
 export interface OpenShiftInput {
+    responsibleUserId?: Id;
     openingBank: Money;
     openingCash: Money;
+    responsibleName: string;
     notes?: string;
+    registerId: Id;
+}
+export interface OrderAdvance {
+    method: PaymentMethod;
+    registeredAt: Timestamp;
+    registeredBy: Principal;
+    amount: Money;
+}
+export interface OrderAdvanceInput {
+    method: PaymentMethod;
+    amount: Money;
+}
+export interface OrderAdvanceReceipt {
+    customerName: string;
+    total: Money;
+    motorcycleModel: string;
+    balance: Money;
+    payments: Array<OrderPayment>;
+    orderId: Id;
+    issuedAt: Timestamp;
+    motorcycleBrand: string;
+    paidAmount: Money;
+    motorcyclePlate: string;
+    customerDocument?: string;
+    orderNumber: string;
+    advance?: OrderAdvance;
 }
 export interface OrderFilter {
     status?: OrderStatus;
     search?: string;
 }
 export interface OrderInput {
+    oilChangeInterval?: bigint;
     motorcycleId: Id;
     customerId: Id;
     intakeMileage: bigint;
     technicianIds: Array<Id>;
+    advance?: OrderAdvanceInput;
     problem: string;
+    previousMileage?: bigint;
 }
 export interface OrderPage {
     total: bigint;
@@ -855,6 +931,19 @@ export interface OrderPartInput {
     quantity: bigint;
     partId: Id;
 }
+export interface OrderPayment {
+    id: Id;
+    method: PaymentMethod;
+    note?: string;
+    registeredAt: Timestamp;
+    registeredBy: Principal;
+    amount: Money;
+}
+export interface OrderPaymentInput {
+    method: PaymentMethod;
+    note?: string;
+    amount: Money;
+}
 export interface OrderPhoto {
     id: Id;
     blob: ExternalBlob;
@@ -875,8 +964,10 @@ export interface OrderStatusCount {
 export interface OrderTotals {
     tax: Money;
     total: Money;
+    balance: Money;
     partsSubtotal: Money;
     laborSubtotal: Money;
+    paidAmount: Money;
     taxRate: TaxRate;
     subtotal: Money;
 }
@@ -1105,7 +1196,7 @@ export interface Quote {
     updatedAt: Timestamp;
     notes?: string;
     discount: Money;
-    motorcycleId: Id;
+    motorcycleId?: Id;
     customerId: Id;
     partLines: Array<QuotePartLine>;
     taxRate: TaxRate;
@@ -1118,7 +1209,7 @@ export interface QuoteInput {
     serviceLines: Array<QuoteServiceLineInput>;
     notes?: string;
     discount: Money;
-    motorcycleId: Id;
+    motorcycleId?: Id;
     customerId: Id;
     partLines: Array<QuotePartLineInput>;
 }
@@ -1217,11 +1308,26 @@ export interface ReminderFinishedOrder {
     orderNumber: string;
     daysInWorkshop: bigint;
 }
+export interface ReminderLowStockPart {
+    id: Id;
+    sku: string;
+    lowStockThreshold: bigint;
+    name: string;
+    totalStock: bigint;
+}
 export interface ReminderOrder {
     id: Id;
     customerName: string;
     plate: string;
     orderNumber: string;
+}
+export interface ReminderOverdueInstallment {
+    customerName: string;
+    installmentNumber: bigint;
+    dueDate: Timestamp;
+    invoiceId: Id;
+    invoiceNumber: string;
+    amount: Money;
 }
 export interface ReminderPayable {
     status: string;
@@ -1268,6 +1374,27 @@ export interface ReminderSection_4 {
 export interface ReminderSection_5 {
     count: bigint;
     items: Array<ReminderOrder>;
+}
+export interface ReminderSection_6 {
+    count: bigint;
+    items: Array<ReminderLowStockPart>;
+}
+export interface ReminderSection_7 {
+    count: bigint;
+    items: Array<ReminderOverdueInstallment>;
+}
+export interface ReminderSection_8 {
+    count: bigint;
+    items: Array<ReminderSupplierOrder>;
+}
+export interface ReminderSupplierOrder {
+    id: Id;
+    sku: string;
+    supplierName: string;
+    createdAt: Timestamp;
+    description: string;
+    quantity: bigint;
+    supplierId: Id;
 }
 export interface RemindersSummary {
     payables?: ReminderSection_2;
@@ -1440,13 +1567,19 @@ export interface SessionInfo {
     roleId: Id;
     modules: Array<ModuleKey>;
 }
+export interface SetOrderAdvanceInput {
+    method?: PaymentMethod;
+    amount?: Money;
+}
 export interface Shift {
     id: Id;
+    responsibleUserId?: Id;
     status: ShiftStatus;
     openingBank: Money;
     openingCash: Money;
     differenceBank: bigint;
     differenceCash: bigint;
+    responsibleName: string;
     closedAt?: Timestamp;
     closedBy?: Principal;
     notes?: string;
@@ -1454,6 +1587,7 @@ export interface Shift {
     declaredClosingCash?: Money;
     computedClosingBank: Money;
     computedClosingCash: Money;
+    registerId: Id;
     openedAt: Timestamp;
     openedBy: Principal;
 }
@@ -1461,6 +1595,8 @@ export interface ShiftFilter {
     to?: Timestamp;
     status?: ShiftStatus;
     from?: Timestamp;
+    responsible?: string;
+    registerId?: Id;
 }
 export interface ShiftPage {
     total: bigint;
@@ -1650,10 +1786,12 @@ export interface WhatsAppMessageResult {
 export interface WorkshopOrder {
     id: Id;
     status: OrderStatus;
+    payments: Array<OrderPayment>;
     createdAt: Timestamp;
     statusHistory: Array<StatusChange>;
     labor: Array<LaborItem>;
     cancelledAt?: Timestamp;
+    oilChangeInterval?: bigint;
     updatedAt: Timestamp;
     motorcycleId: Id;
     customerId: Id;
@@ -1662,8 +1800,10 @@ export interface WorkshopOrder {
     intakeMileage: bigint;
     technicianIds: Array<Id>;
     orderNumber: string;
+    advance?: OrderAdvance;
     problem: string;
     photos: Array<OrderPhoto>;
+    previousMileage?: bigint;
 }
 export interface ZeroInventoryResult {
     affected: bigint;
@@ -1698,7 +1838,12 @@ export enum CashMovementSource {
     commission = "commission",
     receivable = "receivable",
     manual = "manual",
-    purchase = "purchase"
+    purchase = "purchase",
+    advance = "advance"
+}
+export enum CashRegisterKind {
+    bank = "bank",
+    cash = "cash"
 }
 export enum CustomerSort {
     name = "name",
@@ -1876,6 +2021,7 @@ export enum WhatsAppContext {
 export interface backendInterface {
     addLabor(token: string | null, id: Id, input: LaborInput): Promise<OrderView>;
     addOrderPart(token: string | null, id: Id, input: OrderPartInput): Promise<OrderView>;
+    addOrderPayment(token: string | null, id: Id, input: OrderPaymentInput): Promise<OrderView>;
     addOrderPhoto(token: string | null, id: Id, input: OrderPhotoInput): Promise<OrderView>;
     adjustStock(token: string | null, input: AdjustmentInput): Promise<Movement>;
     assignCallerUserRole(user: Principal, role: UserRole): Promise<void>;
@@ -1902,6 +2048,7 @@ export interface backendInterface {
      * / Genera el respaldo y lo sube al Drive del administrador.
      */
     createBackup(token: string | null): Promise<BackupOutcome>;
+    createCashRegister(token: string | null, input: CashRegisterInput): Promise<CashRegister>;
     createCustomer(token: string | null, input: CustomerInput): Promise<Customer>;
     createExpense(token: string | null, input: ExpenseInput): Promise<Expense>;
     createExpenseCategory(token: string | null, input: ExpenseCategoryInput): Promise<ExpenseCategory>;
@@ -1924,6 +2071,7 @@ export interface backendInterface {
     createTechnicianLoan(token: string | null, input: TechnicianLoanInput): Promise<TechnicianLoan>;
     createUser(token: string | null, username: string, name: string, roleId: Id, temporaryPassword: string): Promise<UserListItem>;
     deleteAppointment(token: string | null, id: Id): Promise<boolean>;
+    deleteCashRegister(token: string | null, id: Id): Promise<void>;
     deleteExpense(token: string | null, id: Id): Promise<boolean>;
     deleteExpenseCategory(token: string | null, id: Id): Promise<boolean>;
     deleteInvoice(token: string | null, id: Id): Promise<boolean>;
@@ -1971,6 +2119,7 @@ export interface backendInterface {
     getBusinessSettings(token: string | null): Promise<BusinessSettings>;
     getCallerUserProfile(): Promise<UserProfile | null>;
     getCallerUserRole(): Promise<UserRole>;
+    getCashRegister(token: string | null, id: Id): Promise<CashRegister | null>;
     getCommissionPayment(token: string | null, id: Id): Promise<CommissionPayment | null>;
     getCommissionReport(token: string | null, period: CommissionPeriod): Promise<CommissionReport>;
     getCompanyProfile(token: string | null): Promise<CompanyProfile>;
@@ -1978,6 +2127,7 @@ export interface backendInterface {
     getCustomerDetail(token: string | null, id: Id): Promise<CustomerDetail | null>;
     getDailyHopeMessage(): Promise<HopeMessage>;
     getDailyShiftReport(token: string | null, shiftId: Id): Promise<DailyShiftReport>;
+    getDashboardAlerts(token: string | null): Promise<DashboardAlertsSummary>;
     getDashboardSummary(token: string | null): Promise<DashboardSummary>;
     /**
      * / Estado de la conexión con Google Drive del administrador. Es tolerante a
@@ -2003,8 +2153,9 @@ export interface backendInterface {
      * / cada valor se obtiene con `getBackupSection(index, offset, limit)`.
      */
     getLocalBackupManifest(token: string | null): Promise<LocalBackupManifest>;
-    getOpenShift(token: string | null): Promise<Shift | null>;
+    getOpenShift(token: string | null, registerId: Id): Promise<Shift | null>;
     getOrder(token: string | null, id: Id): Promise<OrderView | null>;
+    getOrderAdvanceReceipt(token: string | null, id: Id): Promise<OrderAdvanceReceipt>;
     getPart(token: string | null, id: Id): Promise<PartView | null>;
     getPayable(token: string | null, supplierId: Id): Promise<Payable | null>;
     getPosSale(token: string | null, id: Id): Promise<PosSale | null>;
@@ -2031,6 +2182,7 @@ export interface backendInterface {
      */
     listBackups(token: string | null): Promise<BackupListOutcome>;
     listCashMovements(token: string | null, filter: CashMovementFilter, offset: bigint, limit: bigint): Promise<CashMovementPage>;
+    listCashRegisters(token: string | null, filter: CashRegisterFilter, offset: bigint, limit: bigint): Promise<CashRegisterPage>;
     listCommissionLines(token: string | null, technicianId: Id | null, period: CommissionPeriod): Promise<Array<CommissionLine>>;
     listCommissionPayments(token: string | null, filter: CommissionPaymentFilter): Promise<Array<CommissionPayment>>;
     listCustomers(token: string | null, search: string | null): Promise<Array<Customer>>;
@@ -2046,6 +2198,8 @@ export interface backendInterface {
     listMotorcyclesPage(token: string | null, filter: MotorcycleFilter, sort: MotorcycleSort, offset: bigint, limit: bigint): Promise<MotorcyclePage>;
     listMotorcyclesPageDir(token: string | null, filter: MotorcycleFilter, sort: MotorcycleSort, descending: boolean, offset: bigint, limit: bigint): Promise<MotorcyclePage>;
     listMovements(token: string | null, partId: Id): Promise<Array<Movement>>;
+    listOpenShifts(token: string | null): Promise<Array<Shift>>;
+    listOrderPayments(token: string | null, id: Id): Promise<Array<OrderPayment>>;
     listOrders(token: string | null, filter: OrderFilter, offset: bigint, limit: bigint): Promise<OrderPage>;
     listPartFacets(token: string | null): Promise<PartFacets>;
     listParts(token: string | null, filter: PartFilter, sort: PartSort, offset: bigint, limit: bigint): Promise<PartPage>;
@@ -2097,6 +2251,9 @@ export interface backendInterface {
     runPurchaseInvoiceExtraction(token: string | null, invoiceId: Id): Promise<PurchaseInvoice>;
     saveCallerUserProfile(name: string): Promise<UserProfile>;
     schema(): Promise<string>;
+    setCashRegisterActive(token: string | null, id: Id, active: boolean): Promise<CashRegister>;
+    setOrderAdvance(token: string | null, id: Id, input: SetOrderAdvanceInput): Promise<OrderView>;
+    setShiftResponsible(token: string | null, id: Id, responsibleName: string, responsibleUserId: Id | null): Promise<Shift>;
     setUserActive(token: string | null, userId: Id, active: boolean): Promise<UserListItem>;
     /**
      * / Inicia la autorización OAuth (PKCE) de la cuenta propia del
@@ -2109,6 +2266,7 @@ export interface backendInterface {
     updateAppointmentStatus(token: string | null, id: Id, status: AppointmentStatus): Promise<Appointment>;
     updateBusinessSettings(token: string | null, settings: BusinessSettings): Promise<BusinessSettings>;
     updateCallerName(token: string, name: string): Promise<SessionInfo>;
+    updateCashRegister(token: string | null, id: Id, input: CashRegisterInput): Promise<CashRegister>;
     updateCompanyProfile(token: string | null, input: CompanyProfileRawInput): Promise<CompanyProfile>;
     updateCustomer(token: string | null, id: Id, input: CustomerInput): Promise<Customer>;
     updateExpense(token: string | null, id: Id, input: ExpenseInput): Promise<Expense>;
@@ -2116,6 +2274,7 @@ export interface backendInterface {
     updateHopeSettings(token: string | null, input: HopeSettingsRawInput): Promise<HopeSettings>;
     updateLaborTechnician(token: string | null, id: Id, laborId: Id, technicianId: Id | null): Promise<OrderView>;
     updateMotorcycle(token: string | null, id: Id, input: MotorcycleInput): Promise<Motorcycle>;
+    updateOilChangeInterval(token: string | null, id: Id, input: OilChangeIntervalInput): Promise<OrderView>;
     updateOrderStatus(token: string | null, id: Id, status: OrderStatus): Promise<OrderView>;
     updatePart(token: string | null, id: Id, input: PartInput): Promise<PartView>;
     updatePurchaseInvoiceReview(token: string | null, invoiceId: Id, input: InvoiceReviewInput): Promise<PurchaseInvoice>;

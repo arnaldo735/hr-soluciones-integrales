@@ -44,7 +44,7 @@ import {
   RotateCcw,
   Search,
 } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 
 const PAGE_SIZE = 20;
@@ -206,12 +206,62 @@ export function QuotesPage() {
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
   const hasFilters = search.q !== "" || search.estado !== "";
 
+  // A factura de origen cotización no conserva el id de su cotización, así que
+  // su buscador de ítems envía el repuesto/servicio y la cantidad elegidos como
+  // query params. Aquí se retoma la cotización en borrador del usuario y se
+  // abre su edición transportando esos params para anexar la línea de primera.
+  const addPartId = rawSearch.addPartId;
+  const addServiceId = rawSearch.addServiceId;
+  const addQuantity = rawSearch.addQuantity;
+  const addAppliedRef = useRef(false);
+
+  useEffect(() => {
+    if (addAppliedRef.current) return;
+    if (addPartId === undefined && addServiceId === undefined) return;
+    if (quotesQuery.isLoading) return;
+
+    addAppliedRef.current = true;
+    const draft = items.find(
+      (view) => view.quote.status === QuoteStatusEnum.draft,
+    );
+
+    if (draft) {
+      void navigate({
+        to: "/cotizaciones/$id",
+        params: { id: draft.quote.id.toString() },
+        search: {
+          addPartId: typeof addPartId === "string" ? addPartId : undefined,
+          addServiceId:
+            typeof addServiceId === "string" ? addServiceId : undefined,
+          addQuantity:
+            typeof addQuantity === "string" ? addQuantity : undefined,
+        },
+      });
+      return;
+    }
+
+    toast.error(
+      "Abre una cotización en borrador para anexar el ítem. La factura emitida no se modifica.",
+    );
+    void navigate({ to: "/cotizaciones", search: {}, replace: true });
+  }, [
+    addPartId,
+    addServiceId,
+    addQuantity,
+    items,
+    quotesQuery.isLoading,
+    navigate,
+  ]);
+
   const customerIds = useMemo(
     () => items.map((view) => view.quote.customerId),
     [items],
   );
   const motorcycleIds = useMemo(
-    () => items.map((view) => view.quote.motorcycleId),
+    () =>
+      items
+        .map((view) => view.quote.motorcycleId)
+        .filter((id): id is Id => id !== undefined),
     [items],
   );
   const lookupsQuery = useQuoteLookups(customerIds, motorcycleIds);
@@ -282,12 +332,17 @@ export function QuotesPage() {
     {
       key: "motorcycle",
       header: "Moto",
-      render: (view) => (
-        <span className="data-rail text-muted-foreground">
-          {motorcyclePlates?.get(view.quote.motorcycleId.toString()) ??
-            `#${view.quote.motorcycleId.toString()}`}
-        </span>
-      ),
+      render: (view) => {
+        const motorcycleId = view.quote.motorcycleId;
+        return (
+          <span className="data-rail text-muted-foreground">
+            {motorcycleId === undefined
+              ? "—"
+              : (motorcyclePlates?.get(motorcycleId.toString()) ??
+                `#${motorcycleId.toString()}`)}
+          </span>
+        );
+      },
     },
     {
       key: "date",

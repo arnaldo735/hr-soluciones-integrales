@@ -83,7 +83,12 @@ function chunk(
 function mockSections(values: Record<string, unknown>) {
   getLocalBackupManifestMock.mockResolvedValue(manifest());
   getBackupSectionMock.mockImplementation(
-    async (index: bigint, _offset: bigint, _limit: bigint) => {
+    async (
+      _token: string | null,
+      index: bigint,
+      _offset: bigint,
+      _limit: bigint,
+    ) => {
       const key = SECTION_KEYS[Number(index)];
       return chunk(Number(index), JSON.stringify(values[key]));
     },
@@ -205,11 +210,12 @@ describe("LocalBackupCard", () => {
         await readBlobText(download.createObjectURL.mock.calls[0][0]),
       ) as Record<string, unknown>;
       // The root object carries exactly the manifest's sections plus the
-      // generation timestamp, so the file keeps the shape `serializeBackup`
-      // produced.
+      // format version and the generation timestamp, so the exported file can
+      // be restored without a validation error.
       expect(Object.keys(parsed).sort()).toEqual(
-        [...SECTION_KEYS, "generatedAt"].sort(),
+        [...SECTION_KEYS, "formatVersion", "generatedAt"].sort(),
       );
+      expect(parsed.formatVersion).toBe(1);
       expect(parsed.generatedAt).toBe(Number(GENERATED_AT));
     } finally {
       download.restore();
@@ -220,7 +226,12 @@ describe("LocalBackupCard", () => {
     getLocalBackupManifestMock.mockResolvedValue(manifest());
     // The customers section arrives in two pages; the rest are single pages.
     getBackupSectionMock.mockImplementation(
-      async (index: bigint, offset: bigint, _limit: bigint) => {
+      async (
+        _token: string | null,
+        index: bigint,
+        offset: bigint,
+        _limit: bigint,
+      ) => {
         const key = SECTION_KEYS[Number(index)];
         if (key === "customers") {
           if (offset === 0n) {
@@ -263,11 +274,13 @@ describe("LocalBackupCard", () => {
       expect(parsed.customers).toEqual([{ id: 1 }, { id: 2 }, { id: 3 }]);
 
       // The second page was requested at the offset the first page reported.
+      // The session token is the first argument, so the section index is the
+      // second and the offset the third.
       const customerCalls = getBackupSectionMock.mock.calls.filter(
-        (call) => call[0] === 0n,
+        (call) => call[1] === 0n,
       );
       expect(customerCalls).toHaveLength(2);
-      expect(customerCalls[1][1]).toBe(2n);
+      expect(customerCalls[1][2]).toBe(2n);
     } finally {
       download.restore();
     }

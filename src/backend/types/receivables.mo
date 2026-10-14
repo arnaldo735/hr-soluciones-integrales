@@ -12,6 +12,9 @@ module {
 
   // Fila de una cuenta por cobrar. Se deriva de una factura a crédito: el
   // saldo pendiente es el total de la factura menos los abonos registrados.
+  // Cuando la factura proviene de una OT con anticipo, el anticipo aplicado
+  // (`Invoice.advanceApplied`) también se descuenta: el saldo por cobrar
+  // excluye el anticipo. `total` conserva el total de la factura.
   public type Receivable = {
     invoiceId : Id;
     invoiceNumber : Text;

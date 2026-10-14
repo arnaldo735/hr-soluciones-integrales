@@ -133,6 +133,7 @@ function orderView(
       problem: "Frenos",
       technicianIds: [],
       photos: [],
+      payments: [],
       ...overrides,
     },
     totals: {
@@ -142,6 +143,8 @@ function orderView(
       laborSubtotal: 0n,
       taxRate: 16n,
       subtotal: 50000n,
+      paidAmount: 0n,
+      balance: 58000n,
     },
   };
 }

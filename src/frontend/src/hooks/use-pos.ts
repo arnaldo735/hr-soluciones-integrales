@@ -1,5 +1,6 @@
 import { useAuth } from "@/hooks/use-auth";
 import { useBackend } from "@/hooks/use-backend";
+import { invalidateCashData } from "@/hooks/use-cash";
 import type {
   Id,
   PartView,
@@ -100,6 +101,9 @@ export function useCreatePosSale() {
       // sale is registered.
       void queryClient.invalidateQueries({ queryKey: ["parts"] });
       void queryClient.invalidateQueries({ queryKey: ["invoices"] });
+      // A cash sale writes a movement into the Caja y Bancos ledger, so the
+      // balances, movements and accounting surfaces must refetch.
+      invalidateCashData(queryClient);
     },
   });
 }
